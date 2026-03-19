@@ -132,10 +132,10 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
             <div>
               <div className="flex items-center gap-2">
                 <span className={`text-xs font-semibold uppercase tracking-[0.3em] ${PRESET_SCENE.accent}`}>
-                  预设场景
+                  {t('scene.preset_label')}
                 </span>
                 <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
-                  ✓ 推荐
+                  {t('scene.preset_badge')}
                 </span>
               </div>
               <h3 className="mt-2 text-xl font-bold text-white">{PRESET_SCENE.name}</h3>
@@ -153,11 +153,11 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
           <div className="mt-5 flex items-center gap-4">
             <div className="flex items-center gap-1.5 text-xs text-slate-300">
               <span className="text-base">👥</span>
-              <span><span className="font-bold text-white">{PRESET_SCENE.residents}</span> 位居民</span>
+              <span><span className="font-bold text-white">{PRESET_SCENE.residents}</span> {t('scene.residents')}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-slate-300">
               <span className="text-base">🏘️</span>
-              <span><span className="font-bold text-white">{PRESET_SCENE.buildings}</span> 栋建筑</span>
+              <span><span className="font-bold text-white">{PRESET_SCENE.buildings}</span> {t('scene.buildings')}</span>
             </div>
           </div>
 
@@ -179,12 +179,12 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
           <span className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
             自定义场景
           </span>
-          <h3 className="mt-2 text-lg font-bold text-white">描述你的小镇</h3>
+          <h3 className="mt-2 text-lg font-bold text-white">{t('scene.custom_title')}</h3>
 
           <textarea
             className="mt-3 w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-3 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-violet-400/50 focus:ring-1 focus:ring-violet-400/30"
             rows={3}
-            placeholder="例如：一个海边渔村，住着6个渔民，有码头和渔市…"
+            placeholder={t('scene.custom_placeholder')}
             value={customDesc}
             onChange={(e) => {
               setCustomDesc(e.target.value)
@@ -201,10 +201,10 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
             {customGenerating ? (
               <>
                 <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-transparent" />
-                AI 生成中…
+                {t('scene.generating')}
               </>
             ) : (
-              '✦ 生成场景'
+              t('scene.generate')
             )}
           </button>
 
@@ -217,8 +217,8 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
             <div className="mt-4 rounded-xl border border-white/8 bg-slate-900/40 p-4">
               <p className="text-sm font-bold text-white">{generatedScenario.name}</p>
               <div className="mt-2 flex gap-4 text-xs text-slate-400">
-                <span>👥 <span className="font-semibold text-slate-200">{generatedScenario.residents.length}</span> 位居民</span>
-                <span>🏘️ <span className="font-semibold text-slate-200">{generatedScenario.buildings.length}</span> 栋建筑</span>
+                <span>👥 <span className="font-semibold text-slate-200">{generatedScenario.residents.length}</span> {t('scene.residents')}</span>
+                <span>🏘️ <span className="font-semibold text-slate-200">{generatedScenario.buildings.length}</span> {t('scene.buildings')}</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {generatedScenario.residents.slice(0, 8).map((r) => (
@@ -238,10 +238,10 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
                 {customStarting ? (
                   <>
                     <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    启动中…
+                    {t('scene.starting')}
                   </>
                 ) : (
-                  '使用此场景 →'
+                  t('scene.use_scene')
                 )}
               </button>
             </div>
@@ -267,11 +267,11 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
             {loading ? (
               <>
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                正在启动…
+                {t('scene.entering')}
               </>
             ) : (
               <>
-                进入小镇
+                {t('scene.enter')}
                 <svg className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>

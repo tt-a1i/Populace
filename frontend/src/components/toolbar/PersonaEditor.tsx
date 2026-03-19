@@ -17,7 +17,6 @@ export function PersonaEditor() {
   const [goals, setGoals] = useState('想搞清楚湖边的传闻, 今晚想约朋友散步')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [loadFailed, setLoadFailed] = useState(false)
 
   const selectedResident = useMemo(
     () => residents.find((resident) => resident.id === residentId) ?? residents[0],
@@ -29,7 +28,6 @@ export function PersonaEditor() {
 
     const loadResidents = async () => {
       setLoading(true)
-      setLoadFailed(false)
 
       try {
         const nextResidents = await getResidents() as ApiResident[]
@@ -43,10 +41,9 @@ export function PersonaEditor() {
         if (!active) {
           return
         }
-
+        
         setResidents([])
         setResidentId('')
-        setLoadFailed(true)
       } finally {
         if (active) {
           setLoading(false)
@@ -118,7 +115,7 @@ export function PersonaEditor() {
           <h3 className="mt-2 font-display text-2xl text-white">{t('persona.title')}</h3>
         </div>
         <p className="text-sm leading-6 text-slate-300">
-          {loadFailed ? t('persona.load_failed') : t('persona.loading')}
+          {t('persona.load_failed')}
         </p>
       </div>
     )

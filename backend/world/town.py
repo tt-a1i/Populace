@@ -146,6 +146,7 @@ def load_scenario(
             hair_style=appearance["hair_style"],
             hair_color=appearance["hair_color"],
             outfit_color=appearance["outfit_color"],
+            home_building_id=home_id,
         )
         agent = GenerativeAgent(resident)
         world.add_agent(agent)
@@ -225,6 +226,7 @@ def load_scenario_from_dict(
             hair_style=appearance["hair_style"],
             hair_color=appearance["hair_color"],
             outfit_color=appearance["outfit_color"],
+            home_building_id=home_id,
         )
         agent = GenerativeAgent(resident)
         world.add_agent(agent)

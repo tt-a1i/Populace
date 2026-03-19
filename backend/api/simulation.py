@@ -227,6 +227,11 @@ class SimulationState:
                 mood=res_data.get("mood", "neutral"),
                 location=res_data.get("location"),
                 x=res_data.get("x", 0), y=res_data.get("y", 0),
+                home_building_id=res_data.get("home_building_id"),
+                skin_color=res_data.get("skin_color"),
+                hair_style=res_data.get("hair_style"),
+                hair_color=res_data.get("hair_color"),
+                outfit_color=res_data.get("outfit_color"),
             )
             agent = GenerativeAgent(resident)
 
@@ -372,16 +377,12 @@ class SimulationState:
 
             # Weather behaviour modifiers (spec §14)
             if weather is WeatherType.stormy and random.random() < 0.70:
-                # Stormy: agents flee indoors — redirect to home building
-                home_building = next(
-                    (b for b in self.world.buildings
-                     if b.type == "home"
-                     and any(r.id == agent.resident.id or True for r in [agent.resident])
-                     and agent.resident.location is None),
-                    None,
-                )
-                if home_building is not None:
-                    p = {"action": "move", "target": list(home_building.position)}
+                # Stormy: agents flee to their own home building
+                home_id = agent.resident.home_building_id
+                if home_id and agent.resident.location is None:
+                    home_building = self.world.get_building(home_id)
+                    if home_building is not None:
+                        p = {"action": "move", "target": list(home_building.position)}
 
             return agent, p
 

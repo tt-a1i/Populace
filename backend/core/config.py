@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     # Snapshot settings
     snapshot_interval_ticks: int = Field(default=10)
 
+    # Internationalisation
+    default_language: str = Field(default="zh")
+
 
 settings = Settings()
 

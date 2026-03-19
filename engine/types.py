@@ -44,9 +44,10 @@ class Resident:
     personality: str          # e.g. "外向, 善良, 喜欢八卦"
     goals: List[str] = field(default_factory=list)
     mood: str = "neutral"     # happy | sad | angry | neutral | ...
-    location: Optional[str] = None  # building id, or None if on the map
-    x: int = 0               # tile grid x-coordinate
-    y: int = 0               # tile grid y-coordinate
+    location: Optional[str] = None        # current building id, or None if on the map
+    x: int = 0                            # tile grid x-coordinate
+    y: int = 0                            # tile grid y-coordinate
+    home_building_id: Optional[str] = None  # permanent home (set at load time)
     skin_color: Optional[str] = None
     hair_style: Optional[str] = None
     hair_color: Optional[str] = None

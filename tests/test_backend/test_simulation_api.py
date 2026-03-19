@@ -2,6 +2,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from backend.api.simulation import SimulationState
 from backend.main import app
 
 
@@ -51,3 +52,24 @@ def test_snapshot_contains_residents(client):
     data = response.json()
     assert "residents" in data
     assert len(data["residents"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_save_load_round_trip_preserves_resident_appearance():
+    state = SimulationState()
+    restored_state = SimulationState()
+
+    resident = state.world.agents[0].resident
+    resident.skin_color = "#f2d3b1"
+    resident.hair_style = "ponytail"
+    resident.hair_color = "#5b4636"
+    resident.outfit_color = "#2563eb"
+
+    payload = state.save_state()
+    await restored_state.load_state(payload)
+
+    restored_resident = restored_state.world.agents[0].resident
+    assert restored_resident.skin_color == resident.skin_color
+    assert restored_resident.hair_style == resident.hair_style
+    assert restored_resident.hair_color == resident.hair_color
+    assert restored_resident.outfit_color == resident.outfit_color

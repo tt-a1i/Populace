@@ -12,11 +12,15 @@ vi.mock('../components/toolbar/PersonaEditor', () => ({
 vi.mock('../components/toolbar/SpeedControl', () => ({
   SpeedControl: () => <div data-testid="speed-control">SpeedControl</div>,
 }))
+vi.mock('../components/toolbar/SavesPanel', () => ({
+  SavesPanel: () => <div data-testid="saves-panel">SavesPanel</div>,
+}))
 vi.mock('../components/report', () => ({
   DailyReport: () => <div data-testid="daily-report">DailyReport</div>,
 }))
 vi.mock('../components/ui', () => ({
   MessageBar: () => <div data-testid="message-bar">MessageBar</div>,
+  LanguageSwitcher: () => <button>EN</button>,
 }))
 
 import { Toolbar } from '../components/toolbar/Toolbar'

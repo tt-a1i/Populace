@@ -13,7 +13,7 @@ i18n
       zh: { translation: zh },
       en: { translation: en },
     },
-    lng: (typeof localStorage !== 'undefined' && localStorage.getItem(STORAGE_KEY)) || 'zh',
+    lng: (() => { try { return localStorage?.getItem?.(STORAGE_KEY) || 'zh' } catch { return 'zh' } })(),
     fallbackLng: 'zh',
     interpolation: { escapeValue: false },
   })

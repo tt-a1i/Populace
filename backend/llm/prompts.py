@@ -42,6 +42,7 @@ def build_perceive_prompt(
     resident: Resident,
     nearby_agents: list[Resident],
     recent_events: list[str],
+    lang: str = "zh",
 ) -> list[dict]:
     """Prompt for the Perceive phase: describe observable environment.
 
@@ -49,13 +50,29 @@ def build_perceive_prompt(
         resident:      The acting agent's data.
         nearby_agents: Residents within interaction distance.
         recent_events: Short descriptions of events this tick.
+        lang:          Response language: ``"zh"`` (default) or ``"en"``.
 
     Returns:
         OpenAI messages list.
     """
+    if lang == "en":
+        nearby_str = ", ".join(a.name for a in nearby_agents) if nearby_agents else "no one"
+        events_str = "\n".join(f"- {e}" for e in recent_events) if recent_events else "- none"
+        content = _truncate(
+            f"You are {resident.name}, personality: {resident.personality}, current mood: {resident.mood}.\n"
+            f"You are currently at: {resident.location or 'somewhere in town'}.\n"
+            f"Nearby people: {nearby_str}.\n"
+            f"Recent events:\n{events_str}\n\n"
+            f"Describe in one sentence what you notice (≤50 words).",
+            _CHAR_BUDGET,
+        )
+        return [
+            {"role": "system", "content": "You are an AI resident of a pixel town. Reply briefly in first person."},
+            {"role": "user", "content": content},
+        ]
+
     nearby_str = "、".join(a.name for a in nearby_agents) if nearby_agents else "无人"
     events_str = "\n".join(f"- {e}" for e in recent_events) if recent_events else "- 无"
-
     content = _truncate(
         f"你是{resident.name}，性格：{resident.personality}，当前心情：{resident.mood}。\n"
         f"你现在在：{resident.location or '小镇某处'}。\n"
@@ -74,6 +91,7 @@ def build_plan_prompt(
     resident: Resident,
     memories: list[Memory],
     reflections: list[Reflection],
+    lang: str = "zh",
 ) -> list[dict]:
     """Prompt for the Plan phase: decide next action.
 
@@ -93,6 +111,25 @@ def build_plan_prompt(
         "\n".join(f"- {r.summary}" for r in reflections) if reflections else "（无反思）",
         refl_budget,
     )
+
+    if lang == "en":
+        goals_str = "; ".join(resident.goals) if resident.goals else "no specific goals"
+        refl_str = _truncate(
+            "\n".join(f"- {r.summary}" for r in reflections) if reflections else "(no reflections)",
+            _CHAR_BUDGET // 4,
+        )
+        content = _truncate(
+            f"You are {resident.name}, personality: {resident.personality}, mood: {resident.mood}.\n"
+            f"Goals: {goals_str}.\n\n"
+            f"Relevant memories:\n{_format_memories(memories, _CHAR_BUDGET // 2)}\n\n"
+            f"Recent reflections:\n{refl_str}\n\n"
+            f"What will you do next? Give one concrete action (move/talk/wait), ≤50 words.",
+            _CHAR_BUDGET,
+        )
+        return [
+            {"role": "system", "content": "You are an AI resident of a pixel town. Reply briefly in first person."},
+            {"role": "user", "content": content},
+        ]
 
     goals_str = "；".join(resident.goals) if resident.goals else "无明确目标"
 
@@ -114,6 +151,7 @@ def build_dialogue_prompt(
     speaker: Resident,
     listener: Resident,
     context: str,
+    lang: str = "zh",
 ) -> list[dict]:
     """Prompt for generating one dialogue turn (spec §11: ≤50 tokens).
 
@@ -121,10 +159,24 @@ def build_dialogue_prompt(
         speaker:  The resident who is about to speak.
         listener: The resident being spoken to.
         context:  Recent conversation history or triggering situation.
+        lang:     Response language: ``"zh"`` (default) or ``"en"``.
 
     Returns:
         OpenAI messages list.
     """
+    if lang == "en":
+        content = _truncate(
+            f"You are {speaker.name} (personality: {speaker.personality}, mood: {speaker.mood}),\n"
+            f"talking to {listener.name} (personality: {listener.personality}).\n\n"
+            f"Context: {context}\n\n"
+            f"Generate your next line, ≤20 words, natural spoken style.",
+            _CHAR_BUDGET,
+        )
+        return [
+            {"role": "system", "content": "You are an AI resident of a pixel town. Speak in first person naturally."},
+            {"role": "user", "content": content},
+        ]
+
     content = _truncate(
         f"你是{speaker.name}（性格：{speaker.personality}，心情：{speaker.mood}），\n"
         f"正在和{listener.name}（性格：{listener.personality}）说话。\n\n"
@@ -141,6 +193,7 @@ def build_dialogue_prompt(
 def build_reflect_prompt(
     resident: Resident,
     memories: list[Memory],
+    lang: str = "zh",
 ) -> list[dict]:
     """Prompt for the Reflect phase: synthesise memories into insight.
 
@@ -155,6 +208,18 @@ def build_reflect_prompt(
         OpenAI messages list.
     """
     mem_str = _format_memories(memories, _CHAR_BUDGET - 300)
+
+    if lang == "en":
+        content = _truncate(
+            f"You are {resident.name}, personality: {resident.personality}.\n\n"
+            f"Recent experiences:\n{mem_str}\n\n"
+            f"Summarise the most important insight you gained from these experiences, in one sentence, ≤50 words.",
+            _CHAR_BUDGET,
+        )
+        return [
+            {"role": "system", "content": "You are a thoughtful AI resident who reflects on life experiences."},
+            {"role": "user", "content": content},
+        ]
 
     content = _truncate(
         f"你是{resident.name}，性格：{resident.personality}。\n\n"
