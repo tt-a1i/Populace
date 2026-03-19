@@ -43,6 +43,35 @@ export interface ReportPayload {
   tick: number
 }
 
+export interface ExperimentHotspot {
+  name: string
+  visits: number
+  interaction_score: number
+}
+
+export interface ExperimentReportStats {
+  days: number
+  start_tick: number
+  end_tick: number
+  node_count: number
+  edge_count: number
+  density_start: number
+  density_end: number
+  density_change: number
+  triangle_count: number
+  dominant_mood: string
+  relation_type_distribution: Record<string, number>
+  social_hotspots: ExperimentHotspot[]
+  recorded_ticks: number
+}
+
+export interface ExperimentReportPayload {
+  title: string
+  sections: ReportSection[]
+  stats: ExperimentReportStats
+  generated_at: string
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
@@ -98,6 +127,13 @@ export function generateReport() {
 
 export function getLatestReport() {
   return request<ReportPayload>('/api/report/latest')
+}
+
+export function generateExperimentReport(days: number) {
+  return request<ExperimentReportPayload>('/api/report/experiment', {
+    method: 'POST',
+    body: JSON.stringify({ days }),
+  })
 }
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@ import { EventInjector } from './EventInjector'
 import { PersonaEditor } from './PersonaEditor'
 import { SavesPanel } from './SavesPanel'
 import { SpeedControl } from './SpeedControl'
-import { DailyReport } from '../report'
+import { ReportsPanel } from '../report'
 import { LanguageSwitcher, MessageBar } from '../ui'
 
 type ToolKey = 'event' | 'persona' | 'build' | 'report' | 'saves'
@@ -44,7 +44,7 @@ export function Toolbar() {
         </div>
       )
     }
-    return <DailyReport />
+    return <ReportsPanel />
   }, [activeTool, t])
 
   return (

@@ -28,6 +28,8 @@ class SimulationState:
         self.loop = SimulationLoop(self.world, tick_handler=self._tick)
         self._task: Optional[asyncio.Task[None]] = None
         self._events: list[dict[str, Any]] = []
+        self._experiment_history: list[dict[str, Any]] = []
+        self._max_experiment_history_ticks = max(200, self.world.config.tick_per_day * 30)
         # Dialogue tasks fired in previous ticks; results are harvested each tick
         self._pending_dialogues: list[asyncio.Task] = []
         # frozenset pairs of resident ids that have an in-flight dialogue task
@@ -141,6 +143,8 @@ class SimulationState:
         self.world = load_scenario_from_dict(scenario_data)
         self.loop = SimulationLoop(self.world, tick_handler=self._tick)
         self._task = None
+        self._experiment_history = []
+        self._max_experiment_history_ticks = max(200, self.world.config.tick_per_day * 30)
 
     def save_state(self) -> dict[str, Any]:
         """Serialise the full simulation state to a JSON-compatible dict."""
@@ -280,6 +284,12 @@ class SimulationState:
         clock = SimulationClock(speed=saved_speed if saved_speed in {0.0, 1.0, 2.0, 5.0} else 1.0)
         self.loop = SimulationLoop(self.world, clock=clock, tick_handler=self._tick)
         self._task = None
+        self._experiment_history = []
+        self._max_experiment_history_ticks = max(200, self.world.config.tick_per_day * 30)
+
+        # Resume simulation if it was running when saved
+        if data.get("running", False):
+            await self.start()
 
     def get_status(self) -> dict[str, Any]:
         return {
@@ -532,8 +542,83 @@ class SimulationState:
 
         # --- Redis cache (spec §4.1 + §12) ---
         asyncio.create_task(self._redis_tick(tick_state))
+        self._record_experiment_frame(tick_state)
 
         return tick_state
+
+    def _record_experiment_frame(self, tick_state: Any) -> None:
+        """Capture a compact per-tick summary for longer-horizon experiment reports."""
+        if not hasattr(self, "_experiment_history"):
+            self._experiment_history = []
+        if not hasattr(self, "_max_experiment_history_ticks"):
+            self._max_experiment_history_ticks = 200
+        building_names = {building.id: building.name for building in self.world.buildings}
+        occupancy: dict[str, int] = {}
+        moods: list[dict[str, Any]] = []
+
+        for agent in self.world.agents:
+            resident = agent.resident
+            moods.append(
+                {
+                    "id": resident.id,
+                    "name": resident.name,
+                    "mood": resident.mood,
+                }
+            )
+
+            if resident.location:
+                location_label = building_names.get(resident.location, resident.location)
+            else:
+                location_label = f"街区 {resident.x // 5}-{resident.y // 5}"
+            occupancy[location_label] = occupancy.get(location_label, 0) + 1
+
+        relationships = [
+            {
+                "from_id": relationship.from_id,
+                "to_id": relationship.to_id,
+                "type": relationship.type.value if hasattr(relationship.type, "value") else str(relationship.type),
+                "intensity": relationship.intensity,
+                "reason": relationship.reason,
+            }
+            for relationship in self.world.relationships.values()
+        ]
+
+        relationship_deltas = [
+            {
+                "from_id": delta.from_id,
+                "to_id": delta.to_id,
+                "type": delta.type,
+                "delta": delta.delta,
+            }
+            for delta in getattr(tick_state, "relationships", [])
+        ]
+
+        dialogues = [
+            {
+                "from_id": dialogue.from_id,
+                "to_id": dialogue.to_id,
+                "text": dialogue.text,
+            }
+            for dialogue in getattr(tick_state, "dialogues", [])
+        ]
+
+        events = [event.description for event in getattr(tick_state, "events", [])]
+
+        self._experiment_history.append(
+            {
+                "tick": tick_state.tick,
+                "time": tick_state.time,
+                "events": events,
+                "dialogues": dialogues,
+                "relationship_deltas": relationship_deltas,
+                "relationships": relationships,
+                "moods": moods,
+                "occupancy": occupancy,
+            }
+        )
+
+        if len(self._experiment_history) > self._max_experiment_history_ticks:
+            self._experiment_history = self._experiment_history[-self._max_experiment_history_ticks :]
 
     async def _redis_tick(self, tick_state: Any) -> None:
         """Fire-and-forget Redis updates every tick (non-blocking)."""

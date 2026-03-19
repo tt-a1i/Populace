@@ -16,7 +16,7 @@ vi.mock('../components/toolbar/SavesPanel', () => ({
   SavesPanel: () => <div data-testid="saves-panel">SavesPanel</div>,
 }))
 vi.mock('../components/report', () => ({
-  DailyReport: () => <div data-testid="daily-report">DailyReport</div>,
+  ReportsPanel: () => <div data-testid="reports-panel">ReportsPanel</div>,
 }))
 vi.mock('../components/ui', () => ({
   MessageBar: () => <div data-testid="message-bar">MessageBar</div>,
@@ -58,10 +58,10 @@ describe('Toolbar', () => {
     expect(screen.queryByTestId('event-injector')).not.toBeInTheDocument()
   })
 
-  it('switches to DailyReport panel when 小镇日报 is clicked', async () => {
+  it('switches to ReportsPanel when 小镇日报 is clicked', async () => {
     render(<Toolbar />)
     await userEvent.click(screen.getByRole('button', { name: /小镇日报/ }))
-    expect(screen.getByTestId('daily-report')).toBeInTheDocument()
+    expect(screen.getByTestId('reports-panel')).toBeInTheDocument()
   })
 
   it('displays the active tool name in the status bar', () => {

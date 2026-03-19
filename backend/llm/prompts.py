@@ -328,3 +328,104 @@ def build_report_prompt(
         {"role": "system", "content": "你是像素小镇八卦报编辑，擅长写带戏剧张力的短日报。"},
         {"role": "user", "content": content},
     ]
+
+
+def build_experiment_report_prompt(
+    graph_stats: dict,
+    event_timeline: list[dict],
+    emotion_distribution: dict,
+    social_hotspots: list[dict],
+) -> list[dict]:
+    """Prompt for a structured AI social-simulation experiment report."""
+    timeline_lines = "\n".join(
+        f"- Tick {e.get('tick')} ({e.get('time', '')}): "
+        f"{', '.join(e.get('events', []))} (影响:{e.get('impact_score', 0):.2f})"
+        for e in event_timeline[:6]
+    ) or "- 无重大事件"
+
+    hotspot_lines = "\n".join(
+        f"- {h['name']} 访问 {h['visits']} 次，互动评分 {h.get('interaction_score', 0):.1f}"
+        for h in social_hotspots[:5]
+    ) or "- 无热点数据"
+
+    rel_dist = ", ".join(
+        f"{k}:{v}" for k, v in graph_stats.get("relation_type_distribution", {}).items()
+    )
+    mood_dist = ", ".join(f"{k}:{v}" for k, v in emotion_distribution.items())
+
+    content = _truncate(
+        f"请对以下 AI 社会模拟实验数据进行深度分析，生成结构化报告。\n\n"
+        f"社交网络：节点={graph_stats.get('node_count', 0)}，边={graph_stats.get('edge_count', 0)}，"
+        f"密度={graph_stats.get('density_start', 0):.2f}→{graph_stats.get('density_end', 0):.2f}，"
+        f"三角形={graph_stats.get('triangle_count', 0)}，关系分布：{rel_dist}\n\n"
+        f"情绪分布：{mood_dist}\n\n"
+        f"关键事件时间线：\n{timeline_lines}\n\n"
+        f"社交热点：\n{hotspot_lines}\n\n"
+        "请严格按以下结构输出，每段之间空一行，使用 ## 标题：\n"
+        "## 实验摘要\n## 社交网络分析\n## 关键发现\n## AI 行为观察\n## 伦理思考",
+        _CHAR_BUDGET,
+    )
+    return [
+        {"role": "system", "content": "你是一名研究 AI 社会实验的学术分析师，擅长从模拟数据中提炼社会学洞察。"},
+        {"role": "user", "content": content},
+    ]
+
+
+def build_experiment_report_prompt(
+    graph_stats: dict,
+    event_timeline: list[dict],
+    emotion_distribution: dict,
+    social_hotspots: list[dict],
+) -> list[dict]:
+    graph_summary = _truncate(
+        (
+            f"节点数：{graph_stats.get('node_count', 0)}\n"
+            f"边数：{graph_stats.get('edge_count', 0)}\n"
+            f"网络密度：{graph_stats.get('density_start', 0):.4f} -> {graph_stats.get('density_end', 0):.4f}\n"
+            f"三角关系数：{graph_stats.get('triangle_count', 0)}\n"
+            f"关系类型分布：{graph_stats.get('relation_type_distribution', {})}"
+        ),
+        _CHAR_BUDGET // 4,
+    )
+    timeline_summary = _truncate(
+        "\n".join(
+            f"- Tick {item.get('tick')} @ {item.get('time')}: 事件={item.get('events', [])} | 影响分={item.get('impact_score', 0)}"
+            for item in event_timeline[:8]
+        )
+        or "- 最近窗口内没有高冲击事件。",
+        _CHAR_BUDGET // 4,
+    )
+    emotion_summary = _truncate(str(emotion_distribution or {"neutral": 0}), _CHAR_BUDGET // 8)
+    hotspot_summary = _truncate(
+        "\n".join(
+            f"- {item.get('name')}: visits={item.get('visits')}, interaction_score={item.get('interaction_score')}"
+            for item in social_hotspots[:5]
+        )
+        or "- 暂无明显热点。",
+        _CHAR_BUDGET // 8,
+    )
+
+    content = _truncate(
+        "请基于以下模拟数据生成一份学术风格的 AI 社会实验报告，使用 Markdown 输出。\n\n"
+        f"关系图谱统计：\n{graph_summary}\n\n"
+        f"事件时间线：\n{timeline_summary}\n\n"
+        f"情绪分布：\n{emotion_summary}\n\n"
+        f"社交热点：\n{hotspot_summary}\n\n"
+        "请严格使用以下结构：\n"
+        "# 报告标题\n"
+        "## 实验摘要\n"
+        "## 社交网络分析\n"
+        "## 关键发现\n"
+        "## AI 行为观察\n"
+        "## 伦理思考\n\n"
+        "要求：\n"
+        "- 内容兼具研究摘要与可读性\n"
+        "- 使用 Markdown 段落和项目符号\n"
+        "- 避免输出 JSON\n"
+        "- 明确提到网络密度变化、关系类型分布、关键事件影响、群体行为模式",
+        _CHAR_BUDGET,
+    )
+    return [
+        {"role": "system", "content": "你是一名研究 AI 社会实验的学术分析员，擅长把模拟数据写成结构化 Markdown 报告。"},
+        {"role": "user", "content": content},
+    ]

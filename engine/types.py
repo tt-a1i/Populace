@@ -2,190 +2,200 @@
 
 Matches the Neo4j graph model described in spec §4.5 and
 configuration parameters from spec §16.
+
+When Python starts in the ``engine/`` directory, stdlib imports such as
+``import types`` can accidentally resolve to this file. The top-level shim
+below delegates that case back to the real stdlib ``types`` module so that
+``python -m pip`` and standalone demos keep working from inside ``engine/``.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import List, Optional, Tuple
+if __name__ == "types":
+    import sys
+
+    stdlib_types = (
+        f"{sys.base_prefix}/lib/python{sys.version_info.major}.{sys.version_info.minor}/types.py"
+    )
+    namespace = {
+        "__name__": "types",
+        "__file__": stdlib_types,
+        "__package__": "",
+        "__builtins__": __builtins__,
+    }
+    with open(stdlib_types, "r", encoding="utf-8") as fh:
+        exec(compile(fh.read(), stdlib_types, "exec"), namespace)
+    globals().update(namespace)
+else:
+    from dataclasses import dataclass, field
+    from enum import Enum
+    from typing import List, Optional, Tuple
+
+    # ---------------------------------------------------------------------------
+    # Enums
+    # ---------------------------------------------------------------------------
+
+    class RelationType(str, Enum):
+        knows = "knows"
+        love = "love"
+        friendship = "friendship"
+        rivalry = "rivalry"
+        fear = "fear"
+        trust = "trust"
+        dislike = "dislike"
 
 
-# ---------------------------------------------------------------------------
-# Enums
-# ---------------------------------------------------------------------------
-
-class RelationType(str, Enum):
-    knows = "knows"
-    love = "love"
-    friendship = "friendship"
-    rivalry = "rivalry"
-    fear = "fear"
-    trust = "trust"
-    dislike = "dislike"
+    class WeatherType(str, Enum):
+        sunny = "sunny"
+        cloudy = "cloudy"
+        rainy = "rainy"
+        stormy = "stormy"
+        snowy = "snowy"
 
 
-class WeatherType(str, Enum):
-    sunny = "sunny"
-    cloudy = "cloudy"
-    rainy = "rainy"
-    stormy = "stormy"
-    snowy = "snowy"
+    # ---------------------------------------------------------------------------
+    # Neo4j node types (§4.5)
+    # ---------------------------------------------------------------------------
+
+    @dataclass
+    class Resident:
+        """An AI resident of the town. Maps to a Neo4j ``Resident`` node."""
+
+        id: str
+        name: str
+        personality: str
+        goals: List[str] = field(default_factory=list)
+        mood: str = "neutral"
+        location: Optional[str] = None
+        x: int = 0
+        y: int = 0
+        home_building_id: Optional[str] = None
+        skin_color: Optional[str] = None
+        hair_style: Optional[str] = None
+        hair_color: Optional[str] = None
+        outfit_color: Optional[str] = None
 
 
-# ---------------------------------------------------------------------------
-# Neo4j node types (§4.5)
-# ---------------------------------------------------------------------------
+    @dataclass
+    class Building:
+        """A building on the town map. Maps to a Neo4j ``Building`` node."""
 
-@dataclass
-class Resident:
-    """An AI resident of the town.  Maps to (Resident) node in Neo4j."""
-    id: str
-    name: str
-    personality: str          # e.g. "外向, 善良, 喜欢八卦"
-    goals: List[str] = field(default_factory=list)
-    mood: str = "neutral"     # happy | sad | angry | neutral | ...
-    location: Optional[str] = None        # current building id, or None if on the map
-    x: int = 0                            # tile grid x-coordinate
-    y: int = 0                            # tile grid y-coordinate
-    home_building_id: Optional[str] = None  # permanent home (set at load time)
-    skin_color: Optional[str] = None
-    hair_style: Optional[str] = None
-    hair_color: Optional[str] = None
-    outfit_color: Optional[str] = None
+        id: str
+        type: str
+        name: str
+        capacity: int
+        position: Tuple[int, int]
 
 
-@dataclass
-class Building:
-    """A building on the town map.  Maps to (Building) node in Neo4j."""
-    id: str
-    type: str                 # cafe | home | park | shop | school | ...
-    name: str
-    capacity: int
-    position: Tuple[int, int]  # (tile_x, tile_y) of entrance
+    @dataclass
+    class Memory:
+        id: str
+        content: str
+        timestamp: str
+        importance: float
+        emotion: str
 
 
-@dataclass
-class Memory:
-    """A single memory entry.  Maps to (Memory) node in Neo4j."""
-    id: str
-    content: str
-    timestamp: str            # e.g. "Day 1, 08:30"
-    importance: float         # 0.0 – 1.0
-    emotion: str              # happy | sad | angry | surprised | neutral | ...
+    @dataclass
+    class Event:
+        id: str
+        description: str
+        timestamp: str
+        source: str
 
 
-@dataclass
-class Event:
-    """An in-world event.  Maps to (Event) node in Neo4j."""
-    id: str
-    description: str
-    timestamp: str
-    source: str               # "user" | "system"
+    @dataclass
+    class Reflection:
+        id: str
+        summary: str
+        timestamp: str
+        derived_from: List[str] = field(default_factory=list)
 
 
-@dataclass
-class Reflection:
-    """A high-level cognitive summary.  Maps to (Reflection) node in Neo4j."""
-    id: str
-    summary: str
-    timestamp: str
-    derived_from: List[str] = field(default_factory=list)  # Memory ids
+    # ---------------------------------------------------------------------------
+    # Neo4j relationship types (§4.5)
+    # ---------------------------------------------------------------------------
+
+    @dataclass
+    class Relationship:
+        """Directed resident relationship edge."""
+
+        from_id: str
+        to_id: str
+        type: RelationType
+        intensity: float
+        since: str = ""
+        familiarity: float = 0.0
+        reason: str = ""
 
 
-# ---------------------------------------------------------------------------
-# Neo4j relationship types (§4.5)
-# ---------------------------------------------------------------------------
+    # ---------------------------------------------------------------------------
+    # WebSocket / tick diff types (§4.5)
+    # ---------------------------------------------------------------------------
 
-@dataclass
-class Relationship:
-    """Directed resident relationship edge.
-
-    Covers both the base acquaintance edge from spec §4.5
-    ``(Resident)-[:KNOWS {since, familiarity}]->(Resident)`` and the
-    emotional FEELS edge. ``type="knows"`` represents neutral
-    acquaintance; other values map to FEELS ``type``.
-    """
-    from_id: str
-    to_id: str
-    type: RelationType
-    intensity: float          # 0.0 (neutral) … 1.0 (very strong)
-    since: str = ""
-    familiarity: float = 0.0  # 0.0 … 1.0; does not decay once established
-    reason: str = ""
+    @dataclass
+    class MovementUpdate:
+        id: str
+        x: int
+        y: int
+        action: str
 
 
-# ---------------------------------------------------------------------------
-# WebSocket / tick diff types (§4.5 WebSocket message format)
-# ---------------------------------------------------------------------------
-
-@dataclass
-class MovementUpdate:
-    id: str
-    x: int
-    y: int
-    action: str               # "walking" | "standing" | "in_building"
+    @dataclass
+    class DialogueUpdate:
+        from_id: str
+        to_id: str
+        text: str
 
 
-@dataclass
-class DialogueUpdate:
-    from_id: str
-    to_id: str
-    text: str
+    @dataclass
+    class RelationshipDelta:
+        from_id: str
+        to_id: str
+        type: str
+        delta: float
 
 
-@dataclass
-class RelationshipDelta:
-    from_id: str
-    to_id: str
-    type: str
-    delta: float
+    @dataclass
+    class EventUpdate:
+        description: str
 
 
-@dataclass
-class EventUpdate:
-    description: str
+    @dataclass
+    class TickState:
+        """Complete diff pushed to the frontend each tick."""
+
+        tick: int
+        time: str
+        movements: List[MovementUpdate] = field(default_factory=list)
+        dialogues: List[DialogueUpdate] = field(default_factory=list)
+        relationships: List[RelationshipDelta] = field(default_factory=list)
+        events: List[EventUpdate] = field(default_factory=list)
+        weather: str = WeatherType.sunny.value
 
 
-@dataclass
-class TickState:
-    """Complete diff pushed to the frontend each tick (§4.5, §8)."""
-    tick: int
-    time: str                                           # "Day 3, 14:30"
-    movements: List[MovementUpdate] = field(default_factory=list)
-    dialogues: List[DialogueUpdate] = field(default_factory=list)
-    relationships: List[RelationshipDelta] = field(default_factory=list)
-    events: List[EventUpdate] = field(default_factory=list)
-    weather: str = WeatherType.sunny.value             # current weather
+    # ---------------------------------------------------------------------------
+    # World configuration (§16)
+    # ---------------------------------------------------------------------------
 
+    @dataclass
+    class WorldConfig:
+        """All tunable simulation parameters."""
 
-# ---------------------------------------------------------------------------
-# World configuration (§16)
-# ---------------------------------------------------------------------------
+        tick_interval_seconds: float = 3.0
+        tick_per_day: int = 48
+        max_concurrent_llm_calls: int = 3
+        llm_timeout_seconds: float = 5.0
+        llm_call_probability: float = 0.2
 
-@dataclass
-class WorldConfig:
-    """All tunable simulation parameters, mirroring backend/core/config.py §16."""
-    # Simulation params
-    tick_interval_seconds: float = 3.0
-    tick_per_day: int = 48
-    max_concurrent_llm_calls: int = 3
-    llm_timeout_seconds: float = 5.0
-    llm_call_probability: float = 0.2
+        short_term_memory_size: int = 20
+        reflection_threshold: int = 10
+        relationship_decay_rate: float = 0.01
 
-    # Memory params
-    short_term_memory_size: int = 20
-    reflection_threshold: int = 10
-    relationship_decay_rate: float = 0.01
+        map_width_tiles: int = 40
+        map_height_tiles: int = 30
+        tile_size_px: int = 32
+        interaction_distance: int = 2
+        max_dialogues_per_tick: int = 2
 
-    # Spatial params (§10)
-    map_width_tiles: int = 40
-    map_height_tiles: int = 30
-    tile_size_px: int = 32
-    interaction_distance: int = 2
-    max_dialogues_per_tick: int = 2
-
-    # Persistence
-    snapshot_interval_ticks: int = 10
-
-    # Deterministic mode (spec §15)
-    seed: Optional[int] = None
+        snapshot_interval_ticks: int = 10
+        seed: Optional[int] = None
