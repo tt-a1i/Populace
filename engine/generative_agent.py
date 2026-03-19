@@ -7,8 +7,9 @@ can override any of the 6 methods without touching the engine modules.
 """
 from __future__ import annotations
 
+import inspect
 import uuid
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
 
 from engine.agent import Agent
 from engine.types import Event, Memory, Reflection, Resident
@@ -29,8 +30,13 @@ class GenerativeAgent(Agent):
       memorize   → self.memory_stream.add  (converts Event → Memory)
     """
 
-    def __init__(self, resident: Resident) -> None:
+    def __init__(
+        self,
+        resident: Resident,
+        llm_fn: Callable[[list[dict[str, Any]], int], Awaitable[str | None] | str | None] | None = None,
+    ) -> None:
         super().__init__(resident)
+        self.llm_fn = llm_fn
 
     # ------------------------------------------------------------------
     # Step a — Perceive
@@ -67,7 +73,7 @@ class GenerativeAgent(Agent):
 
         *context* keys: ``events``, ``memories``, ``reflections``, ``use_llm``.
         """
-        if context.get("use_llm", False):
+        if context.get("use_llm", False) or self.llm_fn is not None:
             from engine.plan import plan as _plan
             return await _plan(
                 self,
@@ -105,9 +111,27 @@ class GenerativeAgent(Agent):
         try:
             import asyncio
             loop = asyncio.get_running_loop()
-            from backend.db.redis import cache_agent_memory
+            try:
+                from backend.db.redis import cache_agent_memory
+            except ImportError:
+                return
             loop.create_task(cache_agent_memory(self.resident.id, mem))
         except RuntimeError:
             pass  # No running event loop (e.g. unit tests) — skip silently
         except Exception:
             pass  # Redis unavailable — skip silently
+
+    async def call_llm(self, messages: list[dict[str, Any]], max_tokens: int) -> str | None:
+        """Use injected llm_fn when available, otherwise fall back to backend client."""
+        if self.llm_fn is not None:
+            result = self.llm_fn(messages, max_tokens)
+            if inspect.isawaitable(result):
+                return await result
+            return result
+
+        try:
+            from backend.llm.client import chat_completion
+        except ImportError:
+            return None
+
+        return await chat_completion(messages, max_tokens=max_tokens)

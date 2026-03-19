@@ -8,7 +8,7 @@ the default idle action so the simulation never blocks.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from engine.types import Event, Memory, Reflection
 
@@ -17,6 +17,36 @@ if TYPE_CHECKING:
 
 # Default action returned on any LLM failure
 _DEFAULT_ACTION: dict = {"action": "idle"}
+
+
+def _build_plan_messages(
+    agent: "Agent",
+    memories: list[Memory],
+    reflections: list[Reflection],
+) -> list[dict[str, Any]]:
+    try:
+        from backend.llm.prompts import build_plan_prompt
+    except ImportError:
+        memory_lines = "\n".join(f"- {memory.content}" for memory in memories[-3:]) or "- 无"
+        reflection_lines = "\n".join(f"- {reflection.summary}" for reflection in reflections[-2:]) or "- 无"
+        return [
+            {
+                "role": "system",
+                "content": "你是小镇居民，需要根据记忆和反思决定下一步行动。",
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"居民：{agent.resident.name}\n"
+                    f"性格：{agent.resident.personality}\n"
+                    f"记忆：\n{memory_lines}\n"
+                    f"反思：\n{reflection_lines}\n"
+                    "请输出下一步行动。"
+                ),
+            },
+        ]
+
+    return build_plan_prompt(agent.resident, memories, reflections)
 
 
 async def plan(
@@ -42,10 +72,7 @@ async def plan(
             {"action": "idle"}
             {"action": "talk", "target_id": "r2"}
     """
-    from backend.llm.client import chat_completion
-    from backend.llm.prompts import build_plan_prompt
-
-    messages = build_plan_prompt(agent.resident, memories, reflections)
+    messages = _build_plan_messages(agent, memories, reflections)
 
     # Inject perceived_events into the user message so the LLM has full context
     if perceived_events:
@@ -55,7 +82,7 @@ async def plan(
                 msg["content"] += f"\n\n当前感知到的事件：\n{events_text}"
                 break
 
-    result = await chat_completion(messages, max_tokens=200)
+    result = await agent.call_llm(messages, max_tokens=200)
 
     if result is None:
         return _DEFAULT_ACTION
