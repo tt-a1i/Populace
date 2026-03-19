@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "populace-engine"
+version = "0.1.0"
+description = "AI town simulation engine inspired by Stanford Generative Agents"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.setuptools]
+package-dir = {"" = ".."}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = [".."]
+include = ["engine"]

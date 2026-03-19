@@ -178,6 +178,9 @@ class SimulationState:
             "buildings": buildings,
             "agents": agents_data,
             "relationships": relationships,
+            "weather": self.world.weather.value if hasattr(self.world.weather, "value") else str(self.world.weather),
+            "clock_speed": self.loop.clock.speed,
+            "running": self.loop.running,
         }
 
     async def load_state(self, data: dict[str, Any]) -> None:
@@ -262,7 +265,20 @@ class SimulationState:
             )
 
         self.world = world
-        self.loop = SimulationLoop(self.world, tick_handler=self._tick)
+
+        # Restore weather
+        from engine.types import WeatherType
+        weather_val = data.get("weather", "sunny")
+        try:
+            world.weather = WeatherType(weather_val)
+        except ValueError:
+            world.weather = WeatherType.sunny
+
+        # Restore loop with saved speed/running state
+        saved_speed = float(data.get("clock_speed", 1.0))
+        from backend.core.clock import SimulationClock
+        clock = SimulationClock(speed=saved_speed if saved_speed in {0.0, 1.0, 2.0, 5.0} else 1.0)
+        self.loop = SimulationLoop(self.world, clock=clock, tick_handler=self._tick)
         self._task = None
 
     def get_status(self) -> dict[str, Any]:
