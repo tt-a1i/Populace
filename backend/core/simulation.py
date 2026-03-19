@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import random
 from typing import Any, Callable, Optional
 
 from .clock import SimulationClock
@@ -31,6 +32,11 @@ class SimulationLoop:
 
         self.running = True
         self._stop_event.clear()
+
+        # Deterministic mode: seed random at simulation start (spec §15)
+        seed = getattr(getattr(self.world, "config", None), "seed", None)
+        if seed is not None:
+            random.seed(seed)
 
         try:
             while not self._stop_event.is_set():

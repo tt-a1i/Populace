@@ -21,6 +21,7 @@ export interface ResidentPosition {
   targetY: Resident['y']
   color: number
   status: ResidentStatus
+  currentBuildingId?: string | null
   dialogueText?: string | null
 }
 
@@ -42,6 +43,12 @@ export interface FrozenSimulationFrame {
   }
 }
 
+export interface SimulationHistoryFrame {
+  tick: number
+  time: string
+  residents: ResidentPosition[]
+}
+
 export interface SimulationTickState extends Omit<TickState, 'movements' | 'dialogues'> {
   dialogues?: DialogueUpdate[]
   movements: TickMovement[]
@@ -53,7 +60,7 @@ export interface SimulationSnapshot {
   time?: string
   running?: boolean
   speed?: number
-  buildings?: Building[]
+  buildings?: Array<Building & { occupants?: number }>
   residents?: Array<{
     id: string
     name: string
@@ -74,6 +81,8 @@ interface SimulationState {
   speed: SimulationSpeed
   lastAppliedTick: number
   residents: ResidentPosition[]
+  history: SimulationHistoryFrame[]
+  buildings: Array<Building & { occupants: number }>
   replayFrozenFrame: FrozenSimulationFrame | null
   messageFeed: string[]
   selectedResidentId: string | null
@@ -84,6 +93,7 @@ interface SimulationState {
   setHoveredPairIds: (pairIds: [string, string] | null) => void
   freezeForReplay: () => void
   resumeLiveFromReplay: () => void
+  getFrameByTick: (tick: number) => SimulationHistoryFrame | null
   updateFromTick: (tickState: SimulationTickState) => void
   initFromSnapshot: (snapshot: SimulationSnapshot) => void
 }
@@ -131,7 +141,40 @@ function appendRecentMessages(existing: string[], incoming: string[]): string[] 
   return [...existing, ...incoming].slice(-5)
 }
 
-export const useSimulationStore = create<SimulationState>((set) => ({
+function cloneResidents(residents: ResidentPosition[]): ResidentPosition[] {
+  return residents.map((resident) => ({ ...resident }))
+}
+
+function recomputeBuildingOccupancy(
+  buildings: Array<Building & { occupants: number }>,
+  residents: ResidentPosition[],
+): Array<Building & { occupants: number }> {
+  const occupantsByBuilding = residents.reduce<Map<string, number>>((counts, resident) => {
+    if (resident.currentBuildingId) {
+      counts.set(resident.currentBuildingId, (counts.get(resident.currentBuildingId) ?? 0) + 1)
+    }
+    return counts
+  }, new Map())
+
+  return buildings.map((building) => ({
+    ...building,
+    occupants: occupantsByBuilding.get(building.id) ?? 0,
+  }))
+}
+
+function inferBuildingId(
+  resident: ResidentPosition,
+  buildings: Array<Building & { occupants: number }>,
+): string | null {
+  const building = buildings.find(
+    (candidate) =>
+      candidate.position[0] === resident.targetX && candidate.position[1] === resident.targetY,
+  )
+
+  return building?.id ?? null
+}
+
+export const useSimulationStore = create<SimulationState>((set, get) => ({
   tick: 16,
   tickPerDay: 48,
   time: 'Day 1, 08:00',
@@ -139,6 +182,8 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   speed: 1,
   lastAppliedTick: 0,
   residents: [],
+  history: [],
+  buildings: [],
   replayFrozenFrame: null,
   messageFeed: [
     '等待居民进入场景...',
@@ -153,7 +198,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   freezeForReplay: () =>
     set((state) => ({
       replayFrozenFrame: {
-        residents: state.residents,
+        residents: cloneResidents(state.residents),
         meta: {
           running: state.running,
           speed: state.speed,
@@ -164,11 +209,13 @@ export const useSimulationStore = create<SimulationState>((set) => ({
       },
     })),
   resumeLiveFromReplay: () => set({ replayFrozenFrame: null }),
+  getFrameByTick: (tick) => get().history.find((frame) => frame.tick === tick) ?? null,
   updateFromTick: (tickState) => {
     set((state) => {
       const residentMap = new Map(state.residents.map((resident) => [resident.id, resident]))
       const dialogueByResident = new Map<string, string>()
       const freshMessages: string[] = []
+      const seenResidents = new Set<string>()
 
       for (const dialogue of tickState.dialogues ?? []) {
         if (!dialogueByResident.has(dialogue.to_id)) {
@@ -185,6 +232,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
       }
 
       for (const movement of tickState.movements) {
+        seenResidents.add(movement.id)
         const existingResident = residentMap.get(movement.id)
         const dialogueText = dialogueByResident.get(movement.id) ?? movement.dialogueText ?? null
         const nextX = clampTilePosition(movement.x, 39)
@@ -201,7 +249,20 @@ export const useSimulationStore = create<SimulationState>((set) => ({
           targetY: nextY,
           color: existingResident?.color ?? colorForResident(movement.id),
           status: statusFromAction(movement.action, movement.status),
+          currentBuildingId: null,
           dialogueText,
+        })
+      }
+
+      for (const resident of state.residents) {
+        if (seenResidents.has(resident.id)) {
+          continue
+        }
+
+        const previous = residentMap.get(resident.id) ?? resident
+        residentMap.set(resident.id, {
+          ...previous,
+          currentBuildingId: previous.currentBuildingId ?? inferBuildingId(previous, state.buildings),
         })
       }
 
@@ -219,12 +280,26 @@ export const useSimulationStore = create<SimulationState>((set) => ({
         })
       }
 
+      const nextResidents = Array.from(residentMap.values())
+      const historyFrame: SimulationHistoryFrame = {
+        tick: tickState.tick,
+        time: tickState.time,
+        residents: cloneResidents(nextResidents),
+      }
+      const existingIndex = state.history.findIndex((frame) => frame.tick === tickState.tick)
+      const history =
+        existingIndex >= 0
+          ? state.history.map((frame, index) => (index === existingIndex ? historyFrame : frame))
+          : [...state.history, historyFrame].slice(-100)
+
       return {
         tick: tickState.tick,
         time: tickState.time,
         lastAppliedTick: tickState.tick,
+        history,
+        buildings: recomputeBuildingOccupancy(state.buildings, nextResidents),
         messageFeed: appendRecentMessages(state.messageFeed, freshMessages),
-        residents: Array.from(residentMap.values()),
+        residents: nextResidents,
       }
     })
   },
@@ -244,22 +319,43 @@ export const useSimulationStore = create<SimulationState>((set) => ({
           targetY: clampTilePosition(r.y ?? 0, 29),
           color: prev?.color ?? colorForResident(r.id),
           status: statusFromAction(undefined, prev?.status ?? 'idle'),
+          currentBuildingId: r.location ?? null,
           dialogueText: prev?.dialogueText ?? null,
         }
       })
 
-        return {
-          tick: snapshot.tick ?? state.tick,
-          time: snapshot.time ?? state.time,
-          running: snapshot.running ?? state.running,
-          lastAppliedTick: snapshot.tick ?? state.lastAppliedTick,
-          replayFrozenFrame: state.replayFrozenFrame,
-          messageFeed:
-            residents.length > 0
-              ? appendRecentMessages(state.messageFeed, ['首帧快照已到达，居民开始进入小镇。'])
-              : appendRecentMessages(state.messageFeed, ['首帧快照为空，等待居民加载...']),
-          residents,
-        }
-      })
+      const buildings = recomputeBuildingOccupancy(
+        (snapshot.buildings ?? []).map((building) => ({
+          ...building,
+          occupants: building.occupants ?? 0,
+        })),
+        residents,
+      )
+      const history =
+        snapshot.tick !== undefined
+          ? [
+              {
+                tick: snapshot.tick,
+                time: snapshot.time ?? state.time,
+                residents: cloneResidents(residents),
+              },
+            ]
+          : []
+
+      return {
+        tick: snapshot.tick ?? state.tick,
+        time: snapshot.time ?? state.time,
+        running: snapshot.running ?? state.running,
+        lastAppliedTick: snapshot.tick ?? state.lastAppliedTick,
+        history,
+        buildings,
+        replayFrozenFrame: state.replayFrozenFrame,
+        messageFeed:
+          residents.length > 0
+            ? appendRecentMessages(state.messageFeed, ['首帧快照已到达，居民开始进入小镇。'])
+            : appendRecentMessages(state.messageFeed, ['首帧快照为空，等待居民加载...']),
+        residents,
+      }
+    })
   },
 }))

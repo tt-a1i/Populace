@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, Rectangle, Text } from 'pixi.js'
 
 import { useSimulationStore, type ResidentPosition, type SimulationSpeed } from '../../stores/simulation'
+import type { Building } from '../../types'
 import { ResidentSprite } from './ResidentSprite'
 
 const TILE_SIZE = 32
@@ -164,6 +165,59 @@ export class TownRenderer {
 
     this.hintLabel.position.set(width - 16, 16)
     this.renderHud()
+  }
+
+  syncBuildings(buildings: Array<Building & { occupants?: number }>): void {
+    // Remove previously added building labels (Text children beyond the graphics object)
+    while (this.buildingLayer.children.length > 1) {
+      const child = this.buildingLayer.children[1]
+      this.buildingLayer.removeChild(child)
+      child.destroy()
+    }
+
+    this.buildingGraphics.clear()
+
+    if (!buildings.length) {
+      this.drawBuildings()
+      return
+    }
+
+    const typeColor: Record<string, number> = {
+      cafe: 0xb45309,
+      park: 0x15803d,
+      school: 0x7c3aed,
+      shop: 0xdc2626,
+      home: 0x1e40af,
+      default: 0x475569,
+    }
+
+    for (const b of buildings) {
+      const [bx, by] = b.position
+      const x = bx * TILE_SIZE
+      const y = by * TILE_SIZE
+      const color = typeColor[b.type] ?? typeColor.default
+
+      this.buildingGraphics.roundRect(x, y, TILE_SIZE * 2, TILE_SIZE * 2, 8)
+      this.buildingGraphics.fill({ color, alpha: 0.82 })
+      this.buildingGraphics.stroke({ color: 0xf8fafc, alpha: 0.18, width: 2 })
+
+      const label = new Text({
+        text: b.name,
+        style: {
+          fill: 0xf8fafc,
+          fontFamily: 'Iowan Old Style, Palatino Linotype, serif',
+          fontSize: 11,
+          fontWeight: '700',
+          stroke: { color: 0x020617, width: 3 },
+          wordWrap: true,
+          wordWrapWidth: TILE_SIZE * 2 - 4,
+          align: 'center',
+        },
+        anchor: { x: 0.5, y: 0.5 },
+      })
+      label.position.set(x + TILE_SIZE, y + TILE_SIZE)
+      this.buildingLayer.addChild(label)
+    }
   }
 
   syncResidents(residents: ResidentPosition[]): void {

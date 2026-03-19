@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 import { Application } from 'pixi.js'
 
@@ -9,6 +9,7 @@ import { TownRenderer } from './TownRenderer'
 export function TownCanvas() {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const rendererRef = useRef<TownRenderer | null>(null)
+  const buildings = useSimulationStore((state) => state.buildings)
   const liveResidents = useSimulationStore((state) => state.residents)
   const liveTick = useSimulationStore((state) => state.tick)
   const tickPerDay = useSimulationStore((state) => state.tickPerDay)
@@ -18,20 +19,43 @@ export function TownCanvas() {
   const speed = useSimulationStore((state) => state.speed)
   const hoveredPairIds = useSimulationStore((state) => state.hoveredPairIds)
   const replayFrozenFrame = useSimulationStore((state) => state.replayFrozenFrame)
+  const getFrameByTick = useSimulationStore((state) => state.getFrameByTick)
   const replayTick = useRelationshipsStore((state) => state.replayTick)
-  const liveMeta = {
-    running: liveRunning,
-    speed,
-    tick: liveTick,
-    tickPerDay,
-    time: liveTime,
-  }
+  const replayFrame = useMemo(
+    () => (replayTick === null ? null : getFrameByTick(replayTick)),
+    [getFrameByTick, replayTick],
+  )
+  const liveMeta = useMemo(
+    () => ({
+      running: liveRunning,
+      speed,
+      tick: liveTick,
+      tickPerDay,
+      time: liveTime,
+    }),
+    [liveRunning, speed, liveTick, tickPerDay, liveTime],
+  )
 
-  const residents = replayTick !== null ? replayFrozenFrame?.residents ?? liveResidents : liveResidents
-  const simulationMeta =
-    replayTick !== null
-      ? replayFrozenFrame?.meta ?? liveMeta
-      : liveMeta
+  const residents = useMemo(
+    () =>
+      replayTick !== null
+        ? replayFrame?.residents ?? replayFrozenFrame?.residents ?? liveResidents
+        : liveResidents,
+    [liveResidents, replayFrame, replayFrozenFrame, replayTick],
+  )
+  const simulationMeta = useMemo(
+    () =>
+      replayTick !== null
+        ? {
+            running: replayFrozenFrame?.meta.running ?? liveMeta.running,
+            speed: replayFrozenFrame?.meta.speed ?? liveMeta.speed,
+            tick: replayFrame?.tick ?? replayFrozenFrame?.meta.tick ?? liveMeta.tick,
+            tickPerDay: replayFrozenFrame?.meta.tickPerDay ?? liveMeta.tickPerDay,
+            time: replayFrame?.time ?? replayFrozenFrame?.meta.time ?? liveMeta.time,
+          }
+        : liveMeta,
+    [liveMeta, replayFrame, replayFrozenFrame, replayTick],
+  )
 
   useEffect(() => {
     const host = hostRef.current
@@ -90,6 +114,7 @@ export function TownCanvas() {
       rendererRef.current = renderer
 
       const state = useSimulationStore.getState()
+      renderer.syncBuildings(state.buildings)
       renderer.syncResidents(state.residents)
       renderer.updateSimulationMeta({
         running: state.running,
@@ -122,6 +147,10 @@ export function TownCanvas() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    rendererRef.current?.syncBuildings(buildings)
+  }, [buildings])
 
   useEffect(() => {
     rendererRef.current?.syncResidents(residents)

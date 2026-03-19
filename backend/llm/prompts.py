@@ -192,6 +192,42 @@ def build_dialogue_eval_prompt(dialogue_text: str) -> list[dict]:
     ]
 
 
+def build_scenario_prompt(user_description: str) -> list[dict]:
+    """Prompt for generating a town scenario from a user description.
+
+    The LLM must return a single valid JSON object matching the
+    ``modern_community.json`` schema (no extra text, no code fences).
+
+    Args:
+        user_description: Free-form description, e.g. "一个海边渔村，6个渔民".
+
+    Returns:
+        OpenAI messages list.
+    """
+    content = _truncate(
+        f"用户描述：{user_description}\n\n"
+        "根据上述描述生成一个小镇场景。只输出一个合法的 JSON 对象，不要有任何解释文字或 Markdown 代码块。\n"
+        "JSON 结构如下（严格遵守字段名和类型）：\n"
+        '{"name":"场景名称","description":"场景简介","map":{"width":40,"height":30,'
+        '"roads":[{"x":0,"y":14,"width":40,"height":2}],"water":[]},'
+        '"buildings":[{"id":"home_1","type":"home","name":"民居A","capacity":4,"position":[5,8]},'
+        '{"id":"cafe_1","type":"cafe","name":"茶馆","capacity":4,"position":[20,8]}],'
+        '"residents":[{"id":"r1","name":"张三","personality":"热情开朗","goals":["探索小镇"],'
+        '"mood":"neutral","home_id":"home_1","x":5,"y":14}]}\n\n'
+        "要求：\n"
+        "- 居民数量与描述一致（最多 10 人）\n"
+        "- 每栋建筑 position 的 x 在 2-38、y 在 2-26 之间，且各建筑之间至少间隔 4 格\n"
+        "- home_id 指向 buildings 中 type=home 的建筑 id\n"
+        "- 居民 x/y 设置在道路上（y=14 或 y=15）\n"
+        "- 只输出 JSON，不要有任何其他内容",
+        _CHAR_BUDGET,
+    )
+    return [
+        {"role": "system", "content": "你是一个游戏场景生成器，只输出 JSON，绝对不要输出任何 JSON 以外的内容。"},
+        {"role": "user", "content": content},
+    ]
+
+
 def build_report_prompt(
     residents: list[dict],
     events: list[str],

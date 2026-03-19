@@ -65,6 +65,21 @@ class SimulationState:
             raise ValueError("speed must be one of 1, 2, or 5")
         self.loop.clock.set_speed(float(speed))
 
+    async def reset_with_scenario(self, scenario_data: dict[str, Any]) -> None:
+        """Stop simulation and replace the world with a custom scenario."""
+        from backend.world.town import load_scenario_from_dict
+
+        await self.stop()
+        for task in self._pending_dialogues:
+            task.cancel()
+        self._pending_dialogues.clear()
+        self._active_dialogue_pairs.clear()
+        self._events.clear()
+
+        self.world = load_scenario_from_dict(scenario_data)
+        self.loop = SimulationLoop(self.world, tick_handler=self._tick)
+        self._task = None
+
     def get_status(self) -> dict[str, Any]:
         return {
             "running": self.loop.running,
@@ -296,6 +311,26 @@ def get_simulation_state(request: Request) -> SimulationState:
     if state is None:
         raise HTTPException(status_code=503, detail="simulation state not initialized")
     return state
+
+
+class CustomScenarioRequest(BaseModel):
+    name: str = ""
+    description: str = ""
+    buildings: list = []
+    residents: list = []
+    map: Optional[dict] = None
+
+
+@router.post("/start-custom")
+async def start_custom_simulation(
+    payload: CustomScenarioRequest, request: Request
+) -> dict[str, Any]:
+    """Replace the current world with *payload* scenario and start the simulation."""
+    state = get_simulation_state(request)
+    scenario_data = payload.model_dump()
+    await state.reset_with_scenario(scenario_data)
+    await state.start()
+    return state.get_status()
 
 
 @router.post("/start")

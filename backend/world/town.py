@@ -105,6 +105,79 @@ def load_scenario(
     return world
 
 
+def load_scenario_from_dict(
+    data: dict[str, Any],
+    config: WorldConfig | None = None,
+) -> World:
+    """Load a scenario from a dict (same structure as JSON template).
+
+    Args:
+        data:   Scenario dict with ``buildings``, ``residents``, and ``map`` keys.
+        config: Optional WorldConfig override; defaults to backend Settings.
+
+    Returns:
+        A :class:`~engine.world.World` pre-populated with agents and buildings.
+    """
+    if config is None:
+        from backend.core.config import settings
+        config = WorldConfig(
+            tick_interval_seconds=settings.tick_interval_seconds,
+            tick_per_day=settings.tick_per_day,
+            max_concurrent_llm_calls=settings.max_concurrent_llm_calls,
+            llm_timeout_seconds=settings.llm_timeout_seconds,
+            llm_call_probability=settings.llm_call_probability,
+            short_term_memory_size=settings.short_term_memory_size,
+            reflection_threshold=settings.reflection_threshold,
+            relationship_decay_rate=settings.relationship_decay_rate,
+            map_width_tiles=settings.map_width_tiles,
+            map_height_tiles=settings.map_height_tiles,
+            tile_size_px=settings.tile_size_px,
+            interaction_distance=settings.interaction_distance,
+            max_dialogues_per_tick=settings.max_dialogues_per_tick,
+            snapshot_interval_ticks=settings.snapshot_interval_ticks,
+        )
+
+    world = World(config=config)
+
+    for b in data.get("buildings", []):
+        pos = tuple(b["position"])
+        building = Building(
+            id=b["id"],
+            type=b["type"],
+            name=b["name"],
+            capacity=b["capacity"],
+            position=pos,  # type: ignore[arg-type]
+        )
+        world.add_building(building)
+
+    map_data = data.get("map", {})
+    _apply_map_tiles(world, map_data, data.get("buildings", []))
+
+    from backend.world.buildings import enter_building
+
+    for r in data.get("residents", []):
+        home_id: str | None = r.get("home_id")
+        resident = Resident(
+            id=r["id"],
+            name=r["name"],
+            personality=r["personality"],
+            goals=list(r.get("goals", [])),
+            mood=r.get("mood", "neutral"),
+            location=None,
+            x=r.get("x", 0),
+            y=r.get("y", 0),
+        )
+        agent = GenerativeAgent(resident)
+        world.add_agent(agent)
+
+        if home_id:
+            home = world.get_building(home_id)
+            if home is not None:
+                enter_building(agent, home, world)
+
+    return world
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------

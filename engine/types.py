@@ -172,3 +172,6 @@ class WorldConfig:
 
     # Persistence
     snapshot_interval_ticks: int = 10
+
+    # Deterministic mode (spec §15)
+    seed: Optional[int] = None

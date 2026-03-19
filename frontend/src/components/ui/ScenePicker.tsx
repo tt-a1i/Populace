@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { startSimulation } from '../../services/api'
+import { type ScenarioData, generateScenario, startCustomSimulation, startSimulation } from '../../services/api'
 
 interface ScenePickerProps {
   onEnter: () => void
@@ -24,6 +24,13 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Custom scenario state
+  const [customDesc, setCustomDesc] = useState('')
+  const [customGenerating, setCustomGenerating] = useState(false)
+  const [customError, setCustomError] = useState<string | null>(null)
+  const [generatedScenario, setGeneratedScenario] = useState<ScenarioData | null>(null)
+  const [customStarting, setCustomStarting] = useState(false)
+
   const handleEnter = async () => {
     setLoading(true)
     setError(null)
@@ -40,6 +47,34 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
     }
     setLoading(false)
     onEnter()
+  }
+
+  const handleGenerateScenario = async () => {
+    if (!customDesc.trim()) return
+    setCustomGenerating(true)
+    setCustomError(null)
+    setGeneratedScenario(null)
+    try {
+      const scenario = await generateScenario(customDesc.trim())
+      setGeneratedScenario(scenario)
+    } catch (err) {
+      setCustomError(err instanceof Error ? err.message : '生成失败，请重试。')
+    } finally {
+      setCustomGenerating(false)
+    }
+  }
+
+  const handleStartCustom = async () => {
+    if (!generatedScenario) return
+    setCustomStarting(true)
+    setCustomError(null)
+    try {
+      await startCustomSimulation(generatedScenario)
+      onEnter()
+    } catch (err) {
+      setCustomError(err instanceof Error ? `启动失败：${err.message}` : '启动失败，请重试。')
+      setCustomStarting(false)
+    }
   }
 
   return (
@@ -131,18 +166,78 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
           </div>
         </div>
 
-        {/* ── Custom scene (coming soon) ── */}
-        <div className="mt-4 relative rounded-3xl border border-white/8 bg-white/[0.02] p-6 opacity-60">
-          <div className="absolute right-4 top-4 rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-[10px] font-semibold tracking-wider text-amber-300 uppercase">
-            即将推出
-          </div>
-          <span className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+        {/* ── Custom scene ── */}
+        <div className="mt-4 rounded-3xl border border-white/8 bg-white/[0.02] p-6">
+          <span className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
             自定义场景
           </span>
-          <h3 className="mt-2 text-lg font-bold text-slate-400">描述你的小镇</h3>
-          <div className="mt-3 rounded-xl border border-white/6 bg-slate-900/50 p-3">
-            <p className="text-xs text-slate-600">在一个宁静的山间小镇，住着…</p>
-          </div>
+          <h3 className="mt-2 text-lg font-bold text-white">描述你的小镇</h3>
+
+          <textarea
+            className="mt-3 w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-3 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-violet-400/50 focus:ring-1 focus:ring-violet-400/30"
+            rows={3}
+            placeholder="例如：一个海边渔村，住着6个渔民，有码头和渔市…"
+            value={customDesc}
+            onChange={(e) => {
+              setCustomDesc(e.target.value)
+              setGeneratedScenario(null)
+              setCustomError(null)
+            }}
+          />
+
+          <button
+            onClick={handleGenerateScenario}
+            disabled={customGenerating || !customDesc.trim()}
+            className="mt-3 flex items-center gap-2 rounded-xl border border-violet-400/30 bg-violet-500/10 px-4 py-2 text-sm font-semibold text-violet-300 transition-colors hover:bg-violet-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {customGenerating ? (
+              <>
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-transparent" />
+                AI 生成中…
+              </>
+            ) : (
+              '✦ 生成场景'
+            )}
+          </button>
+
+          {customError && (
+            <p className="mt-3 text-xs text-red-300">{customError}</p>
+          )}
+
+          {/* Preview */}
+          {generatedScenario && (
+            <div className="mt-4 rounded-xl border border-white/8 bg-slate-900/40 p-4">
+              <p className="text-sm font-bold text-white">{generatedScenario.name}</p>
+              <div className="mt-2 flex gap-4 text-xs text-slate-400">
+                <span>👥 <span className="font-semibold text-slate-200">{generatedScenario.residents.length}</span> 位居民</span>
+                <span>🏘️ <span className="font-semibold text-slate-200">{generatedScenario.buildings.length}</span> 栋建筑</span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {generatedScenario.residents.slice(0, 8).map((r) => (
+                  <span key={r.id} className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">
+                    {r.name}
+                  </span>
+                ))}
+                {generatedScenario.residents.length > 8 && (
+                  <span className="text-[11px] text-slate-500">+{generatedScenario.residents.length - 8}</span>
+                )}
+              </div>
+              <button
+                onClick={handleStartCustom}
+                disabled={customStarting}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {customStarting ? (
+                  <>
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    启动中…
+                  </>
+                ) : (
+                  '使用此场景 →'
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Error */}

@@ -95,3 +95,53 @@ export function generateReport() {
 export function getLatestReport() {
   return request<ReportPayload>('/api/report/latest')
 }
+
+// ---------------------------------------------------------------------------
+// Custom scenario
+// ---------------------------------------------------------------------------
+
+export interface ScenarioBuilding {
+  id: string
+  type: string
+  name: string
+  capacity: number
+  position: [number, number]
+}
+
+export interface ScenarioResident {
+  id: string
+  name: string
+  personality: string
+  goals?: string[]
+  mood?: string
+  home_id?: string
+  x?: number
+  y?: number
+}
+
+export interface ScenarioData {
+  name: string
+  description?: string
+  buildings: ScenarioBuilding[]
+  residents: ScenarioResident[]
+  map?: {
+    width?: number
+    height?: number
+    roads?: Array<{ x: number; y: number; width: number; height: number }>
+    water?: Array<{ x: number; y: number; width: number; height: number }>
+  }
+}
+
+export function generateScenario(description: string) {
+  return request<ScenarioData>('/api/world/generate-scenario', {
+    method: 'POST',
+    body: JSON.stringify({ description }),
+  })
+}
+
+export function startCustomSimulation(scenario: ScenarioData) {
+  return request('/api/simulation/start-custom', {
+    method: 'POST',
+    body: JSON.stringify(scenario),
+  })
+}
