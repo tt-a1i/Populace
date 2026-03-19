@@ -29,10 +29,15 @@ export interface UseWebSocketReturn {
   connected: boolean
   connecting: boolean
   disconnected: boolean
+  hasInitialSnapshot: boolean
+  startupTimedOut: boolean
+  retry: () => void
 }
 
-export function useWebSocket(): UseWebSocketReturn {
-  const [status, setStatus] = useState<ConnectionStatus>('connecting')
+export function useWebSocket(enabled = true): UseWebSocketReturn {
+  const [status, setStatus] = useState<ConnectionStatus>('disconnected')
+  const [hasInitialSnapshot, setHasInitialSnapshot] = useState(false)
+  const [startupTimedOut, setStartupTimedOut] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
   const backoffRef = useRef<number>(MIN_BACKOFF_MS)
@@ -64,6 +69,8 @@ export function useWebSocket(): UseWebSocketReturn {
         // apply last_tick on top for up-to-date positions/dialogues.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const snapshot = (data ?? {}) as any
+        setHasInitialSnapshot(true)
+        setStartupTimedOut(false)
         simInitFromSnapshot(snapshot)
         // Rebuild graph store from backend residents, clearing mock data
         relInitFromSnapshot(snapshot.residents ?? [])
@@ -89,7 +96,7 @@ export function useWebSocket(): UseWebSocketReturn {
   // Connect (called initially and after each disconnect)
   // -------------------------------------------------------------------------
   const connect = useCallback(() => {
-    if (!mountedRef.current) return
+    if (!mountedRef.current || !enabled) return
 
     setStatus('connecting')
 
@@ -125,7 +132,24 @@ export function useWebSocket(): UseWebSocketReturn {
       // onclose fires immediately after onerror, so reconnect is handled there
       ws.close()
     }
-  }, [handleMessage])
+  }, [enabled, handleMessage])
+
+  const retry = useCallback(() => {
+    setStartupTimedOut(false)
+    backoffRef.current = MIN_BACKOFF_MS
+
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current)
+    }
+
+    if (wsRef.current) {
+      wsRef.current.onclose = null
+      wsRef.current.close()
+      wsRef.current = null
+    }
+
+    connectRef.current()
+  }, [])
 
   useEffect(() => {
     connectRef.current = connect
@@ -136,6 +160,13 @@ export function useWebSocket(): UseWebSocketReturn {
   // -------------------------------------------------------------------------
   useEffect(() => {
     mountedRef.current = true
+
+    if (!enabled) {
+      return () => {
+        mountedRef.current = false
+      }
+    }
+
     timerRef.current = setTimeout(() => {
       connectRef.current()
     }, 0)
@@ -145,12 +176,29 @@ export function useWebSocket(): UseWebSocketReturn {
       if (timerRef.current !== null) clearTimeout(timerRef.current)
       wsRef.current?.close()
     }
-  }, [])
+  }, [enabled])
+
+  useEffect(() => {
+    if (!enabled || hasInitialSnapshot) {
+      return undefined
+    }
+
+    const timeout = window.setTimeout(() => {
+      setStartupTimedOut(true)
+    }, 5000)
+
+    return () => {
+      window.clearTimeout(timeout)
+    }
+  }, [enabled, hasInitialSnapshot])
 
   return {
     status,
     connected: status === 'connected',
     connecting: status === 'connecting',
     disconnected: status === 'disconnected',
+    hasInitialSnapshot,
+    startupTimedOut,
+    retry,
   }
 }

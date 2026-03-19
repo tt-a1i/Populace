@@ -60,6 +60,7 @@ interface SimulationState {
   running: boolean
   speed: SimulationSpeed
   residents: ResidentPosition[]
+  messageFeed: string[]
   selectedResidentId: string | null
   setRunning: (running: boolean) => void
   setSpeed: (speed: SimulationSpeed) => void
@@ -69,58 +70,6 @@ interface SimulationState {
 }
 
 const palette = [0xf97316, 0x38bdf8, 0x34d399, 0xf59e0b, 0xe879f9, 0xfb7185]
-
-const seedResidents: ResidentPosition[] = [
-  {
-    id: 'r-ava',
-    name: 'Ava',
-    x: 7,
-    y: 8,
-    color: 0x38bdf8,
-    status: 'happy',
-  },
-  {
-    id: 'r-milo',
-    name: 'Milo',
-    x: 13,
-    y: 12,
-    color: 0xf97316,
-    status: 'chatting',
-    dialogueText: '早上要去咖啡馆吗？',
-  },
-  {
-    id: 'r-juno',
-    name: 'Juno',
-    x: 24,
-    y: 9,
-    color: 0x34d399,
-    status: 'sad',
-  },
-  {
-    id: 'r-lina',
-    name: 'Lina',
-    x: 31,
-    y: 18,
-    color: 0xe879f9,
-    status: 'thinking',
-  },
-  {
-    id: 'r-noah',
-    name: 'Noah',
-    x: 18,
-    y: 22,
-    color: 0xf59e0b,
-    status: 'walking',
-  },
-  {
-    id: 'r-zoe',
-    name: 'Zoe',
-    x: 10,
-    y: 24,
-    color: 0xfb7185,
-    status: 'angry',
-  },
-]
 
 function clampTilePosition(value: number, max: number): number {
   return Math.max(0, Math.min(value, max))
@@ -155,13 +104,25 @@ function statusFromAction(action?: string, fallback?: ResidentStatus): ResidentS
   }
 }
 
+function appendRecentMessages(existing: string[], incoming: string[]): string[] {
+  if (incoming.length === 0) {
+    return existing
+  }
+
+  return [...existing, ...incoming].slice(-5)
+}
+
 export const useSimulationStore = create<SimulationState>((set) => ({
   tick: 16,
   tickPerDay: 48,
   time: 'Day 1, 08:00',
   running: true,
   speed: 1,
-  residents: seedResidents,
+  residents: [],
+  messageFeed: [
+    '等待居民进入场景...',
+    '连接建立后，这里会滚动显示最新事件与对话。',
+  ],
   selectedResidentId: null,
   setRunning: (running) => set({ running }),
   setSpeed: (speed) => set({ speed, running: speed !== 0 }),
@@ -170,9 +131,17 @@ export const useSimulationStore = create<SimulationState>((set) => ({
     set((state) => {
       const residentMap = new Map(state.residents.map((resident) => [resident.id, resident]))
       const dialogueByResident = new Map<string, string>()
+      const freshMessages: string[] = []
 
       for (const dialogue of tickState.dialogues ?? []) {
         dialogueByResident.set(dialogue.from_id, dialogue.text)
+        const fromName = residentMap.get(dialogue.from_id)?.name ?? dialogue.from_id
+        const toName = residentMap.get(dialogue.to_id)?.name ?? dialogue.to_id
+        freshMessages.push(`${fromName} 对 ${toName} 说：${dialogue.text}`)
+      }
+
+      for (const event of tickState.events ?? []) {
+        freshMessages.push(`事件：${event.description}`)
       }
 
       for (const movement of tickState.movements) {
@@ -207,6 +176,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
       return {
         tick: tickState.tick,
         time: tickState.time,
+        messageFeed: appendRecentMessages(state.messageFeed, freshMessages),
         residents: Array.from(residentMap.values()),
       }
     })
@@ -229,13 +199,16 @@ export const useSimulationStore = create<SimulationState>((set) => ({
         }
       })
 
-      return {
-        tick: snapshot.tick ?? state.tick,
-        time: snapshot.time ?? state.time,
-        running: snapshot.running ?? state.running,
-        // Use snapshot residents if non-empty, otherwise keep existing
-        residents: residents.length > 0 ? residents : state.residents,
-      }
-    })
+        return {
+          tick: snapshot.tick ?? state.tick,
+          time: snapshot.time ?? state.time,
+          running: snapshot.running ?? state.running,
+          messageFeed:
+            residents.length > 0
+              ? appendRecentMessages(state.messageFeed, ['首帧快照已到达，居民开始进入小镇。'])
+              : appendRecentMessages(state.messageFeed, ['首帧快照为空，等待居民加载...']),
+          residents,
+        }
+      })
   },
 }))

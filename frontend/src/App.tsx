@@ -1,8 +1,7 @@
 import { Suspense, lazy, useState } from 'react'
 
 import { Toolbar } from './components/toolbar/Toolbar'
-import { WelcomePage } from './components/ui/WelcomePage'
-import { ScenePicker } from './components/ui/ScenePicker'
+import { FirstRunGuide, LoadingTransition, ScenePicker, WelcomePage } from './components/ui'
 import { useWebSocket } from './hooks/useWebSocket'
 
 const TownCanvas = lazy(() =>
@@ -34,16 +33,29 @@ function PanelFallback({ tone, title }: { tone: 'amber' | 'cyan'; title: string 
 }
 
 function SimulationView() {
-  const { connected, disconnected } = useWebSocket()
+  const {
+    connected,
+    disconnected,
+    hasInitialSnapshot,
+    startupTimedOut,
+    retry,
+  } = useWebSocket()
+
+  if (!hasInitialSnapshot) {
+    return <LoadingTransition onRetry={retry} timedOut={startupTimedOut} />
+  }
 
   return (
     <main className="relative min-h-screen bg-slate-950 text-slate-100">
       {/* Disconnection overlay (spec §13) */}
       {disconnected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-slate-900 px-10 py-8 shadow-2xl">
-            <span className="h-6 w-6 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
-            <p className="text-sm font-medium text-cyan-200">连接中…</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/72 backdrop-blur-md">
+          <div className="flex flex-col items-center gap-4 rounded-[28px] border border-white/10 bg-slate-900/90 px-10 py-9 shadow-[0_24px_80px_rgba(2,6,23,0.62)]">
+            <span className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-300/90 border-t-transparent" />
+            <div className="text-center">
+              <p className="text-[11px] uppercase tracking-[0.34em] text-cyan-100/70">Connection Interrupted</p>
+              <p className="mt-3 text-base font-medium text-cyan-50">连接中断，正在重连...</p>
+            </div>
           </div>
         </div>
       )}
@@ -124,6 +136,7 @@ function SimulationView() {
           <Toolbar />
         </footer>
       </div>
+      <FirstRunGuide enabled={hasInitialSnapshot} />
     </main>
   )
 }

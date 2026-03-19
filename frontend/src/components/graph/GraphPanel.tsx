@@ -65,6 +65,17 @@ export function GraphPanel() {
         relationship={hoveredRelationship}
         residents={residents}
       />
+      {relationships.length === 0 && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/45 backdrop-blur-[2px]">
+          <div className="max-w-sm rounded-[22px] border border-amber-200/15 bg-slate-950/84 px-6 py-5 text-center shadow-[0_18px_44px_rgba(8,15,31,0.45)]">
+            <p className="text-[11px] uppercase tracking-[0.32em] text-amber-100/70">Graph Pending</p>
+            <p className="mt-3 font-display text-2xl text-white">暂无关系数据</p>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              观察居民互动后将自动更新。
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

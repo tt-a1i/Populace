@@ -43,3 +43,17 @@
     letter-spacing: -0.02em;
   }
 }
+
+@keyframes message-marquee {
+  0% {
+    transform: translateX(0%);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.message-marquee {
+  animation: message-marquee 22s linear infinite;
+}

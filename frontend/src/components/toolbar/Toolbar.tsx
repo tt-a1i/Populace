@@ -4,6 +4,7 @@ import { EventInjector } from './EventInjector'
 import { PersonaEditor } from './PersonaEditor'
 import { SpeedControl } from './SpeedControl'
 import { DailyReport } from '../report'
+import { MessageBar } from '../ui'
 
 type ToolKey = 'event' | 'persona' | 'build' | 'report'
 
@@ -88,6 +89,8 @@ export function Toolbar() {
             {tools.find((tool) => tool.key === activeTool)?.label}
           </span>
         </div>
+
+        <MessageBar />
       </div>
 
       {panel}
