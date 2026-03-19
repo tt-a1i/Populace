@@ -1,15 +1,13 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { setSpeed, startSimulation, stopSimulation } from '../../services/api'
 import { useSimulationStore, type SimulationSpeed } from '../../stores'
 
-const speeds: Array<{ label: string; value: Exclude<SimulationSpeed, 0> }> = [
-  { label: '1x', value: 1 },
-  { label: '2x', value: 2 },
-  { label: '5x', value: 5 },
-]
+const speedValues: Array<Exclude<SimulationSpeed, 0>> = [1, 2, 5]
 
 export function SpeedControl() {
+  const { t } = useTranslation()
   const speed = useSimulationStore((state) => state.speed)
   const setStoreSpeed = useSimulationStore((state) => state.setSpeed)
   const setRunning = useSimulationStore((state) => state.setRunning)
@@ -50,22 +48,22 @@ export function SpeedControl() {
             : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
         }`}
       >
-        ⏸ 暂停
+        {t('speed.pause')}
       </button>
 
-      {speeds.map((entry) => (
+      {speedValues.map((val) => (
         <button
-          key={entry.value}
+          key={val}
           type="button"
-          onClick={() => void handleSpeedChange(entry.value)}
+          onClick={() => void handleSpeedChange(val)}
           disabled={busy}
           className={`rounded-full border px-4 py-2 text-sm transition ${
-            speed === entry.value
+            speed === val
               ? 'border-cyan-300/40 bg-cyan-300/15 text-cyan-50'
               : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
           }`}
         >
-          {entry.label}
+          {t(`speed.${val}x` as 'speed.1x' | 'speed.2x' | 'speed.5x')}
         </button>
       ))}
     </div>

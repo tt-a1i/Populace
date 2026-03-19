@@ -1,4 +1,6 @@
 """Tests for World state management."""
+from types import SimpleNamespace
+
 import pytest
 
 from engine.types import Building, MovementUpdate, TickState, WorldConfig
@@ -64,6 +66,44 @@ def test_get_nearby_agents_custom_radius(mock_world):
         abs(a.resident.x - 5) + abs(a.resident.y - 5) <= 1
         for a in nearby
     )
+
+
+def test_get_nearby_agents_uses_grid_index_without_full_agent_scan(mock_world):
+    mock_world.rebuild_grid_index()
+
+    class PoisonResident:
+        id = "poison"
+        location = None
+
+        @property
+        def x(self):
+            raise AssertionError("get_nearby_agents should read indexed buckets, not scan every agent")
+
+        @property
+        def y(self):
+            raise AssertionError("get_nearby_agents should read indexed buckets, not scan every agent")
+
+    mock_world.agents.append(SimpleNamespace(resident=PoisonResident()))
+
+    nearby = mock_world.get_nearby_agents(5, 5)
+    ids = {agent.resident.id for agent in nearby}
+
+    assert "a2" in ids
+    assert "poison" not in ids
+
+
+def test_tick_rebuilds_grid_index(mock_world):
+    mock_world.grid_index.clear()
+
+    mock_world.tick()
+
+    indexed_ids = {
+        agent.resident.id
+        for bucket in mock_world.grid_index.values()
+        for agent in bucket
+    }
+
+    assert {"a1", "a2", "a3"} <= indexed_ids
 
 
 def test_simulation_time_format(mock_world):

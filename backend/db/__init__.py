@@ -14,7 +14,19 @@ from backend.db.neo4j import (
     save_reflection,
     save_resident,
 )
-from backend.db.redis import close_redis, get_json, get_redis, set_json
+from backend.db.redis import (
+    cache_agent_memory,
+    clear_agent_memory_cache,
+    close_redis,
+    get_json,
+    get_redis,
+    load_agent_positions,
+    load_cached_memories,
+    publish_tick_event,
+    save_agent_positions,
+    set_json,
+    subscribe_tick_events,
+)
 
 __all__ = [
     "close_driver",
@@ -35,4 +47,11 @@ __all__ = [
     "save_reflection",
     "save_resident",
     "set_json",
+    "cache_agent_memory",
+    "clear_agent_memory_cache",
+    "load_agent_positions",
+    "load_cached_memories",
+    "publish_tick_event",
+    "save_agent_positions",
+    "subscribe_tick_events",
 ]

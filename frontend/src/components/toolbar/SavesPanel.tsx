@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { type SaveMeta, deleteSave, listSaves, loadSave, saveGame } from '../../services/api'
 
 export function SavesPanel() {
+  const { t } = useTranslation()
   const [saves, setSaves] = useState<SaveMeta[]>([])
   const [saveName, setSaveName] = useState('')
   const [saving, setSaving] = useState(false)
@@ -32,7 +34,7 @@ export function SavesPanel() {
     try {
       await saveGame(saveName.trim())
       setSaveName('')
-      flash('存档成功')
+      flash(t('saves.success'))
       await fetchSaves()
     } catch (e) {
       setError(e instanceof Error ? e.message : '存档失败')
@@ -46,7 +48,7 @@ export function SavesPanel() {
     setError(null)
     try {
       await loadSave(id)
-      flash(`已加载「${name}」`)
+      flash(t('saves.load_success', { name }))
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
     } finally {
@@ -80,14 +82,14 @@ export function SavesPanel() {
 
   return (
     <div className="rounded-[24px] border border-white/10 bg-slate-950/70 p-5 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
-      <p className="text-[11px] uppercase tracking-[0.3em] text-violet-200/70">Saves</p>
-      <h3 className="mt-2 font-display text-2xl text-white">多存档管理</h3>
+      <p className="text-[11px] uppercase tracking-[0.3em] text-violet-200/70">{t('saves.badge')}</p>
+      <h3 className="mt-2 font-display text-2xl text-white">{t('saves.title')}</h3>
 
       {/* Save current state */}
       <div className="mt-4 flex gap-2">
         <input
           className="flex-1 rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-violet-400/50"
-          placeholder="存档名称（可留空）"
+          placeholder={t('saves.name_placeholder')}
           value={saveName}
           onChange={(e) => setSaveName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void handleSave()}
@@ -100,7 +102,7 @@ export function SavesPanel() {
           {saving ? (
             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-transparent" />
           ) : '💾'}
-          保存
+          {t('saves.save')}
         </button>
       </div>
 
@@ -115,7 +117,7 @@ export function SavesPanel() {
       {/* Save list */}
       <div className="mt-4 space-y-2">
         {saves.length === 0 ? (
-          <p className="text-sm text-slate-500">暂无存档</p>
+          <p className="text-sm text-slate-500">{t('saves.empty')}</p>
         ) : (
           saves.map((save) => (
             <div
@@ -134,14 +136,14 @@ export function SavesPanel() {
                   disabled={loading === save.id}
                   className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-400/20 disabled:opacity-40"
                 >
-                  {loading === save.id ? '…' : '加载'}
+                  {loading === save.id ? t('saves.loading') : t('saves.load')}
                 </button>
                 <button
                   onClick={() => void handleDelete(save.id)}
                   disabled={deleting === save.id}
                   className="rounded-lg border border-red-400/20 bg-red-400/8 px-3 py-1 text-xs font-semibold text-red-400 transition hover:bg-red-400/15 disabled:opacity-40"
                 >
-                  {deleting === save.id ? '…' : '删除'}
+                  {deleting === save.id ? t('saves.deleting') : t('saves.delete')}
                 </button>
               </div>
             </div>

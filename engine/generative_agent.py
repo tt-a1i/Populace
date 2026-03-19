@@ -92,11 +92,22 @@ class GenerativeAgent(Agent):
     # ------------------------------------------------------------------
 
     def memorize(self, event: Event) -> None:
-        """Convert *event* to a Memory and store it in the stream."""
-        self.memory_stream.add(Memory(
+        """Convert *event* to a Memory, store it in the stream, and cache in Redis."""
+        mem = Memory(
             id=str(uuid.uuid4()),
             content=event.description,
             timestamp=event.timestamp,
             importance=0.5,
             emotion="neutral",
-        ))
+        )
+        self.memory_stream.add(mem)
+        # Non-blocking write to Redis short-term memory cache (spec §4.1)
+        try:
+            import asyncio
+            loop = asyncio.get_running_loop()
+            from backend.db.redis import cache_agent_memory
+            loop.create_task(cache_agent_memory(self.resident.id, mem))
+        except RuntimeError:
+            pass  # No running event loop (e.g. unit tests) — skip silently
+        except Exception:
+            pass  # Redis unavailable — skip silently

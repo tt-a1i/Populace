@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { getResidents, updateResident, type ApiResident } from '../../services/api'
 import { useSimulationStore } from '../../stores'
@@ -6,6 +7,7 @@ import { useSimulationStore } from '../../stores'
 const moodOptions = ['neutral', 'happy', 'sad', 'angry']
 
 export function PersonaEditor() {
+  const { t } = useTranslation()
   const simulationResidents = useSimulationStore((state) => state.residents)
   const [residents, setResidents] = useState<ApiResident[]>([])
   const [residentId, setResidentId] = useState('')
@@ -102,8 +104,8 @@ export function PersonaEditor() {
   if (loading) {
     return (
       <div className="grid gap-4 rounded-[24px] border border-white/10 bg-slate-950/70 p-4 text-slate-100 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
-        <p className="text-[11px] uppercase tracking-[0.3em] text-amber-100/70">Persona Editor</p>
-        <p className="text-sm text-slate-300">正在同步居民列表...</p>
+        <p className="text-[11px] uppercase tracking-[0.3em] text-amber-100/70">{t('persona.badge')}</p>
+        <p className="text-sm text-slate-300">{t('persona.loading')}</p>
       </div>
     )
   }
@@ -112,19 +114,12 @@ export function PersonaEditor() {
     return (
       <div className="grid gap-4 rounded-[24px] border border-white/10 bg-slate-950/70 p-4 text-slate-100 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.3em] text-amber-100/70">Persona Editor</p>
-          <h3 className="mt-2 font-display text-2xl text-white">暂无可编辑对象</h3>
+          <p className="text-[11px] uppercase tracking-[0.3em] text-amber-100/70">{t('persona.badge')}</p>
+          <h3 className="mt-2 font-display text-2xl text-white">{t('persona.title')}</h3>
         </div>
-        <p className="text-sm leading-6 text-slate-300">暂无居民，请先启动模拟。</p>
-        {loadFailed ? (
-          <p className="text-xs uppercase tracking-[0.24em] text-rose-200/70">
-            后端暂不可达，当前不会回退到前端 mock 居民。
-          </p>
-        ) : (
-          <p className="text-xs uppercase tracking-[0.24em] text-slate-400">
-            地图仍可使用 simulation store 的默认占位居民做前端演示，但人设编辑仅面向后端真实居民。
-          </p>
-        )}
+        <p className="text-sm leading-6 text-slate-300">
+          {loadFailed ? t('persona.load_failed') : t('persona.loading')}
+        </p>
       </div>
     )
   }
@@ -132,12 +127,12 @@ export function PersonaEditor() {
   return (
     <div className="grid gap-4 rounded-[24px] border border-white/10 bg-slate-950/70 p-4 text-slate-100 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
       <div>
-        <p className="text-[11px] uppercase tracking-[0.3em] text-amber-100/70">Persona Editor</p>
-        <h3 className="mt-2 font-display text-2xl text-white">改写居民命运</h3>
+        <p className="text-[11px] uppercase tracking-[0.3em] text-amber-100/70">{t('persona.badge')}</p>
+        <h3 className="mt-2 font-display text-2xl text-white">{t('persona.title')}</h3>
       </div>
 
       <label className="grid gap-2 text-sm text-slate-300">
-        选择居民
+        {t('persona.select')}
         <select
           value={residentId}
           onChange={(event) => setResidentId(event.target.value)}
@@ -152,7 +147,7 @@ export function PersonaEditor() {
       </label>
 
       <label className="grid gap-2 text-sm text-slate-300">
-        名字
+        {t('persona.name')}
         <input
           value={name}
           onChange={(event) => setName(event.target.value)}
@@ -161,7 +156,7 @@ export function PersonaEditor() {
       </label>
 
       <label className="grid gap-2 text-sm text-slate-300">
-        性格描述
+        {t('persona.personality')}
         <textarea
           value={personality}
           onChange={(event) => setPersonality(event.target.value)}
@@ -171,7 +166,7 @@ export function PersonaEditor() {
       </label>
 
       <label className="grid gap-2 text-sm text-slate-300">
-        当前情绪
+        {t('persona.mood')}
         <select
           value={mood}
           onChange={(event) => setMood(event.target.value)}
@@ -186,7 +181,7 @@ export function PersonaEditor() {
       </label>
 
       <label className="grid gap-2 text-sm text-slate-300">
-        目标（用逗号分隔）
+        {t('persona.goals')}
         <textarea
           value={goals}
           onChange={(event) => setGoals(event.target.value)}
@@ -201,11 +196,11 @@ export function PersonaEditor() {
         onClick={() => void handleSave()}
         className="rounded-2xl border border-amber-300/30 bg-amber-300/15 px-5 py-3 text-sm font-medium text-amber-50 transition hover:bg-amber-300/25 disabled:opacity-50"
       >
-        保存人设
+        {t('persona.save')}
       </button>
 
       <p className="text-xs uppercase tracking-[0.24em] text-slate-400">
-        simulation store 当前有 {simulationResidents.length} 个默认占位居民；编辑器仅使用后端返回的真实居民。
+        {t('persona.hint', { count: simulationResidents.length })}
       </p>
     </div>
   )

@@ -261,6 +261,10 @@ export class GraphRenderer {
       source: relationship.from_id,
       target: relationship.to_id,
     }))
+    const relationshipChanges = classifyRelationshipChanges(
+      Array.from(this.previousRelationships.values()),
+      relationships,
+    )
 
     this.updateNodes(nodes)
     this.updateLabels(nodes)
@@ -268,18 +272,8 @@ export class GraphRenderer {
     this.updateTriangles(links)
     this.updateLinks(
       links,
-      new Set(
-        classifyRelationshipChanges(
-          Array.from(this.previousRelationships.values()),
-          relationships,
-        ).enteringKeys,
-      ),
-      new Set(
-        classifyRelationshipChanges(
-          Array.from(this.previousRelationships.values()),
-          relationships,
-        ).intensifyingKeys,
-      ),
+      new Set(relationshipChanges.enteringKeys),
+      new Set(relationshipChanges.intensifyingKeys),
     )
     this.previousRelationships = new Map(
       relationships.map((relationship) => [graphLinkKey(relationship), { ...relationship }]),

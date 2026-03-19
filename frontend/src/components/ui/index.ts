@@ -1,4 +1,5 @@
 export { FirstRunGuide } from './FirstRunGuide'
+export { LanguageSwitcher } from './LanguageSwitcher'
 export { LoadingTransition } from './LoadingTransition'
 export { MessageBar } from './MessageBar'
 export { ScenePicker } from './ScenePicker'

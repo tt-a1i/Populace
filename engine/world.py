@@ -6,12 +6,16 @@ loop each time step (§8).
 """
 from __future__ import annotations
 
+import math
 import random
 from typing import Dict, List, Optional, Tuple
 
 from engine.agent import Agent
 from engine.pathfinding import PathCache
 from engine.types import Building, Event, MovementUpdate, Relationship, TickState, WeatherType, WorldConfig
+
+_EXTROVERT_KEYWORDS = ("外向", "开朗", "活泼", "健谈", "社牛", "extrovert", "outgoing")
+_INTROVERT_KEYWORDS = ("内向", "安静", "害羞", "社恐", "introvert", "shy")
 
 
 class World:
@@ -41,6 +45,9 @@ class World:
         self.relationships: Dict[Tuple[str, str], Relationship] = {}
         self.weather: WeatherType = WeatherType.sunny
         self.path_cache: PathCache = PathCache()
+        self.grid_chunk_size: int = max(1, self.config.interaction_distance)
+        self.grid_index: Dict[Tuple[int, int], List[Agent]] = {}
+        self._grid_index_dirty = True
 
     # ------------------------------------------------------------------
     # Agent management
@@ -55,6 +62,7 @@ class World:
         """
         agent.memory_stream._config = self.config
         self.agents.append(agent)
+        self.mark_grid_index_dirty()
 
     def remove_agent(self, agent_id: str) -> None:
         """Remove an agent from the world by its resident id."""
@@ -62,6 +70,7 @@ class World:
         stale_keys = [key for key in self.relationships if agent_id in key]
         for key in stale_keys:
             del self.relationships[key]
+        self.mark_grid_index_dirty()
 
     def get_relationship(self, from_id: str, to_id: str) -> Optional[Relationship]:
         """Return the directed relationship edge from one resident to another."""
@@ -74,6 +83,27 @@ class World:
     def remove_relationship(self, from_id: str, to_id: str) -> None:
         """Delete a directed relationship edge if it exists."""
         self.relationships.pop((from_id, to_id), None)
+
+    def mark_grid_index_dirty(self) -> None:
+        """Mark the nearby-agent spatial index for rebuild before next query."""
+        self._grid_index_dirty = True
+
+    def rebuild_grid_index(self) -> None:
+        """Rebuild the spatial bucket index for agents currently on the map."""
+        chunk_size = max(1, self.config.interaction_distance)
+        if chunk_size != self.grid_chunk_size:
+            self.grid_chunk_size = chunk_size
+
+        next_index: Dict[Tuple[int, int], List[Agent]] = {}
+        for agent in self.agents:
+            if agent.resident.location is not None:
+                continue
+
+            bucket = self._bucket_key(agent.resident.x, agent.resident.y)
+            next_index.setdefault(bucket, []).append(agent)
+
+        self.grid_index = next_index
+        self._grid_index_dirty = False
 
     def get_nearby_agents(self, x: int, y: int, radius: Optional[int] = None) -> List[Agent]:
         """Return agents within Manhattan distance of tile (x, y).
@@ -91,11 +121,21 @@ class World:
         """
         if radius is None:
             radius = self.config.interaction_distance
-        return [
-            a for a in self.agents
-            if a.resident.location is None
-            and 0 < abs(a.resident.x - x) + abs(a.resident.y - y) <= radius
-        ]
+        if self._grid_index_dirty:
+            self.rebuild_grid_index()
+
+        bucket_span = max(1, math.ceil(radius / self.grid_chunk_size))
+        origin_bucket_x, origin_bucket_y = self._bucket_key(x, y)
+        nearby: List[Agent] = []
+
+        for bucket_x in range(origin_bucket_x - bucket_span, origin_bucket_x + bucket_span + 1):
+            for bucket_y in range(origin_bucket_y - bucket_span, origin_bucket_y + bucket_span + 1):
+                for agent in self.grid_index.get((bucket_x, bucket_y), []):
+                    distance = abs(agent.resident.x - x) + abs(agent.resident.y - y)
+                    if 0 < distance <= radius:
+                        nearby.append(agent)
+
+        return nearby
 
     def get_social_candidates(self, agent: Agent) -> List[Agent]:
         """Return agents that can socially interact with *agent* this tick."""
@@ -140,6 +180,7 @@ class World:
             return False
 
         agent.resident.location = building.id
+        self.mark_grid_index_dirty()
         if building.type == "home":
             agent.resident.mood = "neutral"
         return True
@@ -154,6 +195,7 @@ class World:
         building = self.get_building(building_id)
         if building is not None:
             agent.resident.x, agent.resident.y = building.position
+        self.mark_grid_index_dirty()
 
     def get_social_probability_bonus(self, agent_a: Agent, agent_b: Agent) -> float:
         """Return building-based social bonus for an agent pair."""
@@ -167,6 +209,20 @@ class World:
         if building.type == "cafe":
             return 0.2
         return 0.0
+
+    def get_social_probability(self, agent_a: Agent, agent_b: Agent) -> float:
+        """Return the combined base + building social probability."""
+        ext_a = self._extroversion(agent_a.resident.personality)
+        ext_b = self._extroversion(agent_b.resident.personality)
+        relationship = self.get_relationship(agent_a.resident.id, agent_b.resident.id)
+
+        relation_bonus = 0.0
+        if relationship is not None:
+            relation_bonus = relationship.familiarity * 0.10 + relationship.intensity * 0.15
+
+        extroversion_bonus = ((ext_a + ext_b) / 2) * 0.30
+        probability = 0.15 + extroversion_bonus + relation_bonus + self.get_social_probability_bonus(agent_a, agent_b)
+        return max(0.05, min(0.95, probability))
 
     def apply_building_effects(self, agent: Agent) -> None:
         """Apply passive effects from the building the agent is inside."""
@@ -184,6 +240,14 @@ class World:
     def building_stay_duration(self) -> int:
         """Return the random number of ticks an agent stays indoors."""
         return random.randint(3, 8)
+
+    def _extroversion(self, personality: str) -> float:
+        text = personality.lower()
+        if any(keyword in text for keyword in _EXTROVERT_KEYWORDS):
+            return 0.8
+        if any(keyword in text for keyword in _INTROVERT_KEYWORDS):
+            return 0.2
+        return 0.5
 
     # ------------------------------------------------------------------
     # Simulation loop (§8)
@@ -203,6 +267,7 @@ class World:
             A :class:`~engine.types.TickState` describing everything that
             changed this tick (pushed to the frontend via WebSocket).
         """
+        self.rebuild_grid_index()
         self.path_cache.clear()
         self.current_tick += 1
         sim_time = self.simulation_time()
@@ -237,6 +302,9 @@ class World:
         minutes_in_day = tick_in_day * 30
         hour, minute = divmod(minutes_in_day, 60)
         return f"Day {day}, {hour:02d}:{minute:02d}"
+
+    def _bucket_key(self, x: int, y: int) -> Tuple[int, int]:
+        return (x // self.grid_chunk_size, y // self.grid_chunk_size)
 
     def __repr__(self) -> str:
         return (

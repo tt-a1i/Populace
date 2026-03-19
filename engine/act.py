@@ -99,6 +99,7 @@ def _step_astar(agent: "Agent", target: tuple, world: "World") -> None:
         next_pos = agent.current_path[0]
         if _is_walkable(next_pos[0], next_pos[1], world):
             res.x, res.y = next_pos
+            world.mark_grid_index_dirty()
             agent.current_path = agent.current_path[1:]
             _maybe_enter_building(agent, world)
         else:
@@ -120,6 +121,7 @@ def _step_random(agent: "Agent", world: "World") -> None:
     walkable = [p for p in candidates if _is_walkable(p[0], p[1], world)]
     if walkable:
         res.x, res.y = random.choice(walkable)
+        world.mark_grid_index_dirty()
         _maybe_enter_building(agent, world)
 
 

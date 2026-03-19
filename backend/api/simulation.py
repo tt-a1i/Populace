@@ -36,9 +36,14 @@ class SimulationState:
     async def restore_from_neo4j(self) -> None:
         """Attempt to restore memories/reflections/relationships from Neo4j.
 
-        Silently skips if Neo4j is unavailable (spec §12).
-        Agent positions are reset to home building entrance.
+        Before consulting Neo4j, tries Redis short-term memory cache for each
+        agent (faster).  Agent positions are reset to home building entrance
+        (spec §12).
         """
+        # --- Step 1: Redis short-term memory (fast path) ---
+        await self._restore_from_redis()
+
+        # --- Step 2: Neo4j long-term memory / relationships ---
         try:
             from backend.db.neo4j import load_residents, restore_world_memories
             existing = await load_residents()
@@ -49,6 +54,44 @@ class SimulationState:
             self._log.info("Neo4j: session restored (%d existing residents).", len(existing))
         except Exception as exc:
             self._log.warning("Neo4j restore skipped: %s", exc)
+
+    async def _restore_from_redis(self) -> None:
+        """Re-hydrate short-term memory from Redis cache (spec §4.1).
+
+        Also applies cached agent positions.  Silently skips on failure.
+        """
+        try:
+            from backend.db.redis import load_agent_positions, load_cached_memories
+            from engine.types import Memory
+
+            # Restore short-term memories
+            for agent in self.world.agents:
+                cached = await load_cached_memories(agent.resident.id)
+                for row in cached:
+                    try:
+                        mem = Memory(
+                            id=row["id"],
+                            content=row["content"],
+                            timestamp=row["timestamp"],
+                            importance=float(row["importance"]),
+                            emotion=row["emotion"],
+                        )
+                        agent.memory_stream.add(mem)
+                    except Exception:
+                        pass
+
+            # Restore cached positions
+            positions = await load_agent_positions()
+            agent_map = {a.resident.id: a for a in self.world.agents}
+            for rid, (x, y) in positions.items():
+                if rid in agent_map:
+                    agent_map[rid].resident.x = x
+                    agent_map[rid].resident.y = y
+
+            if positions or any(positions):
+                self._log.info("Redis: restored positions for %d agents.", len(positions))
+        except Exception as exc:
+            self._log.debug("Redis restore skipped: %s", exc)
 
     @property
     def pending_events(self) -> list[dict[str, Any]]:
@@ -349,13 +392,16 @@ class SimulationState:
         for agent, p in results:
             agent.act(p, self.world)
 
+        # Rebuild the spatial buckets once after movement so nearby lookups
+        # in the social phase avoid scanning every resident.
+        self.world.rebuild_grid_index()
+
         # Social phase — spec §8: dialogue LLM must NOT block the tick.
         # Pattern: fire tasks this tick, harvest completed results next tick.
         from engine.social import (
             DialogueResult,
             decay_relationships,
             initiate_dialogue,
-            should_interact,
             update_relationships_from_dialogue,
         )
         from engine.types import DialogueUpdate
@@ -420,19 +466,19 @@ class SimulationState:
                 seen_pairs.add(pair)
                 if dialogue_count >= cfg.max_dialogues_per_tick:
                     break
-                should_start = should_interact(a, b, self.world)
-                if not should_start:
-                    bonus = self.world.get_social_probability_bonus(a, b)
-                    # Weather social modifiers
-                    if weather is WeatherType.stormy:
-                        bonus -= 0.30
-                    elif weather is WeatherType.snowy:
-                        in_cafe = (a.resident.location == b.resident.location
-                                   and a.resident.location is not None
-                                   and self.world.get_building(a.resident.location) is not None
-                                   and self.world.get_building(a.resident.location).type == "cafe")
-                        bonus += 0.20 if in_cafe else -0.10
-                    should_start = random.random() < max(0.0, bonus)
+                probability = self.world.get_social_probability(a, b)
+                if weather is WeatherType.stormy:
+                    probability -= 0.30
+                elif weather is WeatherType.snowy:
+                    in_cafe = (
+                        a.resident.location == b.resident.location
+                        and a.resident.location is not None
+                        and self.world.get_building(a.resident.location) is not None
+                        and self.world.get_building(a.resident.location).type == "cafe"
+                    )
+                    probability += 0.20 if in_cafe else -0.10
+
+                should_start = random.random() < max(0.0, min(0.95, probability))
                 if not should_start:
                     continue
                 task = asyncio.create_task(initiate_dialogue(a, b, self.world))
@@ -467,7 +513,19 @@ class SimulationState:
         if interval > 0 and self.world.current_tick % interval == 0:
             asyncio.create_task(self._persist_snapshot())
 
+        # --- Redis cache (spec §4.1 + §12) ---
+        asyncio.create_task(self._redis_tick(tick_state))
+
         return tick_state
+
+    async def _redis_tick(self, tick_state: Any) -> None:
+        """Fire-and-forget Redis updates every tick (non-blocking)."""
+        try:
+            from backend.db.redis import publish_tick_event, save_agent_positions
+            await save_agent_positions(self.world)
+            await publish_tick_event(tick_state)
+        except Exception as exc:
+            self._log.debug("Redis tick update skipped: %s", exc)
 
     async def _persist_relationships(self) -> None:
         """Write all current relationship edges to Neo4j (non-blocking fire-and-forget)."""

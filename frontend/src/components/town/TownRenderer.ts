@@ -3,6 +3,7 @@ import { Application, Container, Graphics, Rectangle, Text } from 'pixi.js'
 import { useSimulationStore, type ResidentPosition, type SimulationSpeed } from '../../stores/simulation'
 import type { Building } from '../../types'
 import { ResidentSprite } from './ResidentSprite'
+import { ResidentSpritePool } from './ResidentSpritePool'
 import { RainEffect } from './effects/RainEffect'
 import { SnowEffect } from './effects/SnowEffect'
 import { StormEffect } from './effects/StormEffect'
@@ -16,6 +17,18 @@ const WORLD_WIDTH = MAP_WIDTH * TILE_SIZE
 const WORLD_HEIGHT = MAP_HEIGHT * TILE_SIZE
 const CAMERA_PADDING = 56
 type TileKind = 'grass' | 'road' | 'water'
+const POOLED_RESIDENT_PLACEHOLDER: ResidentPosition = {
+  id: '__pool__',
+  name: '',
+  x: 0,
+  y: 0,
+  targetX: 0,
+  targetY: 0,
+  color: 0x94a3b8,
+  status: 'idle',
+  currentBuildingId: null,
+  dialogueText: null,
+}
 
 interface SimulationMeta {
   running: boolean
@@ -59,6 +72,12 @@ export class TownRenderer {
   private readonly effectLayer = new Container()
   private readonly uiLayer = new Container()
   private readonly residents = new Map<string, ResidentSprite>()
+  private readonly residentSpritePool = new ResidentSpritePool<ResidentSprite>(
+    () =>
+      new ResidentSprite(POOLED_RESIDENT_PLACEHOLDER, {
+        onFocusRequest: this.followResident,
+      }),
+  )
   private readonly tileGraphics = new Graphics()
   private readonly buildingGraphics = new Graphics()
   private readonly ambientAccent = new Graphics()
@@ -261,7 +280,8 @@ export class TownRenderer {
         continue
       }
 
-      const newSprite = new ResidentSprite(resident, {
+      const newSprite = this.residentSpritePool.acquire()
+      newSprite.reuse(resident, {
         onFocusRequest: this.followResident,
       })
       newSprite.setSimulationSpeed(this.simulationMeta.speed)
@@ -278,7 +298,8 @@ export class TownRenderer {
       }
 
       this.residentLayer.removeChild(sprite)
-      sprite.destroy({ children: true })
+      sprite.prepareForPool()
+      this.residentSpritePool.release(sprite)
       this.residents.delete(residentId)
     }
 
@@ -368,6 +389,9 @@ export class TownRenderer {
     }
 
     this.residents.clear()
+    this.residentSpritePool.drain((sprite) => {
+      sprite.destroy({ children: true })
+    })
   }
 
   private readonly animate = (): void => {

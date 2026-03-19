@@ -103,7 +103,7 @@ interface ResidentSpriteOptions {
 }
 
 export class ResidentSprite extends Container {
-  readonly residentId: string
+  residentId: string
 
   private readonly highlightGlow = new Graphics()
   private readonly body = new Graphics()
@@ -113,7 +113,7 @@ export class ResidentSprite extends Container {
   private readonly bubbleBackground = new Graphics()
   private readonly bubbleLabel: Text
   private readonly nameLabel: Text
-  private readonly onFocusRequest?: (residentId: string) => void
+  private onFocusRequest?: (residentId: string) => void
 
   private currentAppearance: ResidentAppearance
   private currentAppearanceSignature: string
@@ -183,6 +183,31 @@ export class ResidentSprite extends Container {
     this.on('pointertap', this.handlePointerTap)
 
     this.applyResident(resident, true)
+  }
+
+  reuse(resident: ResidentPosition, options: ResidentSpriteOptions = {}): void {
+    this.residentId = resident.id
+    this.onFocusRequest = options.onFocusRequest
+    this.lastTapAt = 0
+    this.dialogueUntil = 0
+    this.externalHighlight = false
+    this.highlightPulse = 0
+    this.bobTime = 0
+    this.renderBubble(null)
+    this.highlightGlow.visible = false
+    this.alpha = 1
+    this.visible = true
+    this.applyResident(resident, true)
+  }
+
+  prepareForPool(): void {
+    this.dialogueUntil = 0
+    this.externalHighlight = false
+    this.highlightPulse = 0
+    this.bobTime = 0
+    this.renderBubble(null)
+    this.highlightGlow.visible = false
+    this.visible = false
   }
 
   applyResident(resident: ResidentPosition, immediate = false): void {
