@@ -294,8 +294,7 @@ async def persist_world_snapshot(world: Any) -> None:
         for agent in world.agents:
             await save_resident(agent.resident)
             for mem in agent.memory_stream.all:
-                if mem.importance > 0.5:          # only important memories
-                    await save_memory(agent.resident.id, mem)
+                await save_memory(agent.resident.id, mem)
             for reflection in agent.reflections:
                 await save_reflection(agent.resident.id, reflection)
         for rel in world.relationships.values():

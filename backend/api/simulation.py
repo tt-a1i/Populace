@@ -374,6 +374,11 @@ class SimulationState:
             for event in events:
                 agent.memorize(event)
 
+            # Neo4j: real-time memory persistence (spec §12: "每 tick 实时写入")
+            from backend.db.neo4j import save_memory as _neo4j_save_memory
+            for mem in agent.memory_stream.all[-len(events) - 1:]:  # heartbeat + events
+                asyncio.create_task(_neo4j_save_memory(agent.resident.id, mem))
+
             # Step b — agent.retrieve(query)
             query = " ".join(e.description for e in events) if events else tick_time
             memories = agent.retrieve(query)
@@ -385,6 +390,9 @@ class SimulationState:
                     result = await result
                 if result is not None:
                     agent.reflections.append(result)
+                    # Neo4j: real-time reflection persistence (spec §12)
+                    from backend.db.neo4j import save_reflection as _neo4j_save_reflection
+                    asyncio.create_task(_neo4j_save_reflection(agent.resident.id, result))
 
             # Step d — agent.plan(context)
             # Always call agent.plan(); pass use_llm so the Agent subclass

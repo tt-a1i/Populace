@@ -128,8 +128,6 @@ def load_scenario(
     # -------------------------------------------------------------------------
     # Residents → GenerativeAgent → place in home building
     # -------------------------------------------------------------------------
-    from backend.world.buildings import enter_building
-
     for r in data.get("residents", []):
         home_id: str | None = r.get("home_id")
         appearance = _resolve_appearance_fields(r)
@@ -155,7 +153,7 @@ def load_scenario(
         if home_id:
             home = world.get_building(home_id)
             if home is not None:
-                enter_building(agent, home, world)
+                world.enter_building(agent, home)
 
     return world
 
@@ -208,8 +206,6 @@ def load_scenario_from_dict(
     map_data = data.get("map", {})
     _apply_map_tiles(world, map_data, data.get("buildings", []))
 
-    from backend.world.buildings import enter_building
-
     for r in data.get("residents", []):
         home_id: str | None = r.get("home_id")
         appearance = _resolve_appearance_fields(r)
@@ -234,7 +230,7 @@ def load_scenario_from_dict(
         if home_id:
             home = world.get_building(home_id)
             if home is not None:
-                enter_building(agent, home, world)
+                world.enter_building(agent, home)
 
     return world
 
