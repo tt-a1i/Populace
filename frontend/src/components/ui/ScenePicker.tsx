@@ -29,8 +29,14 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
     setError(null)
     try {
       await startSimulation()
-    } catch {
-      // Backend may be unavailable; proceed to UI anyway
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `后端连接失败：${err.message}`
+          : '后端连接失败，请确认服务已启动后重试。',
+      )
+      setLoading(false)
+      return  // Stay on picking page — do NOT enter simulation
     }
     setLoading(false)
     onEnter()

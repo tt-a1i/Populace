@@ -1,5 +1,10 @@
 import { useEffect, useRef } from 'react'
 
+// Precomputed at module load so render stays pure (no Math.random in JSX)
+const PIXEL_DOT_OPACITIES = Array.from({ length: 12 }, (_, i) =>
+  0.4 + ((i * 37 + 13) % 100) / 167,
+)
+
 const FEATURES = [
   {
     icon: '🧠',
@@ -74,11 +79,11 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
 
         {/* Pixel-style decorative bar */}
         <div className="mt-5 flex items-center gap-2 opacity-50">
-          {[...Array(12)].map((_, i) => (
+          {PIXEL_DOT_OPACITIES.map((opacity, i) => (
             <span
               key={i}
               className="inline-block h-1.5 w-1.5 rounded-sm bg-cyan-400"
-              style={{ opacity: Math.random() * 0.6 + 0.4 }}
+              style={{ opacity }}
             />
           ))}
         </div>
