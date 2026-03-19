@@ -57,7 +57,6 @@ async def chat_completion(
         The assistant reply string, or *None* on any failure (timeout,
         server error after retries, or other API error).
     """
-    client = _get_client()
     model = settings.llm_model_name or "gpt-4o-mini"
 
     max_retries = 3
@@ -65,6 +64,7 @@ async def chat_completion(
 
     for attempt in range(1, max_retries + 1):
         try:
+            client = _get_client()  # raises ValueError when no API key configured
             response = await client.chat.completions.create(
                 model=model,
                 messages=messages,  # type: ignore[arg-type]
@@ -90,6 +90,11 @@ async def chat_completion(
                 "LLM API error %d after %d attempt(s): %s",
                 exc.status_code, attempt, exc.message,
             )
+            return None
+
+        except ValueError as exc:
+            # LLM not configured (no API key) — silently return None
+            logger.debug("LLM not configured, skipping call: %s", exc)
             return None
 
         except Exception as exc:  # noqa: BLE001

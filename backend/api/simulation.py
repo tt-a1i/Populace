@@ -36,10 +36,21 @@ class SimulationState:
         return self._events
 
     async def start(self) -> None:
+        import logging
+        _log = logging.getLogger(__name__)
+
         if self._task is not None and not self._task.done():
             return
 
-        validate_llm_config()
+        try:
+            validate_llm_config()
+        except ValueError as exc:
+            _log.warning(
+                "%s — starting in rule-only mode (llm_call_probability=0).", exc
+            )
+            # Patch config so _tick() skips LLM calls gracefully
+            object.__setattr__(self.world.config, "llm_call_probability", 0.0)
+
         self._task = asyncio.create_task(self.loop.start())
         await asyncio.sleep(0)
 
@@ -268,12 +279,7 @@ def get_simulation_state(request: Request) -> SimulationState:
 @router.post("/start")
 async def start_simulation(request: Request) -> dict[str, Any]:
     state = get_simulation_state(request)
-
-    try:
-        await state.start()
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
+    await state.start()
     return state.get_status()
 
 
