@@ -1,4 +1,4 @@
-from setuptools import find_packages, setup
+from setuptools import setup
 
 
 setup(
@@ -6,6 +6,6 @@ setup(
     version="0.1.0",
     description="AI town simulation engine inspired by Stanford Generative Agents",
     python_requires=">=3.11",
-    packages=find_packages(where="..", include=["engine"]),
-    package_dir={"": ".."},
+    packages=["engine"],
+    package_dir={"engine": "."},
 )
