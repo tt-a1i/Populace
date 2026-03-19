@@ -8,3 +8,4 @@ neo4j_data/
 *.egg-info/
 .DS_Store
 .golutra/
+.review-venv/
