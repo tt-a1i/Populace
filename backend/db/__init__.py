@@ -1,4 +1,19 @@
-from backend.db.neo4j import close_driver, get_driver, initialize_constraints, run_query
+from backend.db.neo4j import (
+    close_driver,
+    get_driver,
+    initialize_constraints,
+    load_memories,
+    load_relationships,
+    load_reflections,
+    load_residents,
+    persist_world_snapshot,
+    restore_world_memories,
+    run_query,
+    save_memory,
+    save_relationship,
+    save_reflection,
+    save_resident,
+)
 from backend.db.redis import close_redis, get_json, get_redis, set_json
 
 __all__ = [
@@ -8,6 +23,16 @@ __all__ = [
     "get_json",
     "get_redis",
     "initialize_constraints",
+    "load_memories",
+    "load_relationships",
+    "load_reflections",
+    "load_residents",
+    "persist_world_snapshot",
+    "restore_world_memories",
     "run_query",
+    "save_memory",
+    "save_relationship",
+    "save_reflection",
+    "save_resident",
     "set_json",
 ]

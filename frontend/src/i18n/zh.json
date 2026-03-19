@@ -1,0 +1,126 @@
+{
+  "welcome": {
+    "badge": "Stanford Generative Agents · V1",
+    "slogan_en": "Create a pixel town, watch AI residents live their drama.",
+    "slogan_zh": "创造一个像素小镇，围观 AI 居民的悲欢离合",
+    "start": "开始模拟",
+    "footnote": "基于 Stanford Generative Agents 论文 · 完全开源",
+    "features": {
+      "social_title": "AI 自主社交",
+      "social_desc": "居民独立感知环境、检索记忆、做出决策，行为完全自驱",
+      "graph_title": "实时关系图谱",
+      "graph_desc": "力导向图谱动态演化，爱恨情仇一目了然",
+      "god_title": "上帝模式干预",
+      "god_desc": "投放事件、修改人设、改变环境，你掌控这座小镇",
+      "report_title": "小镇日报",
+      "report_desc": "AI 自动生成戏剧化八卦日报，一键截图发社交媒体"
+    }
+  },
+  "scene": {
+    "title": "选择场景",
+    "subtitle": "选择一个预设场景，或自定义你的小镇",
+    "back": "返回",
+    "preset_label": "预设场景",
+    "preset_badge": "✓ 推荐",
+    "residents": "位居民",
+    "buildings": "栋建筑",
+    "enter": "进入小镇",
+    "entering": "正在启动…",
+    "custom_label": "自定义场景",
+    "custom_title": "描述你的小镇",
+    "custom_placeholder": "例如：一个海边渔村，住着6个渔民，有码头和渔市…",
+    "generate": "✦ 生成场景",
+    "generating": "AI 生成中…",
+    "use_scene": "使用此场景 →",
+    "starting": "启动中…"
+  },
+  "toolbar": {
+    "event": "事件投放",
+    "persona": "人设编辑",
+    "build": "建造模式",
+    "report": "小镇日报",
+    "saves": "存档管理",
+    "current_tool": "当前工具："
+  },
+  "speed": {
+    "pause": "⏸ 暂停",
+    "1x": "1x",
+    "2x": "2x",
+    "5x": "5x"
+  },
+  "message_bar": {
+    "label": "消息流",
+    "empty": "等待事件与对话流入消息栏..."
+  },
+  "guide": {
+    "badge": "Quick Guide",
+    "title": "第一次进入操作提示",
+    "tip1": "滚轮缩放地图 | 拖拽平移 | 双击角色跟随",
+    "tip2": "底部工具栏可投放事件、编辑人设，也能查看最新事件流。",
+    "close": "关闭"
+  },
+  "event_injector": {
+    "badge": "Event Injector",
+    "title": "让小镇起风波",
+    "desc": "选择一个预设事件，或写入新的戏剧导火索并立即投放到当前回合队列。",
+    "presets": ["暴风雨", "丢钱包", "匿名情书", "免费蛋糕", "来了个陌生人"],
+    "custom_label": "自定义事件",
+    "custom_placeholder": "例如：广场突然下起玫瑰花雨",
+    "submit": "投放事件",
+    "empty": "等待你的第一道神谕"
+  },
+  "persona": {
+    "badge": "Persona Editor",
+    "title": "改写居民命运",
+    "select": "选择居民",
+    "name": "名字",
+    "personality": "性格描述",
+    "mood": "当前情绪",
+    "goals": "目标（用逗号分隔）",
+    "save": "保存人设",
+    "hint": "simulation store 当前有 {{count}} 个默认占位居民；编辑器仅使用后端返回的真实居民。",
+    "loading": "加载中…",
+    "load_failed": "加载居民列表失败，请确认后端服务正在运行。"
+  },
+  "build": {
+    "badge": "Build Mode",
+    "title": "建造模式稍后接线",
+    "desc": "本轮保留占位，用于后续接入建筑拖拽、环境改造与地图编辑工作流。"
+  },
+  "loading": {
+    "badge": "Simulation Boot",
+    "title": "正在生成小镇...",
+    "desc": "正在等待 WebSocket 建立连接，并同步第一份小镇快照。完成后将自动进入主界面。",
+    "timeout_badge": "Backend Required",
+    "timeout_title": "后端未启动，请运行 docker compose up",
+    "timeout_desc": "前端已启动，但尚未收到后端快照。请确认容器服务已就绪，然后点击下方按钮重试连接。",
+    "retry": "重新尝试连接",
+    "connecting": "连接成功并收到首帧快照后将自动切换。"
+  },
+  "report": {
+    "badge": "Town Gazette",
+    "title": "小镇日报",
+    "desc": "像一张带八卦味的报纸，把当前周期的居民戏剧、关系震荡和天气气氛压缩成可分享的卡片。",
+    "generate": "生成日报",
+    "generating": "生成中…",
+    "latest": "查看最近一份",
+    "share": "截图分享"
+  },
+  "saves": {
+    "badge": "Saves",
+    "title": "多存档管理",
+    "name_placeholder": "存档名称（可留空）",
+    "save": "保存",
+    "saving": "保存中…",
+    "load": "加载",
+    "loading": "…",
+    "delete": "删除",
+    "deleting": "…",
+    "empty": "暂无存档",
+    "success": "存档成功",
+    "load_success": "已加载「{{name}}」"
+  },
+  "lang": {
+    "switch": "EN"
+  }
+}

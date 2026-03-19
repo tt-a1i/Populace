@@ -21,7 +21,9 @@ class SpeedRequest(BaseModel):
 
 class SimulationState:
     def __init__(self) -> None:
+        import logging
         from backend.world.town import load_scenario
+        self._log = logging.getLogger(__name__)
         self.world = load_scenario()
         self.loop = SimulationLoop(self.world, tick_handler=self._tick)
         self._task: Optional[asyncio.Task[None]] = None
@@ -30,6 +32,23 @@ class SimulationState:
         self._pending_dialogues: list[asyncio.Task] = []
         # frozenset pairs of resident ids that have an in-flight dialogue task
         self._active_dialogue_pairs: set[frozenset] = set()
+
+    async def restore_from_neo4j(self) -> None:
+        """Attempt to restore memories/reflections/relationships from Neo4j.
+
+        Silently skips if Neo4j is unavailable (spec §12).
+        Agent positions are reset to home building entrance.
+        """
+        try:
+            from backend.db.neo4j import load_residents, restore_world_memories
+            existing = await load_residents()
+            if not existing:
+                self._log.info("Neo4j: no prior session data found, starting fresh.")
+                return
+            await restore_world_memories(self.world)
+            self._log.info("Neo4j: session restored (%d existing residents).", len(existing))
+        except Exception as exc:
+            self._log.warning("Neo4j restore skipped: %s", exc)
 
     @property
     def pending_events(self) -> list[dict[str, Any]]:
@@ -438,7 +457,35 @@ class SimulationState:
             self._events.clear()
             self.world.pending_events.clear()
 
+        # --- Neo4j persistence (spec §12) ---
+        # Real-time: persist relationship changes that occurred this tick
+        if relationship_deltas:
+            asyncio.create_task(self._persist_relationships())
+
+        # Snapshot every SNAPSHOT_INTERVAL_TICKS (configurable, default 10)
+        interval = cfg.snapshot_interval_ticks
+        if interval > 0 and self.world.current_tick % interval == 0:
+            asyncio.create_task(self._persist_snapshot())
+
         return tick_state
+
+    async def _persist_relationships(self) -> None:
+        """Write all current relationship edges to Neo4j (non-blocking fire-and-forget)."""
+        try:
+            from backend.db.neo4j import save_relationship
+            for rel in list(self.world.relationships.values()):
+                await save_relationship(rel)
+        except Exception as exc:
+            self._log.debug("Neo4j relationship persist skipped: %s", exc)
+
+    async def _persist_snapshot(self) -> None:
+        """Write full world snapshot to Neo4j every N ticks (non-blocking)."""
+        try:
+            from backend.db.neo4j import persist_world_snapshot
+            await persist_world_snapshot(self.world)
+            self._log.debug("Neo4j snapshot at tick %d.", self.world.current_tick)
+        except Exception as exc:
+            self._log.debug("Neo4j snapshot skipped: %s", exc)
 
 
 def _serialize(value: Any) -> Any:

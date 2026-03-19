@@ -13,9 +13,11 @@
   "dependencies": {
     "d3": "^7.9.0",
     "html-to-image": "^1.11.13",
+    "i18next": "^25.8.19",
     "pixi.js": "^8.17.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "react-i18next": "^16.5.8",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

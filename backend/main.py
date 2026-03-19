@@ -33,6 +33,8 @@ async def lifespan(app: FastAPI):
         await get_driver()
         await initialize_constraints()
         logger.info("Neo4j connected and constraints initialised.")
+        # Attempt to restore prior session data (spec §12)
+        await app.state.simulation_state.restore_from_neo4j()
     except Exception as exc:
         logger.warning(
             "Neo4j unavailable (%s). Running without graph persistence. "

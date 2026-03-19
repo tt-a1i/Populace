@@ -292,6 +292,7 @@ export class TownRenderer {
     for (const sprite of this.residents.values()) {
       sprite.setSimulationSpeed(meta.speed)
     }
+    this.updateWeather('sunny')
     this.updateDayNightOverlay()
     this.renderHud()
   }
@@ -605,6 +606,11 @@ export class TownRenderer {
   }
 
   private drawBuildings(): void {
+    if (this.currentBuildings.length > 0) {
+      this.syncBuildings(this.currentBuildings)
+      return
+    }
+
     const fallbackBuildings = [
       { label: 'Cafe', x: 9, y: 6, w: 4, h: 3, color: 0xb45309 },
       { label: 'Park', x: 24, y: 5, w: 5, h: 4, color: 0x15803d },
@@ -613,11 +619,6 @@ export class TownRenderer {
     ]
 
     this.buildingGraphics.clear()
-
-    if (this.currentBuildings.length > 0) {
-      this.syncBuildings(this.currentBuildings)
-      return
-    }
 
     for (const building of fallbackBuildings) {
       const x = building.x * TILE_SIZE

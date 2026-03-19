@@ -1,0 +1,126 @@
+{
+  "welcome": {
+    "badge": "Stanford Generative Agents · V1",
+    "slogan_en": "Create a pixel town, watch AI residents live their drama.",
+    "slogan_zh": "Create a pixel town and watch AI residents unfold their stories.",
+    "start": "Start Simulation",
+    "footnote": "Based on Stanford Generative Agents paper · Open Source",
+    "features": {
+      "social_title": "AI Social Life",
+      "social_desc": "Residents independently perceive, recall memories, and make decisions — fully autonomous",
+      "graph_title": "Live Relationship Graph",
+      "graph_desc": "Force-directed graph evolves in real time — love, hate, rivalry all visible at a glance",
+      "god_title": "God Mode",
+      "god_desc": "Inject events, edit personas, reshape the world — you control this town",
+      "report_title": "Town Gazette",
+      "report_desc": "AI auto-generates a dramatic gossip report — one-tap screenshot to share"
+    }
+  },
+  "scene": {
+    "title": "Choose Scene",
+    "subtitle": "Pick a preset scene or describe your own town",
+    "back": "Back",
+    "preset_label": "Preset Scene",
+    "preset_badge": "✓ Recommended",
+    "residents": "residents",
+    "buildings": "buildings",
+    "enter": "Enter Town",
+    "entering": "Starting…",
+    "custom_label": "Custom Scene",
+    "custom_title": "Describe Your Town",
+    "custom_placeholder": "e.g. A seaside fishing village with 6 fishermen, a dock and a fish market…",
+    "generate": "✦ Generate Scene",
+    "generating": "AI generating…",
+    "use_scene": "Use This Scene →",
+    "starting": "Starting…"
+  },
+  "toolbar": {
+    "event": "Events",
+    "persona": "Persona",
+    "build": "Build",
+    "report": "Gazette",
+    "saves": "Saves",
+    "current_tool": "Active Tool: "
+  },
+  "speed": {
+    "pause": "⏸ Pause",
+    "1x": "1x",
+    "2x": "2x",
+    "5x": "5x"
+  },
+  "message_bar": {
+    "label": "Feed",
+    "empty": "Waiting for events and dialogue to stream in…"
+  },
+  "guide": {
+    "badge": "Quick Guide",
+    "title": "First-Time Tips",
+    "tip1": "Scroll to zoom · Drag to pan · Double-tap a resident to follow",
+    "tip2": "Use the toolbar below to inject events, edit personas, and view the live feed.",
+    "close": "Close"
+  },
+  "event_injector": {
+    "badge": "Event Injector",
+    "title": "Stir Up Drama",
+    "desc": "Pick a preset event or write your own narrative trigger to inject into the current tick.",
+    "presets": ["Storm", "Lost Wallet", "Anonymous Love Letter", "Free Cake", "A Stranger Arrives"],
+    "custom_label": "Custom Event",
+    "custom_placeholder": "e.g. A rose shower suddenly falls on the plaza",
+    "submit": "Inject Event",
+    "empty": "Awaiting your first divine decree"
+  },
+  "persona": {
+    "badge": "Persona Editor",
+    "title": "Rewrite a Fate",
+    "select": "Select Resident",
+    "name": "Name",
+    "personality": "Personality",
+    "mood": "Current Mood",
+    "goals": "Goals (comma-separated)",
+    "save": "Save Persona",
+    "hint": "Store has {{count}} placeholder residents; editor only uses real residents from the backend.",
+    "loading": "Loading…",
+    "load_failed": "Failed to load residents. Make sure the backend is running."
+  },
+  "build": {
+    "badge": "Build Mode",
+    "title": "Build Mode Coming Soon",
+    "desc": "Placeholder for the upcoming building drag, environment editing, and map workflow."
+  },
+  "loading": {
+    "badge": "Simulation Boot",
+    "title": "Generating Town…",
+    "desc": "Waiting for WebSocket connection and first town snapshot. You'll be redirected automatically.",
+    "timeout_badge": "Backend Required",
+    "timeout_title": "Backend not running — please run docker compose up",
+    "timeout_desc": "Frontend is ready but no snapshot has arrived. Confirm the container is up, then retry.",
+    "retry": "Retry Connection",
+    "connecting": "You'll be switched automatically once the first snapshot arrives."
+  },
+  "report": {
+    "badge": "Town Gazette",
+    "title": "Daily Report",
+    "desc": "A gossip-flavoured newspaper that compresses resident drama, relationship shifts, and weather vibes into a shareable card.",
+    "generate": "Generate Report",
+    "generating": "Generating…",
+    "latest": "Load Latest",
+    "share": "Screenshot & Share"
+  },
+  "saves": {
+    "badge": "Saves",
+    "title": "Save Management",
+    "name_placeholder": "Save name (optional)",
+    "save": "Save",
+    "saving": "Saving…",
+    "load": "Load",
+    "loading": "…",
+    "delete": "Delete",
+    "deleting": "…",
+    "empty": "No saves yet",
+    "success": "Saved successfully",
+    "load_success": "Loaded \"{{name}}\""
+  },
+  "lang": {
+    "switch": "中文"
+  }
+}
