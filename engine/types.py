@@ -15,6 +15,7 @@ from typing import List, Optional, Tuple
 # ---------------------------------------------------------------------------
 
 class RelationType(str, Enum):
+    knows = "knows"
     love = "love"
     friendship = "friendship"
     rivalry = "rivalry"
@@ -84,12 +85,19 @@ class Reflection:
 
 @dataclass
 class Relationship:
-    """Directed emotional relationship between two residents.
-    Maps to (Resident)-[:FEELS {type, intensity, reason}]->(Resident)."""
+    """Directed resident relationship edge.
+
+    Covers both the base acquaintance edge from spec §4.5
+    ``(Resident)-[:KNOWS {since, familiarity}]->(Resident)`` and the
+    emotional FEELS edge. ``type="knows"`` represents neutral
+    acquaintance; other values map to FEELS ``type``.
+    """
     from_id: str
     to_id: str
     type: RelationType
-    intensity: float          # -1.0 (very negative) … +1.0 (very positive)
+    intensity: float          # 0.0 (neutral) … 1.0 (very strong)
+    since: str = ""
+    familiarity: float = 0.0  # 0.0 … 1.0; does not decay once established
     reason: str = ""
 
 

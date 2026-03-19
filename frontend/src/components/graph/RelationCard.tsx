@@ -18,6 +18,12 @@ function getRelationshipLabel(type: GraphRelationship['type']): string {
       return '友谊'
     case 'rivalry':
       return '敌对'
+    case 'trust':
+      return '信任'
+    case 'fear':
+      return '畏惧'
+    case 'dislike':
+      return '反感'
     default:
       return '认识'
   }

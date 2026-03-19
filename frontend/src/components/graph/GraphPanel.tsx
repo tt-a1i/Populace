@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { RelationCard } from './RelationCard'
 import { GraphRenderer } from './GraphRenderer'
+import { TimelineSlider } from '../ui'
 import { useSimulationStore } from '../../stores/simulation'
 import { useRelationshipsStore } from '../../stores/relationships'
 
@@ -10,9 +11,39 @@ export function GraphPanel() {
   const rendererRef = useRef<GraphRenderer | null>(null)
   const residents = useRelationshipsStore((state) => state.residents)
   const relationships = useRelationshipsStore((state) => state.relationships)
+  const history = useRelationshipsStore((state) => state.history)
+  const replayTick = useRelationshipsStore((state) => state.replayTick)
+  const lastAppliedTick = useRelationshipsStore((state) => state.lastAppliedTick)
+  const setReplayTick = useRelationshipsStore((state) => state.setReplayTick)
   const selectedResidentId = useSimulationStore((state) => state.selectedResidentId)
+  const selectResident = useSimulationStore((state) => state.selectResident)
+  const setHoveredPairIds = useSimulationStore((state) => state.setHoveredPairIds)
+  const freezeForReplay = useSimulationStore((state) => state.freezeForReplay)
+  const resumeLiveFromReplay = useSimulationStore((state) => state.resumeLiveFromReplay)
   const [hoveredRelationship, setHoveredRelationship] = useState<(typeof relationships)[number] | null>(null)
   const [cardPosition, setCardPosition] = useState<{ x: number; y: number } | null>(null)
+  const replaySnapshot = useMemo(
+    () => history.find((snapshot) => snapshot.tick === replayTick) ?? null,
+    [history, replayTick],
+  )
+  const renderedRelationships = replaySnapshot?.relationships ?? relationships
+  const activeHoveredRelationship =
+    hoveredRelationship &&
+    renderedRelationships.some(
+      (relationship) =>
+        relationship.from_id === hoveredRelationship.from_id &&
+        relationship.to_id === hoveredRelationship.to_id &&
+        relationship.type === hoveredRelationship.type,
+    )
+      ? hoveredRelationship
+      : null
+  const activeCardPosition = activeHoveredRelationship ? cardPosition : null
+
+  useEffect(() => {
+    if (replayTick !== null && !replaySnapshot && history.length > 0) {
+      setReplayTick(history[0]?.tick ?? null)
+    }
+  }, [history, replaySnapshot, replayTick, setReplayTick])
 
   useEffect(() => {
     const host = hostRef.current
@@ -24,6 +55,12 @@ export function GraphPanel() {
       onHoverLink: (relationship, position) => {
         setHoveredRelationship(relationship)
         setCardPosition(position)
+      },
+      onHoverPair: (pairIds) => {
+        setHoveredPairIds(pairIds)
+      },
+      onSelectResident: (residentId) => {
+        selectResident(residentId)
       },
     })
     rendererRef.current = renderer
@@ -42,14 +79,29 @@ export function GraphPanel() {
 
     return () => {
       observer.disconnect()
+      setHoveredPairIds(null)
       renderer.destroy()
       rendererRef.current = null
     }
-  }, [])
+  }, [selectResident, setHoveredPairIds])
 
   useEffect(() => {
-    rendererRef.current?.render(residents, relationships, selectedResidentId)
-  }, [relationships, residents, selectedResidentId])
+    rendererRef.current?.render(residents, renderedRelationships, selectedResidentId)
+  }, [renderedRelationships, residents, selectedResidentId])
+
+  const handleReplayTickChange = (tick: number | null) => {
+    if (tick === null) {
+      resumeLiveFromReplay()
+      setReplayTick(null)
+      return
+    }
+
+    if (replayTick === null) {
+      freezeForReplay()
+    }
+
+    setReplayTick(tick)
+  }
 
   return (
     <div
@@ -58,14 +110,22 @@ export function GraphPanel() {
     >
       <div ref={hostRef} className="h-full min-h-[30rem] w-full" />
       <div className="pointer-events-none absolute left-4 top-4 rounded-full border border-white/10 bg-slate-950/65 px-3 py-1 text-[11px] uppercase tracking-[0.28em] text-amber-100/70">
-        Live Social Graph
+        {replaySnapshot ? `Replay Tick ${replaySnapshot.tick}` : `Live Tick ${lastAppliedTick || '...'}`}
       </div>
       <RelationCard
-        position={cardPosition}
-        relationship={hoveredRelationship}
+        position={activeCardPosition}
+        relationship={activeHoveredRelationship}
         residents={residents}
       />
-      {relationships.length === 0 && (
+      <div className="absolute bottom-4 left-4 right-4 z-10">
+        <TimelineSlider
+          history={history}
+          replayTick={replayTick}
+          liveTick={lastAppliedTick}
+          onReplayTickChange={handleReplayTickChange}
+        />
+      </div>
+      {renderedRelationships.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/45 backdrop-blur-[2px]">
           <div className="max-w-sm rounded-[22px] border border-amber-200/15 bg-slate-950/84 px-6 py-5 text-center shadow-[0_18px_44px_rgba(8,15,31,0.45)]">
             <p className="text-[11px] uppercase tracking-[0.32em] text-amber-100/70">Graph Pending</p>

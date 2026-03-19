@@ -3,18 +3,35 @@ import { useEffect, useRef } from 'react'
 import { Application } from 'pixi.js'
 
 import { useSimulationStore } from '../../stores/simulation'
+import { useRelationshipsStore } from '../../stores/relationships'
 import { TownRenderer } from './TownRenderer'
 
 export function TownCanvas() {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const rendererRef = useRef<TownRenderer | null>(null)
-  const residents = useSimulationStore((state) => state.residents)
-  const tick = useSimulationStore((state) => state.tick)
+  const liveResidents = useSimulationStore((state) => state.residents)
+  const liveTick = useSimulationStore((state) => state.tick)
   const tickPerDay = useSimulationStore((state) => state.tickPerDay)
-  const time = useSimulationStore((state) => state.time)
-  const running = useSimulationStore((state) => state.running)
+  const liveTime = useSimulationStore((state) => state.time)
+  const liveRunning = useSimulationStore((state) => state.running)
   const selectedResidentId = useSimulationStore((state) => state.selectedResidentId)
   const speed = useSimulationStore((state) => state.speed)
+  const hoveredPairIds = useSimulationStore((state) => state.hoveredPairIds)
+  const replayFrozenFrame = useSimulationStore((state) => state.replayFrozenFrame)
+  const replayTick = useRelationshipsStore((state) => state.replayTick)
+  const liveMeta = {
+    running: liveRunning,
+    speed,
+    tick: liveTick,
+    tickPerDay,
+    time: liveTime,
+  }
+
+  const residents = replayTick !== null ? replayFrozenFrame?.residents ?? liveResidents : liveResidents
+  const simulationMeta =
+    replayTick !== null
+      ? replayFrozenFrame?.meta ?? liveMeta
+      : liveMeta
 
   useEffect(() => {
     const host = hostRef.current
@@ -82,6 +99,7 @@ export function TownCanvas() {
         time: state.time,
       })
       renderer.setFollowTarget(state.selectedResidentId)
+      renderer.setHighlightedResidents(state.hoveredPairIds)
       renderer.resize(initialWidth, initialHeight)
 
       resizeObserver.observe(host)
@@ -111,17 +129,27 @@ export function TownCanvas() {
 
   useEffect(() => {
     rendererRef.current?.updateSimulationMeta({
-      running,
-      speed,
-      tick,
-      tickPerDay,
-      time,
+      running: simulationMeta.running,
+      speed: simulationMeta.speed,
+      tick: simulationMeta.tick,
+      tickPerDay: simulationMeta.tickPerDay,
+      time: simulationMeta.time,
     })
-  }, [running, speed, tick, tickPerDay, time])
+  }, [
+    simulationMeta.running,
+    simulationMeta.speed,
+    simulationMeta.tick,
+    simulationMeta.tickPerDay,
+    simulationMeta.time,
+  ])
 
   useEffect(() => {
     rendererRef.current?.setFollowTarget(selectedResidentId)
   }, [selectedResidentId])
+
+  useEffect(() => {
+    rendererRef.current?.setHighlightedResidents(hoveredPairIds)
+  }, [hoveredPairIds])
 
   return (
     <div className="relative mt-5 flex min-h-[30rem] flex-1 overflow-hidden rounded-[24px] border border-cyan-300/30 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.22),_rgba(15,23,42,0.42)_38%,_rgba(2,6,23,0.96)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">

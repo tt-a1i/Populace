@@ -80,7 +80,13 @@ class SimulationState:
             "running": self.loop.running,
             "speed": int(self.loop.clock.speed) if self.loop.clock.speed else 0,
             "residents": [asdict(agent.resident) for agent in self.world.agents],
-            "buildings": [asdict(building) for building in self.world.buildings],
+            "buildings": [
+                {
+                    **asdict(building),
+                    "occupants": len(self.world.get_occupants(building.id)),
+                }
+                for building in self.world.buildings
+            ],
             "pending_events": list(self._events),
             "last_tick": _serialize(tick_state) if tick_state is not None else None,
         }
@@ -179,8 +185,16 @@ class SimulationState:
 
         # Social phase — spec §8: dialogue LLM must NOT block the tick.
         # Pattern: fire tasks this tick, harvest completed results next tick.
-        from engine.social import DialogueResult, initiate_dialogue, should_interact
-        from engine.types import DialogueUpdate, RelationshipDelta
+        from engine.social import (
+            DialogueResult,
+            decay_relationships,
+            initiate_dialogue,
+            should_interact,
+            update_relationships_from_dialogue,
+        )
+        from engine.types import DialogueUpdate
+
+        agents_by_id = {agent.resident.id: agent for agent in self.world.agents}
 
         # --- Harvest completed dialogue tasks from previous tick(s) ---
         dialogue_updates: list = []
@@ -202,16 +216,17 @@ class SimulationState:
                             )
                         )
                     if result.relationship_delta != 0:
-                        d = float(result.relationship_delta)
-                        # Both directions (spec §11: "双方更新关系值")
-                        relationship_deltas.append(
-                            RelationshipDelta(from_id=a_id, to_id=b_id,
-                                              type="friendship", delta=d)
-                        )
-                        relationship_deltas.append(
-                            RelationshipDelta(from_id=b_id, to_id=a_id,
-                                              type="friendship", delta=d)
-                        )
+                        agent_a = agents_by_id.get(a_id)
+                        agent_b = agents_by_id.get(b_id)
+                        if agent_a is not None and agent_b is not None:
+                            relationship_deltas.extend(
+                                update_relationships_from_dialogue(
+                                    self.world,
+                                    agent_a,
+                                    agent_b,
+                                    float(result.relationship_delta),
+                                )
+                            )
                 except Exception:
                     pass  # cancelled or failed — discard silently
                 finally:
@@ -231,7 +246,7 @@ class SimulationState:
         for a in self.world.agents:
             if dialogue_count >= cfg.max_dialogues_per_tick:
                 break
-            nearby = self.world.get_nearby_agents(a.resident.x, a.resident.y)
+            nearby = self.world.get_social_candidates(a)
             for b in nearby:
                 pair = frozenset([a.resident.id, b.resident.id])
                 if pair in seen_pairs:
@@ -239,13 +254,20 @@ class SimulationState:
                 seen_pairs.add(pair)
                 if dialogue_count >= cfg.max_dialogues_per_tick:
                     break
-                if not should_interact(a, b, self.world):
+                should_start = should_interact(a, b, self.world)
+                if not should_start:
+                    bonus = self.world.get_social_probability_bonus(a, b)
+                    should_start = random.random() < bonus
+                if not should_start:
                     continue
                 task = asyncio.create_task(initiate_dialogue(a, b, self.world))
                 task._pair_ids = (a.resident.id, b.resident.id)  # type: ignore[attr-defined]
                 self._active_dialogue_pairs.add(pair)
                 self._pending_dialogues.append(task)
                 dialogue_count += 1
+
+        # Tick-end relationship decay is applied after dialogue updates have landed.
+        relationship_deltas.extend(decay_relationships(self.world, cfg))
 
         # Advance tick counter and collect movements
         tick_state = self.world.tick()

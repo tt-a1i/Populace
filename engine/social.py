@@ -12,7 +12,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from engine.types import DialogueUpdate, Memory, RelationshipDelta
+from engine.types import Memory, RelationType, Relationship, RelationshipDelta, WorldConfig
 
 if TYPE_CHECKING:
     from engine.agent import Agent
@@ -48,6 +48,30 @@ class DialogueResult:
 
 _EXTROVERT_KEYWORDS = ("外向", "开朗", "活泼", "健谈", "社牛", "extrovert", "outgoing")
 _INTROVERT_KEYWORDS = ("内向", "安静", "害羞", "社恐", "introvert", "shy")
+_NEGATIVE_RELATION_TYPES = {RelationType.rivalry, RelationType.fear, RelationType.dislike}
+
+
+def _clamp(value: float, lower: float, upper: float) -> float:
+    return max(lower, min(upper, value))
+
+
+def _delta_to_intensity(delta: float) -> float:
+    return _clamp(delta / 10.0, -1.0, 1.0)
+
+
+def _ensure_relationship(world: "World", from_id: str, to_id: str, since: str) -> Relationship:
+    relationship = world.get_relationship(from_id, to_id)
+    if relationship is None:
+        relationship = Relationship(
+            from_id=from_id,
+            to_id=to_id,
+            type=RelationType.knows,
+            intensity=0.0,
+            since=since,
+            familiarity=0.0,
+        )
+        world.set_relationship(relationship)
+    return relationship
 
 
 def _extroversion(personality: str) -> float:
@@ -70,24 +94,193 @@ def should_interact(agent_a: "Agent", agent_b: "Agent", world: "World") -> bool:
     Probability formula:
         p = clamp(base + extroversion_bonus, 0.05, 0.95)
 
-    where base = 0.15 and extroversion_bonus rewards both agents being
-    extroverted (max +0.30).
+    where base = 0.15, extroversion_bonus rewards both agents being
+    extroverted (max +0.30), and existing familiarity/intensity adds
+    a modest social bias.
 
     Args:
         agent_a: First agent.
         agent_b: Second agent.
-        world:   Current world state (not used for probability, reserved
-                 for future relationship-graph lookups).
+        world:   Current world state, including relationship graph.
 
     Returns:
         True if a dialogue should be initiated this tick.
     """
     ext_a = _extroversion(agent_a.resident.personality)
     ext_b = _extroversion(agent_b.resident.personality)
+    relationship = world.get_relationship(agent_a.resident.id, agent_b.resident.id)
+    relation_bonus = 0.0
+    if relationship is not None:
+        relation_bonus = relationship.familiarity * 0.10 + relationship.intensity * 0.15
     # Average extroversion bonus: up to +0.30
     extroversion_bonus = ((ext_a + ext_b) / 2) * 0.30
-    probability = min(0.95, max(0.05, 0.15 + extroversion_bonus))
+    probability = min(0.95, max(0.05, 0.15 + extroversion_bonus + relation_bonus))
     return random.random() < probability
+
+
+def evolve_relationship(
+    agent_a: "Agent | str",
+    agent_b: "Agent | str",
+    delta: float,
+    current_type: RelationType | str,
+    *,
+    intensity: float | None = None,
+    familiarity: float | None = None,
+) -> RelationType:
+    """Return the next relationship type after a dialogue update.
+
+    The public four-argument signature matches the task contract. The
+    optional keyword-only context lets the simulation pass the already
+    updated intensity/familiarity when available.
+    """
+    del agent_a, agent_b  # type context only; evolution depends on relationship state
+
+    relation_type = current_type if isinstance(current_type, RelationType) else RelationType(current_type)
+    current_intensity = 0.0 if intensity is None else intensity
+    current_familiarity = 0.0 if familiarity is None else familiarity
+
+    if relation_type is RelationType.friendship:
+        if delta > 0 and current_intensity > 0.8:
+            love_probability = _clamp(
+                0.15 + (current_intensity - 0.8) * 1.5 + max(delta, 0.0) * 0.15,
+                0.0,
+                0.65,
+            )
+            if random.random() < love_probability:
+                return RelationType.love
+        if delta < 0 and (delta <= -0.35 or current_intensity < 0.25):
+            return RelationType.rivalry
+        return RelationType.friendship
+
+    if relation_type is RelationType.rivalry:
+        if delta > 0 and (delta >= 0.3 or current_intensity < 0.35):
+            return RelationType.friendship
+        return RelationType.rivalry
+
+    if relation_type is RelationType.knows:
+        if current_familiarity >= 0.2 and current_intensity >= 0.25:
+            return RelationType.friendship if delta >= 0 else RelationType.rivalry
+        return RelationType.knows
+
+    return relation_type
+
+
+def update_relationships_from_dialogue(
+    world: "World",
+    agent_a: "Agent",
+    agent_b: "Agent",
+    delta: float,
+) -> list[RelationshipDelta]:
+    """Apply a dialogue sentiment score to both directed relationship edges."""
+    tick_time = world.simulation_time()
+    return [
+        _apply_relationship_delta(world, agent_a.resident.id, agent_b.resident.id, delta, tick_time),
+        _apply_relationship_delta(world, agent_b.resident.id, agent_a.resident.id, delta, tick_time),
+    ]
+
+
+def _apply_relationship_delta(
+    world: "World",
+    from_id: str,
+    to_id: str,
+    delta: float,
+    tick_time: str,
+) -> RelationshipDelta:
+    relationship = _ensure_relationship(world, from_id, to_id, tick_time)
+    previous_type = relationship.type
+    previous_intensity = relationship.intensity
+    delta_intensity = _delta_to_intensity(delta)
+
+    relationship.familiarity = round(
+        _clamp(relationship.familiarity + 0.05 + abs(delta_intensity) * 0.10, 0.0, 1.0),
+        4,
+    )
+
+    if relationship.type in _NEGATIVE_RELATION_TYPES:
+        relationship.intensity = round(_clamp(relationship.intensity - delta_intensity, 0.0, 1.0), 4)
+    elif relationship.type is RelationType.knows:
+        relationship.intensity = round(_clamp(relationship.intensity + abs(delta_intensity), 0.0, 1.0), 4)
+    else:
+        relationship.intensity = round(_clamp(relationship.intensity + delta_intensity, 0.0, 1.0), 4)
+
+    new_type = evolve_relationship(
+        from_id,
+        to_id,
+        delta_intensity,
+        relationship.type,
+        intensity=relationship.intensity,
+        familiarity=relationship.familiarity,
+    )
+    if new_type is RelationType.love:
+        relationship.intensity = max(relationship.intensity, 0.85)
+    elif new_type in {RelationType.friendship, RelationType.rivalry} and new_type is not previous_type:
+        relationship.intensity = max(relationship.intensity, 0.3)
+
+    relationship.type = new_type
+    if relationship.type is not previous_type:
+        relationship.reason = f"evolved_from:{previous_type.value}@{tick_time}"
+
+    world.set_relationship(relationship)
+    return RelationshipDelta(
+        from_id=from_id,
+        to_id=to_id,
+        type=relationship.type.value,
+        delta=round(relationship.intensity - previous_intensity, 4),
+    )
+
+
+def decay_relationships(world: "World", config: WorldConfig) -> list[RelationshipDelta]:
+    """Naturally decay relationship intensity for every directed edge each tick."""
+    updates: list[RelationshipDelta] = []
+
+    for relationship in list(world.relationships.values()):
+        if relationship.intensity <= 0:
+            continue
+
+        previous_type = relationship.type
+        previous_intensity = relationship.intensity
+        relationship.intensity = round(
+            max(0.0, relationship.intensity - config.relationship_decay_rate),
+            4,
+        )
+        delta = round(relationship.intensity - previous_intensity, 4)
+
+        if relationship.intensity <= 0:
+            if relationship.familiarity > 0:
+                relationship.type = RelationType.knows
+                relationship.reason = ""
+                world.set_relationship(relationship)
+                updates.append(
+                    RelationshipDelta(
+                        from_id=relationship.from_id,
+                        to_id=relationship.to_id,
+                        type=relationship.type.value,
+                        delta=delta,
+                    )
+                )
+            else:
+                world.remove_relationship(relationship.from_id, relationship.to_id)
+                updates.append(
+                    RelationshipDelta(
+                        from_id=relationship.from_id,
+                        to_id=relationship.to_id,
+                        type=previous_type.value,
+                        delta=delta,
+                    )
+                )
+            continue
+
+        world.set_relationship(relationship)
+        updates.append(
+            RelationshipDelta(
+                from_id=relationship.from_id,
+                to_id=relationship.to_id,
+                type=relationship.type.value,
+                delta=delta,
+            )
+        )
+
+    return updates
 
 
 # ---------------------------------------------------------------------------

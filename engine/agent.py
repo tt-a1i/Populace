@@ -30,6 +30,10 @@ class Agent(ABC):
         self.resident = resident
         self.memory_stream: MemoryStream = MemoryStream()
         self.reflections: List[Reflection] = []
+        # Remaining A* waypoints toward the current move target (spec §10).
+        # Does not include the agent's current position.  Cleared on arrival
+        # or when the path is blocked / the target changes.
+        self.current_path: List[tuple] = []
 
     # ------------------------------------------------------------------
     # Decision loop (§4.1)

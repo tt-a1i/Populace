@@ -44,6 +44,8 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
   const connectRef = useRef<() => void>(() => {})
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mountedRef = useRef<boolean>(true)
+  const frameRef = useRef<number | null>(null)
+  const pendingTicksRef = useRef<Array<Record<string, unknown>>>([])
 
   const simUpdateFromTick = useSimulationStore((s) => s.updateFromTick)
   const simInitFromSnapshot = useSimulationStore((s) => s.initFromSnapshot)
@@ -64,6 +66,29 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
 
       const { type, data } = msg
 
+      const commitTick = (tickData: Record<string, unknown>) => {
+        pendingTicksRef.current.push(tickData)
+
+        if (frameRef.current !== null) {
+          return
+        }
+
+        frameRef.current = window.requestAnimationFrame(() => {
+          frameRef.current = null
+          const queuedTicks = pendingTicksRef.current.splice(0)
+
+          for (const queuedTick of queuedTicks) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            simUpdateFromTick(queuedTick as any)
+            relUpdateFromTick({
+              tick: typeof queuedTick.tick === 'number' ? queuedTick.tick : undefined,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              relationships: queuedTick.relationships as any,
+            })
+          }
+        })
+      }
+
       if (type === 'snapshot') {
         // Full state: initialise simulation store from residents list, then
         // apply last_tick on top for up-to-date positions/dialogues.
@@ -75,18 +100,11 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
         // Rebuild graph store from backend residents, clearing mock data
         relInitFromSnapshot(snapshot.residents ?? [])
         if (snapshot.last_tick) {
-          simUpdateFromTick(snapshot.last_tick)
-          relUpdateFromTick({ relationships: snapshot.last_tick.relationships })
+          commitTick(snapshot.last_tick as Record<string, unknown>)
         }
       } else if (type === 'tick') {
         // Incremental diff
-        const tick = data as Record<string, unknown>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        simUpdateFromTick(tick as any)
-        relUpdateFromTick({
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          relationships: tick.relationships as any,
-        })
+        commitTick(data as Record<string, unknown>)
       }
     },
     [simUpdateFromTick, simInitFromSnapshot, relUpdateFromTick, relInitFromSnapshot],
@@ -174,6 +192,10 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
     return () => {
       mountedRef.current = false
       if (timerRef.current !== null) clearTimeout(timerRef.current)
+      if (frameRef.current !== null) {
+        window.cancelAnimationFrame(frameRef.current)
+      }
+      pendingTicksRef.current = []
       wsRef.current?.close()
     }
   }, [enabled])

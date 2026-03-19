@@ -3,7 +3,14 @@ import { create } from 'zustand'
 import type { RelationshipDelta } from '../types'
 
 export type ResidentMood = 'happy' | 'sad' | 'angry' | 'neutral'
-export type RelationshipType = 'love' | 'friendship' | 'rivalry' | 'knows'
+export type RelationshipType =
+  | 'love'
+  | 'friendship'
+  | 'rivalry'
+  | 'knows'
+  | 'trust'
+  | 'fear'
+  | 'dislike'
 
 export interface GraphResident {
   id: string
@@ -20,14 +27,24 @@ export interface GraphRelationship {
 }
 
 export interface RelationshipTickState {
+  tick?: number
   relationships?: Array<RelationshipDelta & { reason?: string }>
+}
+
+export interface RelationshipSnapshot {
+  tick: number
+  relationships: GraphRelationship[]
 }
 
 interface RelationshipsState {
   residents: GraphResident[]
   relationships: GraphRelationship[]
+  history: RelationshipSnapshot[]
+  lastAppliedTick: number
+  replayTick: number | null
   updateFromTick: (tickState: RelationshipTickState) => void
   initFromSnapshot: (residents: Array<{ id: string; name: string; mood?: string }>) => void
+  setReplayTick: (tick: number | null) => void
 }
 
 const seedResidents: GraphResident[] = [
@@ -55,53 +72,89 @@ function normalizeType(value: string): RelationshipType {
     case 'love':
     case 'friendship':
     case 'rivalry':
+    case 'trust':
+    case 'fear':
+    case 'dislike':
       return value
     default:
       return 'knows'
   }
 }
 
+function relationshipKey(fromId: string, toId: string): string {
+  return `${fromId}::${toId}`
+}
+
 export const useRelationshipsStore = create<RelationshipsState>((set) => ({
   residents: seedResidents,
   relationships: seedRelationships,
+  history: [],
+  lastAppliedTick: 0,
+  replayTick: null,
+  setReplayTick: (tick) => set({ replayTick: tick }),
   updateFromTick: (tickState) => {
     const relationshipUpdates = tickState.relationships
 
-    if (!relationshipUpdates?.length) {
+    if (!relationshipUpdates?.length && tickState.tick === undefined) {
       return
     }
 
     set((state) => {
-      const nextRelationships = [...state.relationships]
+      const nextRelationships = new Map(
+        state.relationships.map((relationship) => [
+          relationshipKey(relationship.from_id, relationship.to_id),
+          relationship,
+        ]),
+      )
 
-      for (const update of relationshipUpdates) {
-        const index = nextRelationships.findIndex(
-          (relationship) =>
-            relationship.from_id === update.from_id &&
-            relationship.to_id === update.to_id &&
-            relationship.type === normalizeType(update.type),
-        )
+      for (const update of relationshipUpdates ?? []) {
+        const key = relationshipKey(update.from_id, update.to_id)
+        const current = nextRelationships.get(key)
+        const nextType = normalizeType(update.type)
+        const nextIntensity = clampIntensity((current?.intensity ?? 0) + update.delta)
 
-        if (index >= 0) {
-          const current = nextRelationships[index]
-          nextRelationships[index] = {
-            ...current,
-            intensity: clampIntensity(current.intensity + update.delta / 100),
-            reason: update.reason ?? current.reason,
-          }
+        if (nextIntensity <= 0) {
+          nextRelationships.delete(key)
           continue
         }
 
-        nextRelationships.push({
+        nextRelationships.set(key, {
           from_id: update.from_id,
           to_id: update.to_id,
-          type: normalizeType(update.type),
-          intensity: clampIntensity(update.delta / 100),
-          reason: update.reason ?? '新的互动正在形成',
+          type: nextType,
+          intensity: nextIntensity,
+          reason:
+            update.reason ??
+            current?.reason ??
+            (current ? '关系仍在波动' : '新的互动正在形成'),
         })
       }
 
-      return { relationships: nextRelationships }
+      const nextRelationshipList = Array.from(nextRelationships.values()).map((relationship) => ({
+        ...relationship,
+      }))
+      const nextTick = tickState.tick ?? state.lastAppliedTick
+      let nextHistory = state.history
+
+      if (tickState.tick !== undefined) {
+        const snapshot = {
+          tick: nextTick,
+          relationships: nextRelationshipList.map((relationship) => ({ ...relationship })),
+        }
+        const existingIndex = state.history.findIndex((item) => item.tick === nextTick)
+
+        if (existingIndex >= 0) {
+          nextHistory = state.history.map((item, index) => (index === existingIndex ? snapshot : item))
+        } else {
+          nextHistory = [...state.history, snapshot].slice(-100)
+        }
+      }
+
+      return {
+        history: nextHistory,
+        lastAppliedTick: nextTick,
+        relationships: nextRelationshipList,
+      }
     })
   },
 
@@ -115,6 +168,9 @@ export const useRelationshipsStore = create<RelationshipsState>((set) => ({
       })),
       // Clear mock relationships; real ones accumulate via tick deltas
       relationships: [],
+      history: [],
+      lastAppliedTick: 0,
+      replayTick: null,
     })
   },
 }))

@@ -23,6 +23,7 @@ from engine.agent import Agent
 from engine.generative_agent import GenerativeAgent
 from engine.world import World
 from engine.memory import MemoryStream
+from engine.pathfinding import astar, PathCache
 
 # Submodule functions are intentionally NOT re-exported here to avoid
 # shadowing the engine.perceive / engine.act / engine.social submodules.
@@ -46,4 +47,6 @@ __all__ = [
     "GenerativeAgent",
     "World",
     "MemoryStream",
+    "astar",
+    "PathCache",
 ]

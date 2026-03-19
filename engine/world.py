@@ -6,10 +6,12 @@ loop each time step (§8).
 """
 from __future__ import annotations
 
-from typing import List, Optional
+import random
+from typing import Dict, List, Optional, Tuple
 
 from engine.agent import Agent
-from engine.types import Building, Event, MovementUpdate, TickState, WorldConfig
+from engine.pathfinding import PathCache
+from engine.types import Building, Event, MovementUpdate, Relationship, TickState, WorldConfig
 
 
 class World:
@@ -36,6 +38,8 @@ class World:
         ]
         self.current_tick: int = 0
         self.pending_events: List[Event] = []
+        self.relationships: Dict[Tuple[str, str], Relationship] = {}
+        self.path_cache: PathCache = PathCache()
 
     # ------------------------------------------------------------------
     # Agent management
@@ -54,6 +58,21 @@ class World:
     def remove_agent(self, agent_id: str) -> None:
         """Remove an agent from the world by its resident id."""
         self.agents = [a for a in self.agents if a.resident.id != agent_id]
+        stale_keys = [key for key in self.relationships if agent_id in key]
+        for key in stale_keys:
+            del self.relationships[key]
+
+    def get_relationship(self, from_id: str, to_id: str) -> Optional[Relationship]:
+        """Return the directed relationship edge from one resident to another."""
+        return self.relationships.get((from_id, to_id))
+
+    def set_relationship(self, relationship: Relationship) -> None:
+        """Persist or replace a directed relationship edge."""
+        self.relationships[(relationship.from_id, relationship.to_id)] = relationship
+
+    def remove_relationship(self, from_id: str, to_id: str) -> None:
+        """Delete a directed relationship edge if it exists."""
+        self.relationships.pop((from_id, to_id), None)
 
     def get_nearby_agents(self, x: int, y: int, radius: Optional[int] = None) -> List[Agent]:
         """Return agents within Manhattan distance of tile (x, y).
@@ -73,8 +92,20 @@ class World:
             radius = self.config.interaction_distance
         return [
             a for a in self.agents
-            if 0 < abs(a.resident.x - x) + abs(a.resident.y - y) <= radius
+            if a.resident.location is None
+            and 0 < abs(a.resident.x - x) + abs(a.resident.y - y) <= radius
         ]
+
+    def get_social_candidates(self, agent: Agent) -> List[Agent]:
+        """Return agents that can socially interact with *agent* this tick."""
+        if agent.resident.location is not None:
+            return [
+                other
+                for other in self.get_occupants(agent.resident.location)
+                if other is not agent
+            ]
+
+        return [other for other in self.get_nearby_agents(agent.resident.x, agent.resident.y) if other is not agent]
 
     # ------------------------------------------------------------------
     # Building management
@@ -90,6 +121,68 @@ class World:
             if b.id == building_id:
                 return b
         return None
+
+    def get_building_at_position(self, x: int, y: int) -> Optional[Building]:
+        """Return the building whose entrance is at tile ``(x, y)``."""
+        for building in self.buildings:
+            if building.position == (x, y):
+                return building
+        return None
+
+    def get_occupants(self, building_id: str) -> List[Agent]:
+        """Return all agents currently inside the given building."""
+        return [agent for agent in self.agents if agent.resident.location == building_id]
+
+    def enter_building(self, agent: Agent, building: Building) -> bool:
+        """Move *agent* into *building* if capacity allows."""
+        if building.type != "park" and len(self.get_occupants(building.id)) >= building.capacity:
+            return False
+
+        agent.resident.location = building.id
+        if building.type == "home":
+            agent.resident.mood = "neutral"
+        return True
+
+    def leave_building(self, agent: Agent) -> None:
+        """Place *agent* back on the map at their building entrance."""
+        building_id = agent.resident.location
+        if building_id is None:
+            return
+
+        agent.resident.location = None
+        building = self.get_building(building_id)
+        if building is not None:
+            agent.resident.x, agent.resident.y = building.position
+
+    def get_social_probability_bonus(self, agent_a: Agent, agent_b: Agent) -> float:
+        """Return building-based social bonus for an agent pair."""
+        if agent_a.resident.location is None or agent_a.resident.location != agent_b.resident.location:
+            return 0.0
+
+        building = self.get_building(agent_a.resident.location)
+        if building is None:
+            return 0.0
+
+        if building.type == "cafe":
+            return 0.2
+        return 0.0
+
+    def apply_building_effects(self, agent: Agent) -> None:
+        """Apply passive effects from the building the agent is inside."""
+        building_id = agent.resident.location
+        if building_id is None:
+            return
+
+        building = self.get_building(building_id)
+        if building is None:
+            return
+
+        if building.type == "home":
+            agent.resident.mood = "neutral"
+
+    def building_stay_duration(self) -> int:
+        """Return the random number of ticks an agent stays indoors."""
+        return random.randint(3, 8)
 
     # ------------------------------------------------------------------
     # Simulation loop (§8)
@@ -109,6 +202,7 @@ class World:
             A :class:`~engine.types.TickState` describing everything that
             changed this tick (pushed to the frontend via WebSocket).
         """
+        self.path_cache.clear()
         self.current_tick += 1
         sim_time = self.simulation_time()
 
@@ -121,9 +215,10 @@ class World:
                 id=a.resident.id,
                 x=a.resident.x,
                 y=a.resident.y,
-                action="standing" if a.resident.location else "walking",
+                action="walking" if a.current_path else "standing",
             )
             for a in self.agents
+            if a.resident.location is None
         ]
 
         return TickState(tick=self.current_tick, time=sim_time, movements=movements)

@@ -5,10 +5,14 @@ Implements step 5 of the decision loop described in spec §4.1:
 
 Dialogue is handled by engine/social.py (Task 09).
 This module handles movement and idle only.
+
+Movement with a target uses A* pathfinding (spec §10).  The computed path
+is stored on the agent as ``agent.current_path`` and consumed across
+multiple ticks until the agent arrives or the path is blocked.
 """
 from __future__ import annotations
 
-import math
+import random
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -20,7 +24,7 @@ def act(agent: "Agent", plan: dict, world: "World") -> None:
     """Execute *plan* for *agent*, mutating ``agent.resident`` in place.
 
     Supported actions:
-    - ``"move"``  — move one step toward ``plan["target"]`` (tile coords),
+    - ``"move"``  — move toward ``plan["target"]`` (tile coords) via A*,
                     or random adjacent tile if no target given.
     - ``"idle"``  — stay in place (no-op).
     - ``"talk"``  — no-op here; dialogue handled by social.py.
@@ -28,42 +32,79 @@ def act(agent: "Agent", plan: dict, world: "World") -> None:
     Args:
         agent: The acting agent.
         plan:  Action dict from :func:`engine.plan.plan`.
-        world: Current world state (used for grid walkability checks).
+        world: Current world state (used for grid walkability and path cache).
     """
+    if agent.resident.location is not None:
+        _stay_or_leave_building(agent, world)
+        return
+
     action = plan.get("action", "idle")
 
     if action == "move":
         target = plan.get("target")
         if target is not None:
-            _step_toward(agent, target, world)
+            _step_astar(agent, tuple(target), world)
         else:
             _step_random(agent, world)
 
     # "idle" and "talk" require no position change here
+    _maybe_enter_building(agent, world)
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _step_toward(agent: "Agent", target: tuple[int, int], world: "World") -> None:
-    """Move agent one tile toward *target* along the dominant axis."""
+def _step_astar(agent: "Agent", target: tuple, world: "World") -> None:
+    """Move agent toward *target* using A* pathfinding (spec §10).
+
+    Consumes the first step of ``agent.current_path`` per call.  Recomputes
+    the path when none exists, the destination has changed, or the next tile
+    is blocked.  Uses ``world.path_cache`` to avoid redundant A* searches
+    within the same tick.
+    """
+    from engine.pathfinding import astar
+
     res = agent.resident
-    tx, ty = target
-    dx = tx - res.x
-    dy = ty - res.y
+    pos = (res.x, res.y)
 
-    if dx == 0 and dy == 0:
-        return  # Already at target
+    if pos == target:
+        agent.current_path = []
+        _maybe_enter_building(agent, world)
+        return
 
-    # Move along whichever axis has greater distance
-    if abs(dx) >= abs(dy):
-        nx, ny = res.x + int(math.copysign(1, dx)), res.y
-    else:
-        nx, ny = res.x, res.y + int(math.copysign(1, dy))
+    path = agent.current_path
 
-    if _is_walkable(nx, ny, world):
-        res.x, res.y = nx, ny
+    # Recompute when: no path, wrong destination, or next step is blocked
+    if (
+        not path
+        or path[-1] != target
+        or not _is_walkable(path[0][0], path[0][1], world)
+    ):
+        if world.path_cache.has(pos, target):
+            new_path = world.path_cache.get(pos, target)
+        else:
+            new_path = astar(world.grid, pos, target)
+            world.path_cache.set(pos, target, new_path)
+
+        if not new_path:
+            agent.current_path = []
+            return
+
+        # Exclude the starting tile — agent is already there
+        agent.current_path = new_path[1:]
+        path = agent.current_path
+
+    # Advance 1 step along the path
+    if path:
+        nx, ny = path[0]
+        if _is_walkable(nx, ny, world):
+            res.x, res.y = nx, ny
+            agent.current_path = path[1:]
+            _maybe_enter_building(agent, world)
+        else:
+            # Path became blocked this tick; clear so next tick recomputes
+            agent.current_path = []
 
 
 def _step_random(agent: "Agent", world: "World") -> None:
@@ -79,6 +120,7 @@ def _step_random(agent: "Agent", world: "World") -> None:
     walkable = [p for p in candidates if _is_walkable(p[0], p[1], world)]
     if walkable:
         res.x, res.y = random.choice(walkable)
+        _maybe_enter_building(agent, world)
 
 
 def _is_walkable(x: int, y: int, world: "World") -> bool:
@@ -87,3 +129,29 @@ def _is_walkable(x: int, y: int, world: "World") -> bool:
     if not (0 <= x < cfg.map_width_tiles and 0 <= y < cfg.map_height_tiles):
         return False
     return world.grid[y][x]
+
+
+def _maybe_enter_building(agent: "Agent", world: "World") -> None:
+    building = world.get_building_at_position(agent.resident.x, agent.resident.y)
+    if building is None:
+        return
+
+    if world.enter_building(agent, building):
+        agent.current_path = []
+        setattr(agent, "_building_ticks_remaining", world.building_stay_duration())
+
+
+def _stay_or_leave_building(agent: "Agent", world: "World") -> None:
+    world.apply_building_effects(agent)
+
+    remaining = getattr(agent, "_building_ticks_remaining", None)
+    if remaining is None:
+        remaining = world.building_stay_duration()
+
+    remaining -= 1
+    if remaining <= 0:
+        world.leave_building(agent)
+        setattr(agent, "_building_ticks_remaining", None)
+        return
+
+    setattr(agent, "_building_ticks_remaining", remaining)

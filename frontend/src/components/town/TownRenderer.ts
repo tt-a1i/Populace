@@ -59,6 +59,7 @@ export class TownRenderer {
   private readonly dayNightOverlay = new Graphics()
   private readonly hudLabel: Text
   private readonly hintLabel: Text
+  private highlightedResidentIds = new Set<string>()
 
   private dragging = false
   private dragPointerId: number | null = null
@@ -72,6 +73,9 @@ export class TownRenderer {
   private zoom = 1
   private readonly minZoom = 0.45
   private readonly maxZoom = 2.4
+  private pinchActive = false
+  private pinchStartDistance = 0
+  private pinchStartZoom = 1
   private followedResidentId: string | null = null
   private simulationMeta: SimulationMeta = {
     running: true,
@@ -169,6 +173,8 @@ export class TownRenderer {
       const sprite = this.residents.get(resident.id)
 
       if (sprite) {
+        sprite.setSimulationSpeed(this.simulationMeta.speed)
+        sprite.setExternalHighlight(this.highlightedResidentIds.has(resident.id))
         sprite.applyResident(resident)
         continue
       }
@@ -176,6 +182,8 @@ export class TownRenderer {
       const newSprite = new ResidentSprite(resident, {
         onFocusRequest: this.followResident,
       })
+      newSprite.setSimulationSpeed(this.simulationMeta.speed)
+      newSprite.setExternalHighlight(this.highlightedResidentIds.has(resident.id))
 
       this.residentLayer.addChild(newSprite)
       this.residents.set(resident.id, newSprite)
@@ -198,6 +206,9 @@ export class TownRenderer {
 
   updateSimulationMeta(meta: SimulationMeta): void {
     this.simulationMeta = meta
+    for (const sprite of this.residents.values()) {
+      sprite.setSimulationSpeed(meta.speed)
+    }
     this.updateDayNightOverlay()
     this.renderHud()
   }
@@ -213,6 +224,14 @@ export class TownRenderer {
     this.renderHud()
   }
 
+  setHighlightedResidents(residentIds: string[] | null): void {
+    this.highlightedResidentIds = new Set(residentIds ?? [])
+
+    for (const [residentId, sprite] of this.residents.entries()) {
+      sprite.setExternalHighlight(this.highlightedResidentIds.has(residentId))
+    }
+  }
+
   destroy(): void {
     this.app.ticker.remove(this.animate)
 
@@ -220,6 +239,10 @@ export class TownRenderer {
 
     canvas.removeEventListener('wheel', this.onWheel)
     canvas.removeEventListener('pointerdown', this.onPointerDown)
+    canvas.removeEventListener('touchstart', this.onTouchStart)
+    canvas.removeEventListener('touchmove', this.onTouchMove)
+    canvas.removeEventListener('touchend', this.onTouchEnd)
+    canvas.removeEventListener('touchcancel', this.onTouchEnd)
     window.removeEventListener('pointermove', this.onPointerMove)
     window.removeEventListener('pointerup', this.onPointerUp)
     window.removeEventListener('pointercancel', this.onPointerUp)
@@ -251,6 +274,10 @@ export class TownRenderer {
     canvas.style.touchAction = 'none'
     canvas.addEventListener('wheel', this.onWheel, { passive: false })
     canvas.addEventListener('pointerdown', this.onPointerDown)
+    canvas.addEventListener('touchstart', this.onTouchStart, { passive: false })
+    canvas.addEventListener('touchmove', this.onTouchMove, { passive: false })
+    canvas.addEventListener('touchend', this.onTouchEnd, { passive: false })
+    canvas.addEventListener('touchcancel', this.onTouchEnd, { passive: false })
     window.addEventListener('pointermove', this.onPointerMove)
     window.addEventListener('pointerup', this.onPointerUp)
     window.addEventListener('pointercancel', this.onPointerUp)
@@ -271,21 +298,14 @@ export class TownRenderer {
     const scaleFactor = event.deltaY < 0 ? 1.12 : 0.9
     const nextZoom = this.clamp(this.zoom * scaleFactor, this.minZoom, this.maxZoom)
 
-    if (nextZoom === this.zoom) {
-      return
-    }
-
-    const worldX = (pointerX - this.world.x) / this.zoom
-    const worldY = (pointerY - this.world.y) / this.zoom
-
-    this.zoom = nextZoom
-    this.world.scale.set(nextZoom)
-    this.world.position.set(pointerX - worldX * nextZoom, pointerY - worldY * nextZoom)
-    this.clampPan()
-    this.renderHud()
+    this.zoomToPoint(pointerX, pointerY, nextZoom)
   }
 
   private readonly onPointerDown = (event: PointerEvent): void => {
+    if (this.pinchActive) {
+      return
+    }
+
     this.dragging = true
     this.dragPointerId = event.pointerId
     this.dragStartX = event.clientX
@@ -298,6 +318,10 @@ export class TownRenderer {
   }
 
   private readonly onPointerMove = (event: PointerEvent): void => {
+    if (this.pinchActive) {
+      return
+    }
+
     if (!this.dragging || this.dragPointerId !== event.pointerId) {
       return
     }
@@ -315,13 +339,59 @@ export class TownRenderer {
       return
     }
 
-    this.dragging = false
-    this.dragPointerId = null
-    this.app.canvas.style.cursor = 'grab'
+    this.cancelDrag(event.pointerId)
+  }
 
-    if (this.app.canvas.hasPointerCapture(event.pointerId)) {
-      this.app.canvas.releasePointerCapture(event.pointerId)
+  private readonly onTouchStart = (event: TouchEvent): void => {
+    if (event.touches.length < 2) {
+      return
     }
+
+    event.preventDefault()
+    this.cancelDrag()
+    this.clearFollowMode()
+    this.hasUserCameraOverride = true
+    this.pinchActive = true
+    this.pinchStartDistance = this.touchDistance(event.touches[0], event.touches[1])
+    this.pinchStartZoom = this.zoom
+  }
+
+  private readonly onTouchMove = (event: TouchEvent): void => {
+    if (!this.pinchActive || event.touches.length < 2) {
+      return
+    }
+
+    event.preventDefault()
+
+    const distance = this.touchDistance(event.touches[0], event.touches[1])
+    if (distance <= 0 || this.pinchStartDistance <= 0) {
+      return
+    }
+
+    const nextZoom = this.clamp(
+      this.pinchStartZoom * (distance / this.pinchStartDistance),
+      this.minZoom,
+      this.maxZoom,
+    )
+    const rect = this.app.canvas.getBoundingClientRect()
+    const midpointX = (event.touches[0].clientX + event.touches[1].clientX) / 2 - rect.left
+    const midpointY = (event.touches[0].clientY + event.touches[1].clientY) / 2 - rect.top
+
+    this.zoomToPoint(midpointX, midpointY, nextZoom)
+  }
+
+  private readonly onTouchEnd = (event: TouchEvent): void => {
+    if (!this.pinchActive) {
+      return
+    }
+
+    if (event.touches.length >= 2) {
+      this.pinchStartDistance = this.touchDistance(event.touches[0], event.touches[1])
+      this.pinchStartZoom = this.zoom
+      return
+    }
+
+    this.pinchActive = false
   }
 
   private readonly handleBackgroundTap = (): void => {
@@ -346,6 +416,21 @@ export class TownRenderer {
     this.renderHud()
   }
 
+  private cancelDrag(pointerId?: number): void {
+    if (pointerId !== undefined && this.app.canvas.hasPointerCapture(pointerId)) {
+      this.app.canvas.releasePointerCapture(pointerId)
+    } else if (
+      this.dragPointerId !== null &&
+      this.app.canvas.hasPointerCapture(this.dragPointerId)
+    ) {
+      this.app.canvas.releasePointerCapture(this.dragPointerId)
+    }
+
+    this.dragging = false
+    this.dragPointerId = null
+    this.app.canvas.style.cursor = 'grab'
+  }
+
   private centerOnResident(residentId: string, immediate = false): void {
     const sprite = this.residents.get(residentId)
 
@@ -364,6 +449,25 @@ export class TownRenderer {
     }
 
     this.clampPan()
+  }
+
+  private zoomToPoint(pointerX: number, pointerY: number, nextZoom: number): void {
+    if (nextZoom === this.zoom) {
+      return
+    }
+
+    const worldX = (pointerX - this.world.x) / this.zoom
+    const worldY = (pointerY - this.world.y) / this.zoom
+
+    this.zoom = nextZoom
+    this.world.scale.set(nextZoom)
+    this.world.position.set(pointerX - worldX * nextZoom, pointerY - worldY * nextZoom)
+    this.clampPan()
+    this.renderHud()
+  }
+
+  private touchDistance(a: Touch, b: Touch): number {
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
   }
 
   private drawTiles(): void {
