@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+node_modules/
+dist/
+.vite/
+neo4j_data/
+*.egg-info/
+.DS_Store
+.golutra/

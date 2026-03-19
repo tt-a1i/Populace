@@ -1,0 +1,156 @@
+/**
+ * useWebSocket — persistent WebSocket connection with exponential-backoff
+ * reconnect (spec §13).
+ *
+ * Message protocol:
+ *   { type: 'snapshot', data: { ... } }  — full state on (re)connect
+ *   { type: 'tick',     data: { ... } }  — incremental tick diff
+ *
+ * Connection is established to /ws (relative path; nginx reverse-proxies
+ * to the FastAPI backend).
+ */
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+import { useRelationshipsStore } from '../stores/relationships'
+import { useSimulationStore } from '../stores/simulation'
+
+export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected'
+
+const MIN_BACKOFF_MS = 1_000
+const MAX_BACKOFF_MS = 10_000
+
+function buildWsUrl(): string {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${window.location.host}/ws`
+}
+
+export interface UseWebSocketReturn {
+  status: ConnectionStatus
+  connected: boolean
+  connecting: boolean
+  disconnected: boolean
+}
+
+export function useWebSocket(): UseWebSocketReturn {
+  const [status, setStatus] = useState<ConnectionStatus>('connecting')
+
+  const wsRef = useRef<WebSocket | null>(null)
+  const backoffRef = useRef<number>(MIN_BACKOFF_MS)
+  const connectRef = useRef<() => void>(() => {})
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mountedRef = useRef<boolean>(true)
+
+  const simUpdateFromTick = useSimulationStore((s) => s.updateFromTick)
+  const simInitFromSnapshot = useSimulationStore((s) => s.initFromSnapshot)
+  const relUpdateFromTick = useRelationshipsStore((s) => s.updateFromTick)
+  const relInitFromSnapshot = useRelationshipsStore((s) => s.initFromSnapshot)
+
+  // -------------------------------------------------------------------------
+  // Message handler
+  // -------------------------------------------------------------------------
+  const handleMessage = useCallback(
+    (event: MessageEvent) => {
+      let msg: { type?: string; data?: unknown }
+      try {
+        msg = JSON.parse(event.data as string)
+      } catch {
+        return
+      }
+
+      const { type, data } = msg
+
+      if (type === 'snapshot') {
+        // Full state: initialise simulation store from residents list, then
+        // apply last_tick on top for up-to-date positions/dialogues.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const snapshot = (data ?? {}) as any
+        simInitFromSnapshot(snapshot)
+        // Rebuild graph store from backend residents, clearing mock data
+        relInitFromSnapshot(snapshot.residents ?? [])
+        if (snapshot.last_tick) {
+          simUpdateFromTick(snapshot.last_tick)
+          relUpdateFromTick({ relationships: snapshot.last_tick.relationships })
+        }
+      } else if (type === 'tick') {
+        // Incremental diff
+        const tick = data as Record<string, unknown>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        simUpdateFromTick(tick as any)
+        relUpdateFromTick({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          relationships: tick.relationships as any,
+        })
+      }
+    },
+    [simUpdateFromTick, simInitFromSnapshot, relUpdateFromTick, relInitFromSnapshot],
+  )
+
+  // -------------------------------------------------------------------------
+  // Connect (called initially and after each disconnect)
+  // -------------------------------------------------------------------------
+  const connect = useCallback(() => {
+    if (!mountedRef.current) return
+
+    setStatus('connecting')
+
+    const ws = new WebSocket(buildWsUrl())
+    wsRef.current = ws
+
+    ws.onopen = () => {
+      if (!mountedRef.current) {
+        ws.close()
+        return
+      }
+      // Reset backoff on successful connection
+      backoffRef.current = MIN_BACKOFF_MS
+      setStatus('connected')
+      // Ask backend for full snapshot (spec §13: full sync on connect)
+      ws.send(JSON.stringify({ type: 'get_snapshot' }))
+    }
+
+    ws.onmessage = handleMessage
+
+    ws.onclose = () => {
+      if (!mountedRef.current) return
+      setStatus('disconnected')
+      // Exponential backoff: 1 s → 2 s → 4 s → … → 10 s max
+      const delay = backoffRef.current
+      backoffRef.current = Math.min(delay * 2, MAX_BACKOFF_MS)
+      timerRef.current = setTimeout(() => {
+        connectRef.current()
+      }, delay)
+    }
+
+    ws.onerror = () => {
+      // onclose fires immediately after onerror, so reconnect is handled there
+      ws.close()
+    }
+  }, [handleMessage])
+
+  useEffect(() => {
+    connectRef.current = connect
+  }, [connect])
+
+  // -------------------------------------------------------------------------
+  // Lifecycle
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    mountedRef.current = true
+    timerRef.current = setTimeout(() => {
+      connectRef.current()
+    }, 0)
+
+    return () => {
+      mountedRef.current = false
+      if (timerRef.current !== null) clearTimeout(timerRef.current)
+      wsRef.current?.close()
+    }
+  }, [])
+
+  return {
+    status,
+    connected: status === 'connected',
+    connecting: status === 'connecting',
+    disconnected: status === 'disconnected',
+  }
+}
