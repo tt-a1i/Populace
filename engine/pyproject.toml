@@ -11,6 +11,6 @@ requires-python = ">=3.11"
 dependencies = []
 
 [tool.setuptools]
-packages = ["engine"]
+packages = ["engine", "engine.examples"]
 package-dir = {"engine" = "."}
 include-package-data = true
