@@ -3,6 +3,11 @@ import { Application, Container, Graphics, Rectangle, Text } from 'pixi.js'
 import { useSimulationStore, type ResidentPosition, type SimulationSpeed } from '../../stores/simulation'
 import type { Building } from '../../types'
 import { ResidentSprite } from './ResidentSprite'
+import { RainEffect } from './effects/RainEffect'
+import { SnowEffect } from './effects/SnowEffect'
+import { StormEffect } from './effects/StormEffect'
+
+type WeatherEffect = RainEffect | SnowEffect | StormEffect
 
 const TILE_SIZE = 32
 const MAP_WIDTH = 40
@@ -58,9 +63,13 @@ export class TownRenderer {
   private readonly buildingGraphics = new Graphics()
   private readonly ambientAccent = new Graphics()
   private readonly dayNightOverlay = new Graphics()
+  private readonly weatherContainer = new Container()
+  private currentWeatherEffect: WeatherEffect | null = null
+  private currentWeather = 'sunny'
   private readonly hudLabel: Text
   private readonly hintLabel: Text
   private highlightedResidentIds = new Set<string>()
+  private currentBuildings: Array<Building & { occupants?: number }> = []
 
   private dragging = false
   private dragPointerId: number | null = null
@@ -104,7 +113,7 @@ export class TownRenderer {
 
     this.tileLayer.addChild(this.tileGraphics)
     this.buildingLayer.addChild(this.buildingGraphics)
-    this.effectLayer.addChild(this.ambientAccent, this.dayNightOverlay)
+    this.effectLayer.addChild(this.ambientAccent, this.dayNightOverlay, this.weatherContainer)
 
     this.tileLayer.eventMode = 'static'
     this.tileLayer.hitArea = new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
@@ -168,6 +177,8 @@ export class TownRenderer {
   }
 
   syncBuildings(buildings: Array<Building & { occupants?: number }>): void {
+    this.currentBuildings = buildings
+
     // Remove previously added building labels (Text children beyond the graphics object)
     while (this.buildingLayer.children.length > 1) {
       const child = this.buildingLayer.children[1]
@@ -196,8 +207,10 @@ export class TownRenderer {
       const x = bx * TILE_SIZE
       const y = by * TILE_SIZE
       const color = typeColor[b.type] ?? typeColor.default
+      const width = TILE_SIZE * 2
+      const height = TILE_SIZE * 3
 
-      this.buildingGraphics.roundRect(x, y, TILE_SIZE * 2, TILE_SIZE * 2, 8)
+      this.buildingGraphics.roundRect(x, y, width, height, 8)
       this.buildingGraphics.fill({ color, alpha: 0.82 })
       this.buildingGraphics.stroke({ color: 0xf8fafc, alpha: 0.18, width: 2 })
 
@@ -210,13 +223,27 @@ export class TownRenderer {
           fontWeight: '700',
           stroke: { color: 0x020617, width: 3 },
           wordWrap: true,
-          wordWrapWidth: TILE_SIZE * 2 - 4,
+          wordWrapWidth: width - 4,
           align: 'center',
         },
         anchor: { x: 0.5, y: 0.5 },
       })
-      label.position.set(x + TILE_SIZE, y + TILE_SIZE)
+      label.position.set(x + width / 2, y + height / 2 - 6)
       this.buildingLayer.addChild(label)
+
+      const occupantLabel = new Text({
+        text: `${b.occupants ?? 0}/${b.type === 'park' ? '∞' : b.capacity}`,
+        style: {
+          fill: 0xfef3c7,
+          fontFamily: 'Avenir Next, Helvetica Neue, sans-serif',
+          fontSize: 10,
+          fontWeight: '700',
+          stroke: { color: 0x020617, width: 3 },
+        },
+        anchor: { x: 0.5, y: 0.5 },
+      })
+      occupantLabel.position.set(x + width / 2, y + height - 10)
+      this.buildingLayer.addChild(occupantLabel)
     }
   }
 
@@ -230,6 +257,7 @@ export class TownRenderer {
         sprite.setSimulationSpeed(this.simulationMeta.speed)
         sprite.setExternalHighlight(this.highlightedResidentIds.has(resident.id))
         sprite.applyResident(resident)
+        sprite.alpha = resident.currentBuildingId ? 0.18 : 1
         continue
       }
 
@@ -238,6 +266,7 @@ export class TownRenderer {
       })
       newSprite.setSimulationSpeed(this.simulationMeta.speed)
       newSprite.setExternalHighlight(this.highlightedResidentIds.has(resident.id))
+      newSprite.alpha = resident.currentBuildingId ? 0.18 : 1
 
       this.residentLayer.addChild(newSprite)
       this.residents.set(resident.id, newSprite)
@@ -265,6 +294,37 @@ export class TownRenderer {
     }
     this.updateDayNightOverlay()
     this.renderHud()
+  }
+
+  updateWeather(weather: string): void {
+    if (weather === this.currentWeather) return
+    this.currentWeather = weather
+
+    // Tear down existing effect
+    if (this.currentWeatherEffect) {
+      this.weatherContainer.removeChild(this.currentWeatherEffect.container)
+      this.currentWeatherEffect.destroy()
+      this.currentWeatherEffect = null
+    }
+
+    // Spawn new effect
+    let effect: WeatherEffect | null = null
+    if (weather === 'rainy') {
+      effect = new RainEffect()
+    } else if (weather === 'snowy') {
+      effect = new SnowEffect()
+    } else if (weather === 'stormy') {
+      effect = new StormEffect()
+    }
+
+    if (effect) {
+      this.weatherContainer.addChild(effect.container)
+      this.currentWeatherEffect = effect
+    }
+  }
+
+  tickWeatherEffect(deltaMs: number): void {
+    this.currentWeatherEffect?.update(deltaMs)
   }
 
   setFollowTarget(residentId: string | null): void {
@@ -315,6 +375,9 @@ export class TownRenderer {
     for (const sprite of this.residents.values()) {
       sprite.update(deltaMs)
     }
+
+    // Animate weather particles
+    this.tickWeatherEffect(deltaMs)
 
     if (this.followedResidentId) {
       this.centerOnResident(this.followedResidentId)
@@ -542,7 +605,7 @@ export class TownRenderer {
   }
 
   private drawBuildings(): void {
-    const buildings = [
+    const fallbackBuildings = [
       { label: 'Cafe', x: 9, y: 6, w: 4, h: 3, color: 0xb45309 },
       { label: 'Park', x: 24, y: 5, w: 5, h: 4, color: 0x15803d },
       { label: 'School', x: 29, y: 16, w: 4, h: 3, color: 0x7c3aed },
@@ -551,7 +614,12 @@ export class TownRenderer {
 
     this.buildingGraphics.clear()
 
-    for (const building of buildings) {
+    if (this.currentBuildings.length > 0) {
+      this.syncBuildings(this.currentBuildings)
+      return
+    }
+
+    for (const building of fallbackBuildings) {
       const x = building.x * TILE_SIZE
       const y = building.y * TILE_SIZE
       const width = building.w * TILE_SIZE

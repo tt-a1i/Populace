@@ -1,5 +1,7 @@
 # Populace
 
+[![CI](https://github.com/tt-a1i/Populace/actions/workflows/ci.yml/badge.svg)](https://github.com/tt-a1i/Populace/actions/workflows/ci.yml)
+
 > Create a pixel town, watch AI residents live their drama.
 >
 > 创造一个像素小镇，围观 AI 居民的悲欢离合。

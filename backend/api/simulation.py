@@ -80,6 +80,124 @@ class SimulationState:
         self.loop = SimulationLoop(self.world, tick_handler=self._tick)
         self._task = None
 
+    def save_state(self) -> dict[str, Any]:
+        """Serialise the full simulation state to a JSON-compatible dict."""
+        from dataclasses import asdict as _asdict
+        from engine.types import Relationship
+
+        agents_data = []
+        for agent in self.world.agents:
+            res = agent.resident
+            memories = [_asdict(m) for m in agent.memory_stream.all]
+            reflections = [_asdict(r) for r in agent.reflections]
+            agents_data.append({
+                "resident": _asdict(res),
+                "memories": memories,
+                "total_added": agent.memory_stream.total_added,
+                "last_reflect_at": agent.memory_stream._last_reflect_at,
+                "reflections": reflections,
+                "current_path": list(agent.current_path),
+                "building_ticks_remaining": getattr(agent, "_building_ticks_remaining", None),
+            })
+
+        relationships = [
+            _asdict(rel)
+            for rel in self.world.relationships.values()
+        ]
+
+        buildings = [_asdict(b) for b in self.world.buildings]
+        grid = [list(row) for row in self.world.grid]
+        config = _asdict(self.world.config)
+
+        return {
+            "tick": self.world.current_tick,
+            "config": config,
+            "grid": grid,
+            "buildings": buildings,
+            "agents": agents_data,
+            "relationships": relationships,
+        }
+
+    async def load_state(self, data: dict[str, Any]) -> None:
+        """Stop simulation and restore world from a previously saved dict."""
+        from backend.core.simulation import SimulationLoop
+        from engine.generative_agent import GenerativeAgent
+        from engine.memory import MemoryStream
+        from engine.types import (
+            Building, Memory, Reflection, Relationship, RelationType, Resident, WorldConfig,
+        )
+        from engine.world import World
+
+        await self.stop()
+        for task in self._pending_dialogues:
+            task.cancel()
+        self._pending_dialogues.clear()
+        self._active_dialogue_pairs.clear()
+        self._events.clear()
+
+        # Rebuild config
+        cfg_data = data.get("config", {})
+        config = WorldConfig(**{k: v for k, v in cfg_data.items() if hasattr(WorldConfig, k)})
+
+        world = World(config=config)
+        world.current_tick = data.get("tick", 0)
+
+        # Restore buildings
+        for b in data.get("buildings", []):
+            world.add_building(Building(
+                id=b["id"], type=b["type"], name=b["name"],
+                capacity=b["capacity"], position=tuple(b["position"]),  # type: ignore[arg-type]
+            ))
+
+        # Restore grid
+        for y, row in enumerate(data.get("grid", [])):
+            for x, val in enumerate(row):
+                if 0 <= y < config.map_height_tiles and 0 <= x < config.map_width_tiles:
+                    world.grid[y][x] = bool(val)
+
+        # Restore agents
+        for ad in data.get("agents", []):
+            res_data = ad["resident"]
+            resident = Resident(
+                id=res_data["id"], name=res_data["name"],
+                personality=res_data["personality"],
+                goals=list(res_data.get("goals", [])),
+                mood=res_data.get("mood", "neutral"),
+                location=res_data.get("location"),
+                x=res_data.get("x", 0), y=res_data.get("y", 0),
+            )
+            agent = GenerativeAgent(resident)
+
+            ms = MemoryStream(config)
+            for m in ad.get("memories", []):
+                ms._memories.append(Memory(**m))
+            ms._total_added = ad.get("total_added", 0)
+            ms._last_reflect_at = ad.get("last_reflect_at", 0)
+            agent.memory_stream = ms
+
+            agent.reflections = [
+                Reflection(**r) for r in ad.get("reflections", [])
+            ]
+            agent.current_path = [tuple(p) for p in ad.get("current_path", [])]
+            if ad.get("building_ticks_remaining") is not None:
+                agent._building_ticks_remaining = ad["building_ticks_remaining"]
+
+            world.add_agent(agent)
+
+        # Restore relationships
+        for rel_data in data.get("relationships", []):
+            world.relationships[(rel_data["from_id"], rel_data["to_id"])] = Relationship(
+                from_id=rel_data["from_id"],
+                to_id=rel_data["to_id"],
+                type=RelationType(rel_data["type"]),
+                intensity=rel_data["intensity"],
+                reason=rel_data.get("reason", ""),
+            )
+
+        self.world = world
+        self.loop = SimulationLoop(self.world, tick_handler=self._tick)
+        self._task = None
+
     def get_status(self) -> dict[str, Any]:
         return {
             "running": self.loop.running,
@@ -115,9 +233,10 @@ class SimulationState:
         import random
         import uuid
 
-        from engine.types import Event as EngineEvent
+        from engine.types import Event as EngineEvent, WeatherType
 
         queued_events = list(self._events)
+        weather = self.world.weather
 
         # Inject user-queued events into world.pending_events so agent.perceive() picks them up
         for ev in queued_events:
@@ -188,6 +307,19 @@ class SimulationState:
                 p = await result
             else:
                 p = result
+
+            # Weather behaviour modifiers (spec §14)
+            if weather is WeatherType.stormy and random.random() < 0.70:
+                # Stormy: agents flee indoors — redirect to home building
+                home_building = next(
+                    (b for b in self.world.buildings
+                     if b.type == "home"
+                     and any(r.id == agent.resident.id or True for r in [agent.resident])
+                     and agent.resident.location is None),
+                    None,
+                )
+                if home_building is not None:
+                    p = {"action": "move", "target": list(home_building.position)}
 
             return agent, p
 
@@ -272,7 +404,16 @@ class SimulationState:
                 should_start = should_interact(a, b, self.world)
                 if not should_start:
                     bonus = self.world.get_social_probability_bonus(a, b)
-                    should_start = random.random() < bonus
+                    # Weather social modifiers
+                    if weather is WeatherType.stormy:
+                        bonus -= 0.30
+                    elif weather is WeatherType.snowy:
+                        in_cafe = (a.resident.location == b.resident.location
+                                   and a.resident.location is not None
+                                   and self.world.get_building(a.resident.location) is not None
+                                   and self.world.get_building(a.resident.location).type == "cafe")
+                        bonus += 0.20 if in_cafe else -0.10
+                    should_start = random.random() < max(0.0, bonus)
                 if not should_start:
                     continue
                 task = asyncio.create_task(initiate_dialogue(a, b, self.world))

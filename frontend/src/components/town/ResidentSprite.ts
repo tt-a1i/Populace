@@ -6,6 +6,19 @@ const TILE_SIZE = 32
 const HALF_TILE = TILE_SIZE / 2
 const DOUBLE_TAP_MS = 280
 const DIALOGUE_DURATION_MS = 3000
+const FALLBACK_SKIN_COLORS = [0xf2d3b1, 0xe5b887, 0xd39a6a, 0xb97c52, 0x8a5a3c, 0x5c3a27]
+const FALLBACK_HAIR_COLORS = [0x1f2937, 0x5b4636, 0x8b5a2b, 0xd4a373, 0xc084fc, 0xf8fafc]
+const FALLBACK_OUTFIT_COLORS = [0x2563eb, 0x059669, 0xdc2626, 0xd97706, 0x7c3aed, 0xdb2777, 0x0f766e, 0x4b5563]
+const FALLBACK_HAIR_STYLES = ['short', 'long', 'spiky', 'bald', 'ponytail'] as const
+
+type HairStyle = (typeof FALLBACK_HAIR_STYLES)[number]
+
+interface ResidentAppearance {
+  skinColor: number
+  hairStyle: HairStyle
+  hairColor: number
+  outfitColor: number
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
@@ -13,6 +26,58 @@ function clamp(value: number, min: number, max: number): number {
 
 function easeOutCubic(progress: number): number {
   return 1 - (1 - progress) ** 3
+}
+
+function checksum(value: string): number {
+  return [...value].reduce((total, char) => total + char.charCodeAt(0), 0)
+}
+
+function hexToNumber(value: string | null | undefined, fallback: number): number {
+  if (!value) {
+    return fallback
+  }
+
+  const normalized = value.startsWith('#') ? value.slice(1) : value
+  const parsed = Number.parseInt(normalized, 16)
+  return Number.isNaN(parsed) ? fallback : parsed
+}
+
+function normalizeHairStyle(value: string | null | undefined, residentId: string): HairStyle {
+  if (value && FALLBACK_HAIR_STYLES.includes(value as HairStyle)) {
+    return value as HairStyle
+  }
+
+  return FALLBACK_HAIR_STYLES[checksum(`${residentId}-hair-style`) % FALLBACK_HAIR_STYLES.length]
+}
+
+function resolveAppearance(resident: ResidentPosition): ResidentAppearance {
+  const identitySeed = checksum(resident.id)
+  const fallbackOutfit = resident.color || FALLBACK_OUTFIT_COLORS[identitySeed % FALLBACK_OUTFIT_COLORS.length]
+
+  return {
+    skinColor: hexToNumber(
+      resident.skinColor,
+      FALLBACK_SKIN_COLORS[checksum(`${resident.id}-skin`) % FALLBACK_SKIN_COLORS.length],
+    ),
+    hairStyle: normalizeHairStyle(resident.hairStyle, resident.id),
+    hairColor: hexToNumber(
+      resident.hairColor,
+      FALLBACK_HAIR_COLORS[checksum(`${resident.id}-hair-color`) % FALLBACK_HAIR_COLORS.length],
+    ),
+    outfitColor: hexToNumber(
+      resident.outfitColor,
+      fallbackOutfit,
+    ),
+  }
+}
+
+function appearanceSignature(appearance: ResidentAppearance): string {
+  return [
+    appearance.skinColor,
+    appearance.hairStyle,
+    appearance.hairColor,
+    appearance.outfitColor,
+  ].join(':')
 }
 
 function movementDuration(distancePx: number, speed: SimulationSpeed): number {
@@ -26,14 +91,8 @@ function statusIconFor(status: ResidentStatus): string | null {
   switch (status) {
     case 'chatting':
       return '💬'
-    case 'happy':
-      return '❤️'
-    case 'angry':
-      return '💢'
     case 'thinking':
       return '💭'
-    case 'sad':
-      return '💧'
     default:
       return null
   }
@@ -48,6 +107,7 @@ export class ResidentSprite extends Container {
 
   private readonly highlightGlow = new Graphics()
   private readonly body = new Graphics()
+  private readonly emotionAccent = new Graphics()
   private readonly shadow = new Graphics()
   private readonly bubble = new Container()
   private readonly bubbleBackground = new Graphics()
@@ -55,7 +115,8 @@ export class ResidentSprite extends Container {
   private readonly nameLabel: Text
   private readonly onFocusRequest?: (residentId: string) => void
 
-  private currentColor: number
+  private currentAppearance: ResidentAppearance
+  private currentAppearanceSignature: string
   private currentStatus: ResidentStatus
   private bobTime = 0
   private moveFromX = 0
@@ -74,16 +135,17 @@ export class ResidentSprite extends Container {
     super()
 
     this.residentId = resident.id
-    this.currentColor = resident.color
+    this.currentAppearance = resolveAppearance(resident)
+    this.currentAppearanceSignature = appearanceSignature(this.currentAppearance)
     this.currentStatus = resident.status
     this.onFocusRequest = options.onFocusRequest
     this.sortableChildren = true
     this.eventMode = 'static'
     this.cursor = 'pointer'
 
-    this.shadow.ellipse(0, 13, 10, 5).fill({ color: 0x020617, alpha: 0.45 })
+    this.shadow.ellipse(0, 22, 10.5, 4.8).fill({ color: 0x020617, alpha: 0.42 })
     this.highlightGlow.zIndex = 1
-    this.redrawBody(resident.color)
+    this.redrawAvatar()
 
     this.nameLabel = new Text({
       text: resident.name,
@@ -96,8 +158,8 @@ export class ResidentSprite extends Container {
         stroke: { color: 0x0f172a, width: 3 },
       },
     })
-    this.nameLabel.y = 19
-    this.nameLabel.zIndex = 3
+    this.nameLabel.y = 25
+    this.nameLabel.zIndex = 4
 
     this.bubbleLabel = new Text({
       text: '',
@@ -114,22 +176,31 @@ export class ResidentSprite extends Container {
     })
 
     this.bubble.addChild(this.bubbleBackground, this.bubbleLabel)
-    this.bubble.position.set(0, -22)
-    this.bubble.zIndex = 4
+    this.bubble.position.set(0, -28)
+    this.bubble.zIndex = 5
 
-    this.addChild(this.shadow, this.highlightGlow, this.body, this.bubble, this.nameLabel)
+    this.addChild(this.shadow, this.highlightGlow, this.body, this.emotionAccent, this.bubble, this.nameLabel)
     this.on('pointertap', this.handlePointerTap)
 
     this.applyResident(resident, true)
   }
 
   applyResident(resident: ResidentPosition, immediate = false): void {
-    if (resident.color !== this.currentColor) {
-      this.currentColor = resident.color
-      this.redrawBody(resident.color)
+    const nextAppearance = resolveAppearance(resident)
+    const nextSignature = appearanceSignature(nextAppearance)
+    const appearanceChanged = nextSignature !== this.currentAppearanceSignature
+    const statusChanged = resident.status !== this.currentStatus
+
+    if (appearanceChanged) {
+      this.currentAppearance = nextAppearance
+      this.currentAppearanceSignature = nextSignature
+      this.redrawAvatar()
     }
 
     this.currentStatus = resident.status
+    if (statusChanged || appearanceChanged) {
+      this.renderEmotionAccent()
+    }
     this.nameLabel.text = resident.name
     this.moveTo(resident.targetX, resident.targetY, immediate)
     this.updateStatus(resident.status, resident.dialogueText)
@@ -272,20 +343,115 @@ export class ResidentSprite extends Container {
     this.bubbleBackground.fill({ color: 0xf8fafc, alpha: 0.94 })
   }
 
-  private redrawBody(color: number): void {
+  private redrawAvatar(): void {
     this.body.clear()
-    this.body.circle(0, -2, 11).fill({ color })
-    this.body.stroke({ color: 0xf8fafc, alpha: 0.55, width: 1.5 })
-    this.body.circle(-3.5, -5, 1.2).fill(0xffffff)
-    this.body.circle(3.5, -5, 1.2).fill(0xffffff)
-    this.body.roundRect(-6.5, 3, 13, 4, 2).fill({ color: 0x0f172a, alpha: 0.2 })
+    const { outfitColor, skinColor } = this.currentAppearance
+
+    this.body.roundRect(-8, -2, 16, 12, 4).fill({ color: outfitColor })
+    this.body.roundRect(-7, 9, 14, 5, 2).fill({ color: 0x0f172a, alpha: 0.14 })
+    this.body.rect(-8, 0, 2, 10).fill({ color: this.mixColor(outfitColor, 0xffffff, 0.18) })
+    this.body.rect(6, 0, 2, 10).fill({ color: this.mixColor(outfitColor, 0x020617, 0.18) })
+    this.body.rect(-6, 14, 4, 8).fill({ color: this.mixColor(outfitColor, 0x020617, 0.1) })
+    this.body.rect(2, 14, 4, 8).fill({ color: this.mixColor(outfitColor, 0x020617, 0.1) })
+    this.body.rect(-7, 22, 4, 2).fill({ color: 0x1f2937 })
+    this.body.rect(3, 22, 4, 2).fill({ color: 0x1f2937 })
+
+    this.body.circle(0, -11, 5).fill({ color: skinColor })
+    this.body.stroke({ color: 0x0f172a, alpha: 0.28, width: 1 })
+
+    this.drawHair()
+    this.body.rect(-3, -12, 2, 2).fill({ color: 0x111827 })
+    this.body.rect(1, -12, 2, 2).fill({ color: 0x111827 })
+    this.body.rect(-1, -8, 2, 1).fill({ color: this.mixColor(skinColor, 0x111827, 0.45) })
     this.body.zIndex = 2
+    this.renderEmotionAccent()
   }
 
   private renderHighlightGlow(alpha: number): void {
     this.highlightGlow.visible = true
     this.highlightGlow.clear()
-    this.highlightGlow.circle(0, -2, 18).fill({ color: 0xfde68a, alpha: alpha * 0.16 })
-    this.highlightGlow.stroke({ color: 0xfef08a, alpha, width: 3 })
+    this.highlightGlow.roundRect(-12, -18, 24, 44, 9).fill({ color: 0xfde68a, alpha: alpha * 0.15 })
+    this.highlightGlow.stroke({ color: 0xfef08a, alpha, width: 2.6 })
+  }
+
+  private drawHair(): void {
+    const { hairStyle, hairColor } = this.currentAppearance
+
+    switch (hairStyle) {
+      case 'short':
+        this.body.roundRect(-5, -16, 10, 5, 3).fill({ color: hairColor })
+        this.body.rect(-5, -13, 2, 3).fill({ color: hairColor })
+        this.body.rect(3, -13, 2, 3).fill({ color: hairColor })
+        break
+      case 'long':
+        this.body.roundRect(-5, -16, 10, 8, 4).fill({ color: hairColor })
+        this.body.rect(-5, -9, 2, 6).fill({ color: hairColor })
+        this.body.rect(3, -9, 2, 6).fill({ color: hairColor })
+        break
+      case 'spiky':
+        this.body.moveTo(-5, -11)
+        this.body.lineTo(-4, -17)
+        this.body.lineTo(-1, -12)
+        this.body.lineTo(0, -18)
+        this.body.lineTo(2, -12)
+        this.body.lineTo(5, -17)
+        this.body.lineTo(5, -11)
+        this.body.fill({ color: hairColor })
+        break
+      case 'ponytail':
+        this.body.roundRect(-5, -16, 10, 5, 3).fill({ color: hairColor })
+        this.body.rect(4, -12, 3, 8).fill({ color: hairColor })
+        this.body.circle(5.5, -3, 2.2).fill({ color: hairColor })
+        break
+      case 'bald':
+      default:
+        break
+    }
+  }
+
+  private renderEmotionAccent(): void {
+    this.emotionAccent.clear()
+    this.emotionAccent.zIndex = 3
+
+    switch (this.currentStatus) {
+      case 'happy':
+        this.emotionAccent.circle(-2.6, -21, 2.3).fill({ color: 0xfb7185, alpha: 0.95 })
+        this.emotionAccent.circle(2.6, -21, 2.3).fill({ color: 0xfb7185, alpha: 0.95 })
+        this.emotionAccent.moveTo(-5.6, -20.2)
+        this.emotionAccent.lineTo(0, -13)
+        this.emotionAccent.lineTo(5.6, -20.2)
+        this.emotionAccent.fill({ color: 0xfb7185, alpha: 0.95 })
+        break
+      case 'angry':
+        this.emotionAccent.circle(0, -11, 5.2).fill({ color: 0xef4444, alpha: 0.16 })
+        this.emotionAccent.rect(-4, -15, 3, 1).fill({ color: 0x7f1d1d, alpha: 0.9 })
+        this.emotionAccent.rect(1, -15, 3, 1).fill({ color: 0x7f1d1d, alpha: 0.9 })
+        break
+      case 'sad':
+        this.emotionAccent.circle(3.8, -8.8, 1.4).fill({ color: 0x60a5fa, alpha: 0.95 })
+        this.emotionAccent.moveTo(3.8, -6.8)
+        this.emotionAccent.lineTo(2.7, -3.5)
+        this.emotionAccent.lineTo(4.9, -3.5)
+        this.emotionAccent.fill({ color: 0x60a5fa, alpha: 0.95 })
+        break
+      default:
+        break
+    }
+  }
+
+  private mixColor(base: number, overlay: number, ratio: number): number {
+    const clampedRatio = clamp(ratio, 0, 1)
+    const baseR = (base >> 16) & 0xff
+    const baseG = (base >> 8) & 0xff
+    const baseB = base & 0xff
+    const overlayR = (overlay >> 16) & 0xff
+    const overlayG = (overlay >> 8) & 0xff
+    const overlayB = overlay & 0xff
+
+    const mixedR = Math.round(baseR * (1 - clampedRatio) + overlayR * clampedRatio)
+    const mixedG = Math.round(baseG * (1 - clampedRatio) + overlayG * clampedRatio)
+    const mixedB = Math.round(baseB * (1 - clampedRatio) + overlayB * clampedRatio)
+
+    return (mixedR << 16) + (mixedG << 8) + mixedB
   }
 }

@@ -22,6 +22,10 @@ export interface ResidentPosition {
   color: number
   status: ResidentStatus
   currentBuildingId?: string | null
+  skinColor?: string | null
+  hairStyle?: string | null
+  hairColor?: string | null
+  outfitColor?: string | null
   dialogueText?: string | null
 }
 
@@ -69,6 +73,10 @@ export interface SimulationSnapshot {
     mood?: string
     personality?: string
     location?: string | null
+    skin_color?: string | null
+    hair_style?: string | null
+    hair_color?: string | null
+    outfit_color?: string | null
   }>
   last_tick?: SimulationTickState | null
 }
@@ -80,6 +88,7 @@ interface SimulationState {
   running: boolean
   speed: SimulationSpeed
   lastAppliedTick: number
+  weather: string
   residents: ResidentPosition[]
   history: SimulationHistoryFrame[]
   buildings: Array<Building & { occupants: number }>
@@ -181,6 +190,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   running: true,
   speed: 1,
   lastAppliedTick: 0,
+  weather: 'sunny',
   residents: [],
   history: [],
   buildings: [],
@@ -250,6 +260,10 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           color: existingResident?.color ?? colorForResident(movement.id),
           status: statusFromAction(movement.action, movement.status),
           currentBuildingId: null,
+          skinColor: existingResident?.skinColor ?? null,
+          hairStyle: existingResident?.hairStyle ?? null,
+          hairColor: existingResident?.hairColor ?? null,
+          outfitColor: existingResident?.outfitColor ?? null,
           dialogueText,
         })
       }
@@ -296,6 +310,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         tick: tickState.tick,
         time: tickState.time,
         lastAppliedTick: tickState.tick,
+        weather: tickState.weather ?? state.weather,
         history,
         buildings: recomputeBuildingOccupancy(state.buildings, nextResidents),
         messageFeed: appendRecentMessages(state.messageFeed, freshMessages),
@@ -320,6 +335,10 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           color: prev?.color ?? colorForResident(r.id),
           status: statusFromAction(undefined, prev?.status ?? 'idle'),
           currentBuildingId: r.location ?? null,
+          skinColor: r.skin_color ?? prev?.skinColor ?? null,
+          hairStyle: r.hair_style ?? prev?.hairStyle ?? null,
+          hairColor: r.hair_color ?? prev?.hairColor ?? null,
+          outfitColor: r.outfit_color ?? prev?.outfitColor ?? null,
           dialogueText: prev?.dialogueText ?? null,
         }
       })

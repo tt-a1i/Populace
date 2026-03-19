@@ -75,12 +75,9 @@ def _step_astar(agent: "Agent", target: tuple, world: "World") -> None:
 
     path = agent.current_path
 
-    # Recompute when: no path, wrong destination, or next step is blocked
-    if (
-        not path
-        or path[-1] != target
-        or not _is_walkable(path[0][0], path[0][1], world)
-    ):
+    # Recompute when: no path or destination changed
+    # (blocked next-step is handled in the walk loop below, not here)
+    if not path or path[-1] != target:
         if world.path_cache.has(pos, target):
             new_path = world.path_cache.get(pos, target)
         else:
@@ -93,18 +90,21 @@ def _step_astar(agent: "Agent", target: tuple, world: "World") -> None:
 
         # Exclude the starting tile — agent is already there
         agent.current_path = new_path[1:]
-        path = agent.current_path
 
-    # Advance 1 step along the path
-    if path:
-        nx, ny = path[0]
-        if _is_walkable(nx, ny, world):
-            res.x, res.y = nx, ny
-            agent.current_path = path[1:]
+    # Advance up to 2 steps along the path (spec §10: 1-2 步/tick)
+    steps = min(2, len(agent.current_path))
+    for _ in range(steps):
+        if not agent.current_path:
+            break
+        next_pos = agent.current_path[0]
+        if _is_walkable(next_pos[0], next_pos[1], world):
+            res.x, res.y = next_pos
+            agent.current_path = agent.current_path[1:]
             _maybe_enter_building(agent, world)
         else:
-            # Path became blocked this tick; clear so next tick recomputes
+            # Path became blocked; clear so next tick recomputes
             agent.current_path = []
+            break
 
 
 def _step_random(agent: "Agent", world: "World") -> None:

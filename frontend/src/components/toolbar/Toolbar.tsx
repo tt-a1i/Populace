@@ -2,17 +2,19 @@ import { useMemo, useState } from 'react'
 
 import { EventInjector } from './EventInjector'
 import { PersonaEditor } from './PersonaEditor'
+import { SavesPanel } from './SavesPanel'
 import { SpeedControl } from './SpeedControl'
 import { DailyReport } from '../report'
 import { MessageBar } from '../ui'
 
-type ToolKey = 'event' | 'persona' | 'build' | 'report'
+type ToolKey = 'event' | 'persona' | 'build' | 'report' | 'saves'
 
 const tools: Array<{ key: ToolKey; label: string; icon: string; tone: string }> = [
   { key: 'event', label: '事件投放', icon: '⚡', tone: 'cyan' },
   { key: 'persona', label: '人设编辑', icon: '👤', tone: 'amber' },
   { key: 'build', label: '建造模式', icon: '🏗', tone: 'emerald' },
   { key: 'report', label: '小镇日报', icon: '📰', tone: 'rose' },
+  { key: 'saves', label: '存档管理', icon: '💾', tone: 'violet' },
 ]
 
 function toneClass(tone: string, active: boolean): string {
@@ -20,18 +22,10 @@ function toneClass(tone: string, active: boolean): string {
     return 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
   }
 
-  if (tone === 'cyan') {
-    return 'border-cyan-300/40 bg-cyan-300/15 text-cyan-50'
-  }
-
-  if (tone === 'amber') {
-    return 'border-amber-300/40 bg-amber-300/15 text-amber-50'
-  }
-
-  if (tone === 'emerald') {
-    return 'border-emerald-300/40 bg-emerald-300/15 text-emerald-50'
-  }
-
+  if (tone === 'cyan') return 'border-cyan-300/40 bg-cyan-300/15 text-cyan-50'
+  if (tone === 'amber') return 'border-amber-300/40 bg-amber-300/15 text-amber-50'
+  if (tone === 'emerald') return 'border-emerald-300/40 bg-emerald-300/15 text-emerald-50'
+  if (tone === 'violet') return 'border-violet-300/40 bg-violet-300/15 text-violet-50'
   return 'border-rose-300/40 bg-rose-300/15 text-rose-50'
 }
 
@@ -39,13 +33,9 @@ export function Toolbar() {
   const [activeTool, setActiveTool] = useState<ToolKey>('event')
 
   const panel = useMemo(() => {
-    if (activeTool === 'event') {
-      return <EventInjector />
-    }
-
-    if (activeTool === 'persona') {
-      return <PersonaEditor />
-    }
+    if (activeTool === 'event') return <EventInjector />
+    if (activeTool === 'persona') return <PersonaEditor />
+    if (activeTool === 'saves') return <SavesPanel />
 
     if (activeTool === 'build') {
       return (

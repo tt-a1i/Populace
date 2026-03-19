@@ -22,6 +22,10 @@ def test_resident_defaults():
     assert r.location is None
     assert r.goals == []
     assert r.x == 0 and r.y == 0
+    assert r.skin_color is None
+    assert r.hair_style is None
+    assert r.hair_color is None
+    assert r.outfit_color is None
 
 
 def test_resident_serialisation():

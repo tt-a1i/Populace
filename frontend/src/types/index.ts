@@ -29,6 +29,7 @@ export interface TickState {
   dialogues: DialogueUpdate[]
   relationships: RelationshipDelta[]
   events: EventUpdate[]
+  weather: string
 }
 
 export interface Resident {
@@ -40,6 +41,10 @@ export interface Resident {
   location: string | null
   x: number
   y: number
+  skin_color?: string | null
+  hair_style?: string | null
+  hair_color?: string | null
+  outfit_color?: string | null
 }
 
 export interface Building {

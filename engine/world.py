@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Tuple
 
 from engine.agent import Agent
 from engine.pathfinding import PathCache
-from engine.types import Building, Event, MovementUpdate, Relationship, TickState, WorldConfig
+from engine.types import Building, Event, MovementUpdate, Relationship, TickState, WeatherType, WorldConfig
 
 
 class World:
@@ -39,6 +39,7 @@ class World:
         self.current_tick: int = 0
         self.pending_events: List[Event] = []
         self.relationships: Dict[Tuple[str, str], Relationship] = {}
+        self.weather: WeatherType = WeatherType.sunny
         self.path_cache: PathCache = PathCache()
 
     # ------------------------------------------------------------------
@@ -221,7 +222,8 @@ class World:
             if a.resident.location is None
         ]
 
-        return TickState(tick=self.current_tick, time=sim_time, movements=movements)
+        return TickState(tick=self.current_tick, time=sim_time, movements=movements,
+                         weather=self.weather.value)
 
     # ------------------------------------------------------------------
     # Helpers

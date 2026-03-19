@@ -24,6 +24,14 @@ class RelationType(str, Enum):
     dislike = "dislike"
 
 
+class WeatherType(str, Enum):
+    sunny = "sunny"
+    cloudy = "cloudy"
+    rainy = "rainy"
+    stormy = "stormy"
+    snowy = "snowy"
+
+
 # ---------------------------------------------------------------------------
 # Neo4j node types (§4.5)
 # ---------------------------------------------------------------------------
@@ -39,6 +47,10 @@ class Resident:
     location: Optional[str] = None  # building id, or None if on the map
     x: int = 0               # tile grid x-coordinate
     y: int = 0               # tile grid y-coordinate
+    skin_color: Optional[str] = None
+    hair_style: Optional[str] = None
+    hair_color: Optional[str] = None
+    outfit_color: Optional[str] = None
 
 
 @dataclass
@@ -142,6 +154,7 @@ class TickState:
     dialogues: List[DialogueUpdate] = field(default_factory=list)
     relationships: List[RelationshipDelta] = field(default_factory=list)
     events: List[EventUpdate] = field(default_factory=list)
+    weather: str = WeatherType.sunny.value             # current weather
 
 
 # ---------------------------------------------------------------------------

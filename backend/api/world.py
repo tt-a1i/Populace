@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.api.simulation import get_simulation_state
+from engine.types import WeatherType
 
 
 router = APIRouter(prefix="/api/world", tags=["world"])
@@ -138,3 +139,30 @@ def _mock_scenario(description: str) -> dict[str, Any]:
 async def list_buildings(request: Request) -> list[dict[str, Any]]:
     state = get_simulation_state(request)
     return [asdict(building) for building in state.world.buildings]
+
+
+class SetWeatherRequest(BaseModel):
+    type: str = Field(description="Weather type: sunny|cloudy|rainy|stormy|snowy")
+
+
+@router.post("/weather")
+async def set_weather(payload: SetWeatherRequest, request: Request) -> dict[str, Any]:
+    """Set current weather and broadcast on next tick (spec §4.2, §14)."""
+    state = get_simulation_state(request)
+    try:
+        weather = WeatherType(payload.type)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown weather type '{payload.type}'. "
+                   f"Valid: {[w.value for w in WeatherType]}",
+        )
+    state.world.weather = weather
+    return {"weather": weather.value}
+
+
+@router.get("/weather")
+async def get_weather(request: Request) -> dict[str, Any]:
+    """Return the current weather."""
+    state = get_simulation_state(request)
+    return {"weather": state.world.weather.value}

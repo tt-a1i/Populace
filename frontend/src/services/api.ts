@@ -9,6 +9,10 @@ export interface ApiResident {
   location?: string | null
   x?: number
   y?: number
+  skin_color?: string | null
+  hair_style?: string | null
+  hair_color?: string | null
+  outfit_color?: string | null
 }
 
 interface SpeedPayload {
@@ -117,6 +121,10 @@ export interface ScenarioResident {
   home_id?: string
   x?: number
   y?: number
+  skin_color?: string | null
+  hair_style?: string | null
+  hair_color?: string | null
+  outfit_color?: string | null
 }
 
 export interface ScenarioData {
@@ -144,4 +152,34 @@ export function startCustomSimulation(scenario: ScenarioData) {
     method: 'POST',
     body: JSON.stringify(scenario),
   })
+}
+
+// ---------------------------------------------------------------------------
+// Save system
+// ---------------------------------------------------------------------------
+
+export interface SaveMeta {
+  id: string
+  name: string
+  created_at: string
+  tick: number
+}
+
+export function saveGame(name: string) {
+  return request<SaveMeta>('/api/saves', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export function listSaves() {
+  return request<SaveMeta[]>('/api/saves')
+}
+
+export function loadSave(id: string) {
+  return request('/api/saves/' + id + '/load', { method: 'POST' })
+}
+
+export function deleteSave(id: string) {
+  return request('/api/saves/' + id, { method: 'DELETE' })
 }

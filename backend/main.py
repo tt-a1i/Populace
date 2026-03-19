@@ -11,6 +11,7 @@ try:
         SimulationState,
         report_router,
         residents_router,
+        saves_router,
         simulation_router,
         world_router,
         ws_router,
@@ -18,7 +19,7 @@ try:
     from backend.db import close_driver, close_redis, get_driver, get_redis, initialize_constraints
     from backend.core.config import settings
 except ModuleNotFoundError:
-    from api import SimulationState, report_router, residents_router, simulation_router, world_router, ws_router
+    from api import SimulationState, report_router, residents_router, saves_router, simulation_router, world_router, ws_router
     from db import close_driver, close_redis, get_driver, get_redis, initialize_constraints
     from core.config import settings
 
@@ -89,4 +90,5 @@ app.include_router(simulation_router)
 app.include_router(residents_router)
 app.include_router(world_router)
 app.include_router(report_router)
+app.include_router(saves_router)
 app.include_router(ws_router)

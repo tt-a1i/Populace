@@ -5,6 +5,7 @@ GenerativeAgent and Building instances ready for simulation.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import pathlib
 from typing import Any
@@ -15,6 +16,54 @@ from engine.world import World
 
 # Default template bundled with the backend
 DEFAULT_TEMPLATE = pathlib.Path(__file__).parent / "templates" / "modern_community.json"
+SKIN_COLORS = (
+    "#F2D3B1",
+    "#E5B887",
+    "#D39A6A",
+    "#B97C52",
+    "#8A5A3C",
+    "#5C3A27",
+)
+HAIR_STYLES = ("short", "long", "spiky", "bald", "ponytail")
+HAIR_COLORS = (
+    "#1F2937",
+    "#5B4636",
+    "#8B5A2B",
+    "#D4A373",
+    "#C084FC",
+    "#F8FAFC",
+)
+OUTFIT_COLORS = (
+    "#2563EB",
+    "#059669",
+    "#DC2626",
+    "#D97706",
+    "#7C3AED",
+    "#DB2777",
+    "#0F766E",
+    "#4B5563",
+)
+
+
+def generate_resident_appearance(resident_id: str) -> dict[str, str]:
+    """Derive a deterministic appearance tuple from a resident id."""
+    digest = hashlib.sha256(resident_id.encode("utf-8")).digest()
+    return {
+        "skin_color": SKIN_COLORS[digest[0] % len(SKIN_COLORS)],
+        "hair_style": HAIR_STYLES[digest[1] % len(HAIR_STYLES)],
+        "hair_color": HAIR_COLORS[digest[2] % len(HAIR_COLORS)],
+        "outfit_color": OUTFIT_COLORS[digest[3] % len(OUTFIT_COLORS)],
+    }
+
+
+def _resolve_appearance_fields(resident_data: dict[str, Any]) -> dict[str, str]:
+    generated = generate_resident_appearance(resident_data["id"])
+    return {
+        "skin_color": resident_data.get("skin_color") or generated["skin_color"],
+        "hair_style": resident_data.get("hair_style") or generated["hair_style"],
+        "hair_color": resident_data.get("hair_color") or generated["hair_color"],
+        "outfit_color": resident_data.get("outfit_color") or generated["outfit_color"],
+    }
 
 
 def load_scenario(
@@ -83,6 +132,7 @@ def load_scenario(
 
     for r in data.get("residents", []):
         home_id: str | None = r.get("home_id")
+        appearance = _resolve_appearance_fields(r)
         resident = Resident(
             id=r["id"],
             name=r["name"],
@@ -92,6 +142,10 @@ def load_scenario(
             location=None,
             x=r.get("x", 0),
             y=r.get("y", 0),
+            skin_color=appearance["skin_color"],
+            hair_style=appearance["hair_style"],
+            hair_color=appearance["hair_color"],
+            outfit_color=appearance["outfit_color"],
         )
         agent = GenerativeAgent(resident)
         world.add_agent(agent)
@@ -157,6 +211,7 @@ def load_scenario_from_dict(
 
     for r in data.get("residents", []):
         home_id: str | None = r.get("home_id")
+        appearance = _resolve_appearance_fields(r)
         resident = Resident(
             id=r["id"],
             name=r["name"],
@@ -166,6 +221,10 @@ def load_scenario_from_dict(
             location=None,
             x=r.get("x", 0),
             y=r.get("y", 0),
+            skin_color=appearance["skin_color"],
+            hair_style=appearance["hair_style"],
+            hair_color=appearance["hair_color"],
+            outfit_color=appearance["outfit_color"],
         )
         agent = GenerativeAgent(resident)
         world.add_agent(agent)

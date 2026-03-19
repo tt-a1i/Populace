@@ -18,6 +18,7 @@ export function TownCanvas() {
   const selectedResidentId = useSimulationStore((state) => state.selectedResidentId)
   const speed = useSimulationStore((state) => state.speed)
   const hoveredPairIds = useSimulationStore((state) => state.hoveredPairIds)
+  const weather = useSimulationStore((state) => state.weather)
   const replayFrozenFrame = useSimulationStore((state) => state.replayFrozenFrame)
   const getFrameByTick = useSimulationStore((state) => state.getFrameByTick)
   const replayTick = useRelationshipsStore((state) => state.replayTick)
@@ -179,6 +180,10 @@ export function TownCanvas() {
   useEffect(() => {
     rendererRef.current?.setHighlightedResidents(hoveredPairIds)
   }, [hoveredPairIds])
+
+  useEffect(() => {
+    rendererRef.current?.updateWeather(weather)
+  }, [weather])
 
   return (
     <div className="relative mt-5 flex min-h-[30rem] flex-1 overflow-hidden rounded-[24px] border border-cyan-300/30 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.22),_rgba(15,23,42,0.42)_38%,_rgba(2,6,23,0.96)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
