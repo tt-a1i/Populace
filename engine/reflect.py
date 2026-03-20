@@ -11,16 +11,18 @@ from __future__ import annotations
 import uuid
 from typing import Any, TYPE_CHECKING
 
+from engine._optional_backend import load_backend_attr
 from engine.types import Memory, Reflection
 
 if TYPE_CHECKING:
     from engine.agent import Agent
 
 
+_BUILD_REFLECT_PROMPT = load_backend_attr("backend.llm.prompts", "build_reflect_prompt")
+
+
 def _build_reflect_messages(agent: "Agent", memories: list[Memory]) -> list[dict[str, Any]]:
-    try:
-        from backend.llm.prompts import build_reflect_prompt
-    except ImportError:
+    if _BUILD_REFLECT_PROMPT is None:
         memory_lines = "\n".join(f"- {memory.content}" for memory in memories[-5:])
         return [
             {
@@ -37,7 +39,7 @@ def _build_reflect_messages(agent: "Agent", memories: list[Memory]) -> list[dict
             },
         ]
 
-    return build_reflect_prompt(agent.resident, memories)
+    return _BUILD_REFLECT_PROMPT(agent.resident, memories)
 
 
 async def reflect(agent: "Agent", memories: list[Memory]) -> Reflection | None:

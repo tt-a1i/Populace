@@ -12,6 +12,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from engine._optional_backend import load_backend_attr
 from engine.types import Memory, RelationType, Relationship, RelationshipDelta, WorldConfig
 
 if TYPE_CHECKING:
@@ -49,6 +50,49 @@ class DialogueResult:
 _EXTROVERT_KEYWORDS = ("外向", "开朗", "活泼", "健谈", "社牛", "extrovert", "outgoing")
 _INTROVERT_KEYWORDS = ("内向", "安静", "害羞", "社恐", "introvert", "shy")
 _NEGATIVE_RELATION_TYPES = {RelationType.rivalry, RelationType.fear, RelationType.dislike}
+_BUILD_DIALOGUE_PROMPT = load_backend_attr("backend.llm.prompts", "build_dialogue_prompt")
+_BUILD_DIALOGUE_EVAL_PROMPT = load_backend_attr("backend.llm.prompts", "build_dialogue_eval_prompt")
+
+
+def _build_dialogue_prompt_messages(
+    speaker: "Agent",
+    listener: "Agent",
+    context: str,
+) -> list[dict[str, str]]:
+    if _BUILD_DIALOGUE_PROMPT is None:
+        return [
+            {
+                "role": "system",
+                "content": "请生成一句简短、自然的角色对话。",
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"说话者：{speaker.resident.name}\n"
+                    f"听者：{listener.resident.name}\n"
+                    f"上下文：{context}\n"
+                    "请输出一句对话。"
+                ),
+            },
+        ]
+
+    return _BUILD_DIALOGUE_PROMPT(speaker.resident, listener.resident, context)
+
+
+def _build_dialogue_eval_messages(context_history: str) -> list[dict[str, str]]:
+    if _BUILD_DIALOGUE_EVAL_PROMPT is None:
+        return [
+            {
+                "role": "system",
+                "content": "请根据对话情绪输出一个 -10 到 10 的整数。",
+            },
+            {
+                "role": "user",
+                "content": context_history,
+            },
+        ]
+
+    return _BUILD_DIALOGUE_EVAL_PROMPT(context_history)
 
 
 def _clamp(value: float, lower: float, upper: float) -> float:
@@ -311,9 +355,6 @@ async def initiate_dialogue(
     Returns:
         A :class:`DialogueResult` with messages and relationship_delta.
     """
-    from backend.llm.client import chat_completion
-    from backend.llm.prompts import build_dialogue_eval_prompt, build_dialogue_prompt
-
     messages: list[dict] = []
     context_history = ""
     tick_time = world.simulation_time()
@@ -321,12 +362,12 @@ async def initiate_dialogue(
     # Up to 3 rounds = 6 turns (A, B, A, B, A, B)
     for round_idx in range(3):
         for speaker, listener in ((agent_a, agent_b), (agent_b, agent_a)):
-            prompt_msgs = build_dialogue_prompt(
-                speaker.resident,
-                listener.resident,
+            prompt_msgs = _build_dialogue_prompt_messages(
+                speaker,
+                listener,
                 context_history or "两人偶遇",
             )
-            text = await chat_completion(prompt_msgs, max_tokens=50)
+            text = await speaker.call_llm(prompt_msgs, max_tokens=50)
             if text is None:
                 # LLM failure → end dialogue early
                 break
@@ -342,10 +383,7 @@ async def initiate_dialogue(
 
     # Evaluate relationship delta
     delta = 0
-    eval_text = await chat_completion(
-        build_dialogue_eval_prompt(context_history),
-        max_tokens=10,
-    )
+    eval_text = await agent_a.call_llm(_build_dialogue_eval_messages(context_history), max_tokens=10)
     if eval_text is not None:
         try:
             delta = max(-10, min(10, int(eval_text.strip().split()[0])))

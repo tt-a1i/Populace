@@ -1,0 +1,121 @@
+{
+  "name": "海边渔村",
+  "description": "宁静的海边小渔村，渔夫与商人在海风中演绎各自的故事。",
+  "map": {
+    "width": 40,
+    "height": 30,
+    "roads": [
+      { "x": 0, "y": 16, "width": 40, "height": 2 },
+      { "x": 18, "y": 0, "width": 2, "height": 16 }
+    ],
+    "water": [
+      { "x": 0, "y": 0, "width": 40, "height": 8 }
+    ]
+  },
+  "buildings": [
+    {
+      "id": "harbor",
+      "type": "shop",
+      "name": "渔港码头",
+      "capacity": 6,
+      "position": [5, 9]
+    },
+    {
+      "id": "fish_market",
+      "type": "shop",
+      "name": "鱼市",
+      "capacity": 5,
+      "position": [14, 9]
+    },
+    {
+      "id": "lighthouse",
+      "type": "school",
+      "name": "灯塔",
+      "capacity": 2,
+      "position": [30, 12]
+    },
+    {
+      "id": "cottage_a",
+      "type": "home",
+      "name": "海边小屋A",
+      "capacity": 3,
+      "position": [5, 21]
+    },
+    {
+      "id": "cottage_b",
+      "type": "home",
+      "name": "海边小屋B",
+      "capacity": 3,
+      "position": [15, 21]
+    },
+    {
+      "id": "tavern",
+      "type": "cafe",
+      "name": "渔人酒馆",
+      "capacity": 4,
+      "position": [25, 21]
+    }
+  ],
+  "residents": [
+    {
+      "id": "r_laohai",
+      "name": "老海",
+      "personality": "内向、沉默寡言、海上经验丰富、为人忠厚",
+      "goals": ["捕到今年最大的鱼", "把船修好"],
+      "mood": "neutral",
+      "home_id": "cottage_a",
+      "x": 6,
+      "y": 22
+    },
+    {
+      "id": "r_xiaolan",
+      "name": "小岚",
+      "personality": "外向、活泼好动、对未知充满好奇、爱跟渔船出海",
+      "goals": ["学会驾船", "探索远方的小岛"],
+      "mood": "happy",
+      "home_id": "cottage_a",
+      "x": 7,
+      "y": 23
+    },
+    {
+      "id": "r_shang_ren",
+      "name": "胡掌柜",
+      "personality": "外向、精明能干、爱砍价、心里藏着一本账",
+      "goals": ["鱼市生意翻倍", "垄断整个渔村的鱼货"],
+      "mood": "happy",
+      "home_id": "cottage_b",
+      "x": 16,
+      "y": 22
+    },
+    {
+      "id": "r_yuer",
+      "name": "鱼儿",
+      "personality": "内向、温柔、擅长腌鱼、爱在灯塔附近发呆",
+      "goals": ["做出最好吃的咸鱼干", "等某人回来"],
+      "mood": "sad",
+      "home_id": "cottage_b",
+      "x": 17,
+      "y": 23
+    },
+    {
+      "id": "r_deng_shou",
+      "name": "灯守",
+      "personality": "内向、博学、独居灯塔、观察海面为乐",
+      "goals": ["记录每一次风暴", "写一本海洋日志"],
+      "mood": "neutral",
+      "home_id": "cottage_b",
+      "x": 31,
+      "y": 13
+    },
+    {
+      "id": "r_ah_gui",
+      "name": "阿贵",
+      "personality": "外向、嗜酒、爱讲故事、对每个人都热情",
+      "goals": ["今晚酒馆满座", "让所有人都听他的故事"],
+      "mood": "happy",
+      "home_id": "cottage_a",
+      "x": 26,
+      "y": 22
+    }
+  ]
+}

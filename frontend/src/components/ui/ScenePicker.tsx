@@ -9,21 +9,39 @@ interface ScenePickerProps {
   onBack: () => void
 }
 
-const PRESET_SCENE = {
-  id: 'modern_community',
-  name: '现代小区',
-  nameEn: 'Modern Community',
-  description: '一个充满故事的都市小区，十位居民各有各的性格与秘密。',
-  residents: 10,
-  buildings: 8,
-  tags: ['社交', '爱恨情仇', '八卦'],
-  color: 'from-cyan-500/20 to-violet-500/10',
-  border: 'border-cyan-400/30',
-  accent: 'text-cyan-300',
-}
+const PRESET_SCENES = [
+  {
+    id: 'modern_community',
+    name: '现代小区',
+    nameEn: 'Modern Community',
+    description: '一个充满故事的都市小区，十位居民各有各的性格与秘密。',
+    residents: 10,
+    buildings: 8,
+    tags: ['社交', '爱恨情仇', '八卦'],
+    color: 'from-cyan-500/20 to-violet-500/10',
+    border: 'border-cyan-400/30',
+    accent: 'text-cyan-300',
+    recommended: true,
+  },
+  {
+    id: 'seaside_village',
+    name: '海边渔村',
+    nameEn: 'Seaside Village',
+    description: '宁静的海边小渔村，渔夫与商人在海风中演绎各自的故事。',
+    residents: 6,
+    buildings: 6,
+    tags: ['渔村', '海边', '慢生活'],
+    color: 'from-blue-500/20 to-teal-500/10',
+    border: 'border-blue-400/30',
+    accent: 'text-blue-300',
+    recommended: false,
+  },
+]
+
 
 export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
   const { t } = useTranslation()
+  const [selectedScene, setSelectedScene] = useState(PRESET_SCENES[0].id)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -38,7 +56,7 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
     setLoading(true)
     setError(null)
     try {
-      await startSimulation()
+      await startSimulation(selectedScene)
     } catch (err) {
       setError(
         err instanceof Error
@@ -115,63 +133,78 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
           <LanguageSwitcher />
         </div>
 
-        {/* ── Preset scene card ── */}
-        <div
-          className={[
-            'mt-8 cursor-pointer rounded-3xl border bg-gradient-to-br p-6 shadow-lg',
-            'ring-2 ring-cyan-400/50 ring-offset-2 ring-offset-slate-950',
-            PRESET_SCENE.color,
-            PRESET_SCENE.border,
-          ].join(' ')}
-          onClick={handleEnter}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && handleEnter()}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-semibold uppercase tracking-[0.3em] ${PRESET_SCENE.accent}`}>
-                  {t('scene.preset_label')}
-                </span>
-                <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
-                  {t('scene.preset_badge')}
-                </span>
-              </div>
-              <h3 className="mt-2 text-xl font-bold text-white">{PRESET_SCENE.name}</h3>
-              <p className="mt-1 text-xs text-slate-400">{PRESET_SCENE.nameEn}</p>
-            </div>
-            {/* Selected indicator */}
-            <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-cyan-400 bg-cyan-400/20">
-              <div className="h-2.5 w-2.5 rounded-full bg-cyan-400" />
-            </div>
-          </div>
-
-          <p className="mt-4 text-sm leading-relaxed text-slate-300">{PRESET_SCENE.description}</p>
-
-          {/* Stats */}
-          <div className="mt-5 flex items-center gap-4">
-            <div className="flex items-center gap-1.5 text-xs text-slate-300">
-              <span className="text-base">👥</span>
-              <span><span className="font-bold text-white">{PRESET_SCENE.residents}</span> {t('scene.residents')}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-300">
-              <span className="text-base">🏘️</span>
-              <span><span className="font-bold text-white">{PRESET_SCENE.buildings}</span> {t('scene.buildings')}</span>
-            </div>
-          </div>
-
-          {/* Tags */}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {PRESET_SCENE.tags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[11px] text-slate-300"
+        {/* ── Preset scene cards ── */}
+        <div className="mt-8 flex flex-col gap-3">
+          {PRESET_SCENES.map((scene) => {
+            const isSelected = selectedScene === scene.id
+            return (
+              <div
+                key={scene.id}
+                className={[
+                  'cursor-pointer rounded-3xl border bg-gradient-to-br p-6 shadow-lg transition-all',
+                  isSelected
+                    ? `ring-2 ring-offset-2 ring-offset-slate-950 ${scene.border.replace('border-', 'ring-')}`
+                    : 'opacity-70 hover:opacity-90',
+                  scene.color,
+                  scene.border,
+                ].join(' ')}
+                onClick={() => setSelectedScene(scene.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && setSelectedScene(scene.id)}
               >
-                {tag}
-              </span>
-            ))}
-          </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-semibold uppercase tracking-[0.3em] ${scene.accent}`}>
+                        {t('scene.preset_label')}
+                      </span>
+                      {scene.recommended && (
+                        <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                          {t('scene.preset_badge')}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="mt-2 text-xl font-bold text-white">{scene.name}</h3>
+                    <p className="mt-1 text-xs text-slate-400">{scene.nameEn}</p>
+                  </div>
+                  {/* Selection indicator */}
+                  <div className={[
+                    'mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+                    isSelected
+                      ? `${scene.border} bg-white/20`
+                      : 'border-white/20 bg-transparent',
+                  ].join(' ')}>
+                    {isSelected && <div className="h-2.5 w-2.5 rounded-full bg-white/80" />}
+                  </div>
+                </div>
+
+                <p className="mt-4 text-sm leading-relaxed text-slate-300">{scene.description}</p>
+
+                <div className="mt-5 flex items-center gap-4">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-300">
+                    <span className="text-base">👥</span>
+                    <span><span className="font-bold text-white">{scene.residents}</span> {t('scene.residents')}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-300">
+                    <span className="text-base">🏘️</span>
+                    <span><span className="font-bold text-white">{scene.buildings}</span> {t('scene.buildings')}</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {scene.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[11px] text-slate-300"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
         </div>
 
         {/* ── Custom scene ── */}

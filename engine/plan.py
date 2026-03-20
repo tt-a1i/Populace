@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
 
+from engine._optional_backend import load_backend_attr
 from engine.types import Event, Memory, Reflection
 
 if TYPE_CHECKING:
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
 
 # Default action returned on any LLM failure
 _DEFAULT_ACTION: dict = {"action": "idle"}
+_BUILD_PLAN_PROMPT = load_backend_attr("backend.llm.prompts", "build_plan_prompt")
 
 
 def _build_plan_messages(
@@ -24,9 +26,7 @@ def _build_plan_messages(
     memories: list[Memory],
     reflections: list[Reflection],
 ) -> list[dict[str, Any]]:
-    try:
-        from backend.llm.prompts import build_plan_prompt
-    except ImportError:
+    if _BUILD_PLAN_PROMPT is None:
         memory_lines = "\n".join(f"- {memory.content}" for memory in memories[-3:]) or "- 无"
         reflection_lines = "\n".join(f"- {reflection.summary}" for reflection in reflections[-2:]) or "- 无"
         return [
@@ -46,7 +46,7 @@ def _build_plan_messages(
             },
         ]
 
-    return build_plan_prompt(agent.resident, memories, reflections)
+    return _BUILD_PLAN_PROMPT(agent.resident, memories, reflections)
 
 
 async def plan(

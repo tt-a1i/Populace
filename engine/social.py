@@ -12,6 +12,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from engine._optional_backend import load_backend_attr
 from engine.types import Memory, RelationType, Relationship, RelationshipDelta, WorldConfig
 
 if TYPE_CHECKING:
@@ -49,6 +50,8 @@ class DialogueResult:
 _EXTROVERT_KEYWORDS = ("外向", "开朗", "活泼", "健谈", "社牛", "extrovert", "outgoing")
 _INTROVERT_KEYWORDS = ("内向", "安静", "害羞", "社恐", "introvert", "shy")
 _NEGATIVE_RELATION_TYPES = {RelationType.rivalry, RelationType.fear, RelationType.dislike}
+_BUILD_DIALOGUE_PROMPT = load_backend_attr("backend.llm.prompts", "build_dialogue_prompt")
+_BUILD_DIALOGUE_EVAL_PROMPT = load_backend_attr("backend.llm.prompts", "build_dialogue_eval_prompt")
 
 
 def _build_dialogue_prompt_messages(
@@ -56,9 +59,7 @@ def _build_dialogue_prompt_messages(
     listener: "Agent",
     context: str,
 ) -> list[dict[str, str]]:
-    try:
-        from backend.llm.prompts import build_dialogue_prompt
-    except ImportError:
+    if _BUILD_DIALOGUE_PROMPT is None:
         return [
             {
                 "role": "system",
@@ -75,13 +76,11 @@ def _build_dialogue_prompt_messages(
             },
         ]
 
-    return build_dialogue_prompt(speaker.resident, listener.resident, context)
+    return _BUILD_DIALOGUE_PROMPT(speaker.resident, listener.resident, context)
 
 
 def _build_dialogue_eval_messages(context_history: str) -> list[dict[str, str]]:
-    try:
-        from backend.llm.prompts import build_dialogue_eval_prompt
-    except ImportError:
+    if _BUILD_DIALOGUE_EVAL_PROMPT is None:
         return [
             {
                 "role": "system",
@@ -93,7 +92,7 @@ def _build_dialogue_eval_messages(context_history: str) -> list[dict[str, str]]:
             },
         ]
 
-    return build_dialogue_eval_prompt(context_history)
+    return _BUILD_DIALOGUE_EVAL_PROMPT(context_history)
 
 
 def _clamp(value: float, lower: float, upper: float) -> float:

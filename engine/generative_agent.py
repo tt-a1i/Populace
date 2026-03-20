@@ -11,11 +11,16 @@ import inspect
 import uuid
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
 
+from engine._optional_backend import load_backend_attr
 from engine.agent import Agent
 from engine.types import Event, Memory, Reflection, Resident
 
 if TYPE_CHECKING:
     from engine.world import World
+
+
+_CACHE_AGENT_MEMORY = load_backend_attr("backend.db.redis", "cache_agent_memory")
+_CHAT_COMPLETION = load_backend_attr("backend.llm.client", "chat_completion")
 
 
 class GenerativeAgent(Agent):
@@ -111,11 +116,9 @@ class GenerativeAgent(Agent):
         try:
             import asyncio
             loop = asyncio.get_running_loop()
-            try:
-                from backend.db.redis import cache_agent_memory
-            except ImportError:
+            if _CACHE_AGENT_MEMORY is None:
                 return
-            loop.create_task(cache_agent_memory(self.resident.id, mem))
+            loop.create_task(_CACHE_AGENT_MEMORY(self.resident.id, mem))
         except RuntimeError:
             pass  # No running event loop (e.g. unit tests) — skip silently
         except Exception:
@@ -129,9 +132,7 @@ class GenerativeAgent(Agent):
                 return await result
             return result
 
-        try:
-            from backend.llm.client import chat_completion
-        except ImportError:
+        if _CHAT_COMPLETION is None:
             return None
 
-        return await chat_completion(messages, max_tokens=max_tokens)
+        return await _CHAT_COMPLETION(messages, max_tokens=max_tokens)

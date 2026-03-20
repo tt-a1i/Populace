@@ -19,6 +19,10 @@ class SpeedRequest(BaseModel):
     speed: int
 
 
+class StartRequest(BaseModel):
+    scene: str = "modern_community"   # template slug, e.g. "seaside_village"
+
+
 class SimulationState:
     def __init__(self) -> None:
         import logging
@@ -149,6 +153,36 @@ class SimulationState:
         if speed not in {1, 2, 5}:
             raise ValueError("speed must be one of 1, 2, or 5")
         self.loop.clock.set_speed(float(speed))
+
+    async def reset_with_scene(self, scene_slug: str) -> None:
+        """Stop simulation and reload a named preset template.
+
+        Args:
+            scene_slug: Template file stem, e.g. ``"seaside_village"``.
+                        Falls back to ``"modern_community"`` if the file is
+                        not found.
+        """
+        import pathlib
+        from backend.world.town import load_scenario
+
+        templates_dir = pathlib.Path(__file__).parent.parent / "world" / "templates"
+        template_path = templates_dir / f"{scene_slug}.json"
+        if not template_path.exists():
+            self._log.warning(
+                "Scene template '%s' not found; using modern_community.", scene_slug
+            )
+            template_path = templates_dir / "modern_community.json"
+
+        await self.stop()
+        for task in self._pending_dialogues:
+            task.cancel()
+        self._pending_dialogues.clear()
+        self._active_dialogue_pairs.clear()
+        self._events.clear()
+
+        self.world = load_scenario(template_path)
+        self.loop = SimulationLoop(self.world, tick_handler=self._tick)
+        self._task = None
 
     async def reset_with_scenario(self, scenario_data: dict[str, Any]) -> None:
         """Stop simulation and replace the world with a custom scenario."""
@@ -711,8 +745,20 @@ async def start_custom_simulation(
 
 
 @router.post("/start")
-async def start_simulation(request: Request) -> dict[str, Any]:
+async def start_simulation(
+    request: Request,
+    payload: StartRequest = StartRequest(),
+) -> dict[str, Any]:
+    """Start the simulation, optionally loading a specific preset scene.
+
+    Args:
+        payload.scene: Template slug — ``"modern_community"`` (default) or
+                       ``"seaside_village"``.  Unknown slugs fall back to the
+                       default template.
+    """
     state = get_simulation_state(request)
+    if payload.scene != "modern_community":
+        await state.reset_with_scene(payload.scene)
     await state.start()
     return state.get_status()
 

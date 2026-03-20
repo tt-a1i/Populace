@@ -88,8 +88,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
-export function startSimulation() {
-  return request('/api/simulation/start', { method: 'POST' })
+export function startSimulation(scene = 'modern_community') {
+  return request('/api/simulation/start', {
+    method: 'POST',
+    body: JSON.stringify({ scene }),
+  })
 }
 
 export function stopSimulation() {
