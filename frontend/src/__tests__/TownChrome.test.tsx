@@ -1,10 +1,27 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const {
+  mockGetResidentMemories,
+  mockGetResidentRelationships,
+  mockGetResidentReflections,
+} = vi.hoisted(() => ({
+  mockGetResidentMemories: vi.fn(),
+  mockGetResidentRelationships: vi.fn(),
+  mockGetResidentReflections: vi.fn(),
+}))
+
+vi.mock('../services/api', () => ({
+  getResidentMemories: mockGetResidentMemories,
+  getResidentRelationships: mockGetResidentRelationships,
+  getResidentReflections: mockGetResidentReflections,
+}))
 
 import { TownChrome, type TownContextMenuState, type TownInspectionState, type TownPlaceholder } from '../components/town/TownChrome'
 import type { ResidentPosition } from '../stores/simulation'
 import type { GraphRelationship } from '../stores/relationships'
+import type { ResidentMemory, ResidentReflection, ResidentRelationship } from '../services/api'
 
 const residents: ResidentPosition[] = [
   {
@@ -77,7 +94,48 @@ const inspection: TownInspectionState = {
 
 const placeholders: TownPlaceholder[] = [{ id: 'placeholder-1', tileX: 8, tileY: 10, label: '预留地块' }]
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+
+  return { promise, resolve, reject }
+}
+
+function buildProps(selectedResidentId: string | null) {
+  return {
+    residents,
+    buildings,
+    relationships,
+    selectedResidentId,
+    currentTime: 'Day 2, 09:30',
+    messageFeed: ['小明 对 小红 说：今天真热闹。', '事件：咖啡馆门口传来笑声'],
+    contextMenu: null,
+    inspection: null,
+    placeholders,
+    onCloseContextMenu: vi.fn(),
+    onInjectEvent: vi.fn(),
+    onInspectTile: vi.fn(),
+    onPlacePlaceholder: vi.fn(),
+    onClearResidentSelection: vi.fn(),
+    onDismissInspection: vi.fn(),
+  } satisfies React.ComponentProps<typeof TownChrome>
+}
+
 describe('TownChrome', () => {
+  beforeEach(() => {
+    mockGetResidentMemories.mockReset()
+    mockGetResidentRelationships.mockReset()
+    mockGetResidentReflections.mockReset()
+
+    mockGetResidentMemories.mockResolvedValue([])
+    mockGetResidentRelationships.mockResolvedValue([])
+    mockGetResidentReflections.mockResolvedValue([])
+  })
+
   it('shows the tile context menu and dispatches actions', async () => {
     const user = userEvent.setup()
     const onInjectEvent = vi.fn()
@@ -175,5 +233,200 @@ describe('TownChrome', () => {
       width: '5%',
       height: '10%',
     })
+  })
+
+  it('clears live API data immediately when switching residents', async () => {
+    const residentAMemories: ResidentMemory[] = [
+      { id: 'memory-a', content: 'A API 记忆', timestamp: 'Day 1, 08:00', importance: 0.8, emotion: 'happy' },
+    ]
+    const residentARelationships: ResidentRelationship[] = [
+      {
+        from_id: 'r1',
+        to_id: 'r2',
+        type: 'friendship',
+        intensity: 0.9,
+        familiarity: 0.7,
+        reason: 'A API 关系原因',
+        since: 'Day 1',
+        counterpart_name: 'A API 关系',
+        direction: 'outgoing',
+      },
+    ]
+    const residentAReflections: ResidentReflection[] = [
+      { id: 'reflection-a', summary: 'A API 反思', timestamp: 'Day 1, 09:00', derived_from: [] },
+    ]
+    const residentBMemories = createDeferred<ResidentMemory[]>()
+    const residentBRelationships = createDeferred<ResidentRelationship[]>()
+    const residentBReflections = createDeferred<ResidentReflection[]>()
+
+    mockGetResidentMemories.mockImplementation((id: string) => {
+      if (id === 'r1') return Promise.resolve(residentAMemories)
+      return residentBMemories.promise
+    })
+    mockGetResidentRelationships.mockImplementation((id: string) => {
+      if (id === 'r1') return Promise.resolve(residentARelationships)
+      return residentBRelationships.promise
+    })
+    mockGetResidentReflections.mockImplementation((id: string) => {
+      if (id === 'r1') return Promise.resolve(residentAReflections)
+      return residentBReflections.promise
+    })
+
+    const { rerender } = render(<TownChrome {...buildProps('r1')} />)
+
+    expect(await screen.findByText('A API 记忆')).toBeInTheDocument()
+    expect(screen.getByText('A API 反思')).toBeInTheDocument()
+    expect(screen.getByText('A API 关系')).toBeInTheDocument()
+
+    rerender(<TownChrome {...buildProps('r2')} />)
+
+    expect(screen.getByText('小红')).toBeInTheDocument()
+    expect(screen.queryByText('A API 记忆')).not.toBeInTheDocument()
+    expect(screen.queryByText('A API 反思')).not.toBeInTheDocument()
+    expect(screen.queryByText('A API 关系')).not.toBeInTheDocument()
+    expect(screen.getByText(/当前在地图/)).toBeInTheDocument()
+
+    residentBMemories.resolve([])
+    residentBRelationships.resolve([])
+    residentBReflections.resolve([])
+
+    await waitFor(() => {
+      expect(mockGetResidentMemories).toHaveBeenCalledWith('r2')
+    })
+  })
+
+  it('ignores stale API results that resolve after switching to another resident', async () => {
+    const residentAMemories = createDeferred<ResidentMemory[]>()
+    const residentARelationships = createDeferred<ResidentRelationship[]>()
+    const residentAReflections = createDeferred<ResidentReflection[]>()
+    const residentBMemories = createDeferred<ResidentMemory[]>()
+    const residentBRelationships = createDeferred<ResidentRelationship[]>()
+    const residentBReflections = createDeferred<ResidentReflection[]>()
+
+    mockGetResidentMemories.mockImplementation((id: string) =>
+      id === 'r1' ? residentAMemories.promise : residentBMemories.promise,
+    )
+    mockGetResidentRelationships.mockImplementation((id: string) =>
+      id === 'r1' ? residentARelationships.promise : residentBRelationships.promise,
+    )
+    mockGetResidentReflections.mockImplementation((id: string) =>
+      id === 'r1' ? residentAReflections.promise : residentBReflections.promise,
+    )
+
+    const { rerender } = render(<TownChrome {...buildProps('r1')} />)
+
+    rerender(<TownChrome {...buildProps('r2')} />)
+
+    residentAMemories.resolve([
+      { id: 'memory-a-late', content: '过期的 A 记忆', timestamp: 'Day 1, 08:00', importance: 0.9, emotion: 'happy' },
+    ])
+    residentARelationships.resolve([
+      {
+        from_id: 'r1',
+        to_id: 'r2',
+        type: 'friendship',
+        intensity: 0.8,
+        familiarity: 0.7,
+        reason: '过期的 A 关系原因',
+        since: 'Day 1',
+        counterpart_name: '过期的 A 关系',
+        direction: 'outgoing',
+      },
+    ])
+    residentAReflections.resolve([
+      { id: 'reflection-a-late', summary: '过期的 A 反思', timestamp: 'Day 1, 09:00', derived_from: [] },
+    ])
+
+    await waitFor(() => {
+      expect(screen.getByText('小红')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByText('过期的 A 记忆')).not.toBeInTheDocument()
+    expect(screen.queryByText('过期的 A 关系')).not.toBeInTheDocument()
+    expect(screen.queryByText('过期的 A 反思')).not.toBeInTheDocument()
+
+    residentBMemories.resolve([
+      { id: 'memory-b', content: 'B API 记忆', timestamp: 'Day 1, 10:00', importance: 0.6, emotion: 'neutral' },
+    ])
+    residentBRelationships.resolve([
+      {
+        from_id: 'r2',
+        to_id: 'r1',
+        type: 'trust',
+        intensity: 0.75,
+        familiarity: 0.5,
+        reason: 'B API 关系原因',
+        since: 'Day 2',
+        counterpart_name: 'B API 关系',
+        direction: 'outgoing',
+      },
+    ])
+    residentBReflections.resolve([
+      { id: 'reflection-b', summary: 'B API 反思', timestamp: 'Day 2, 10:00', derived_from: [] },
+    ])
+
+    expect(await screen.findByText('B API 记忆')).toBeInTheDocument()
+    expect(screen.getByText('B API 关系')).toBeInTheDocument()
+    expect(screen.getByText('B API 反思')).toBeInTheDocument()
+    expect(screen.queryByText('过期的 A 记忆')).not.toBeInTheDocument()
+  })
+
+  it('clears stale live data when the next resident request fails', async () => {
+    const residentAMemories: ResidentMemory[] = [
+      { id: 'memory-a-success', content: '成功的 A 记忆', timestamp: 'Day 1, 08:00', importance: 0.7, emotion: 'happy' },
+    ]
+    const residentARelationships: ResidentRelationship[] = [
+      {
+        from_id: 'r1',
+        to_id: 'r2',
+        type: 'friendship',
+        intensity: 0.85,
+        familiarity: 0.6,
+        reason: '成功的 A 关系原因',
+        since: 'Day 1',
+        counterpart_name: '成功的 A 关系',
+        direction: 'outgoing',
+      },
+    ]
+    const residentAReflections: ResidentReflection[] = [
+      { id: 'reflection-a-success', summary: '成功的 A 反思', timestamp: 'Day 1, 09:00', derived_from: [] },
+    ]
+
+    mockGetResidentMemories.mockImplementation((id: string) =>
+      id === 'r1'
+        ? Promise.resolve(residentAMemories)
+        : Promise.reject(new Error('resident B memories failed')),
+    )
+    mockGetResidentRelationships.mockImplementation((id: string) =>
+      id === 'r1'
+        ? Promise.resolve(residentARelationships)
+        : Promise.reject(new Error('resident B relationships failed')),
+    )
+    mockGetResidentReflections.mockImplementation((id: string) =>
+      id === 'r1'
+        ? Promise.resolve(residentAReflections)
+        : Promise.reject(new Error('resident B reflections failed')),
+    )
+
+    const { rerender } = render(<TownChrome {...buildProps('r1')} />)
+
+    expect(await screen.findByText('成功的 A 记忆')).toBeInTheDocument()
+    expect(screen.getByText('成功的 A 关系')).toBeInTheDocument()
+    expect(screen.getByText('成功的 A 反思')).toBeInTheDocument()
+
+    rerender(<TownChrome {...buildProps('r2')} />)
+
+    await waitFor(() => {
+      expect(mockGetResidentMemories).toHaveBeenCalledWith('r2')
+    })
+
+    await waitFor(() => {
+      expect(screen.queryByText('成功的 A 记忆')).not.toBeInTheDocument()
+      expect(screen.queryByText('成功的 A 关系')).not.toBeInTheDocument()
+      expect(screen.queryByText('成功的 A 反思')).not.toBeInTheDocument()
+    })
+
+    expect(screen.getByText('小红')).toBeInTheDocument()
+    expect(screen.queryByText('反思 ·')).not.toBeInTheDocument()
   })
 })

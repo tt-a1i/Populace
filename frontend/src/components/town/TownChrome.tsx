@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import type { GraphRelationship } from '../../stores/relationships'
 import type { ResidentPosition } from '../../stores/simulation'
@@ -129,27 +129,49 @@ export function TownChrome({
   )
 
   // Real data from API (fetched when a resident is selected)
-  const [liveMemories, setLiveMemories] = useState<ResidentMemory[]>([])
-  const [liveRelationships, setLiveRelationships] = useState<ResidentRelationship[]>([])
-  const [liveReflections, setLiveReflections] = useState<ResidentReflection[]>([])
+  const [liveMemories, setLiveMemories] = useState<ResidentMemory[] | null>(null)
+  const [liveRelationships, setLiveRelationships] = useState<ResidentRelationship[] | null>(null)
+  const [liveReflections, setLiveReflections] = useState<ResidentReflection[] | null>(null)
+  const requestSequenceRef = useRef(0)
+
+  useLayoutEffect(() => {
+    requestSequenceRef.current += 1
+    setLiveMemories(null)
+    setLiveRelationships(null)
+    setLiveReflections(null)
+  }, [selectedResidentId])
 
   useEffect(() => {
     if (!selectedResidentId) {
-      // Defer state resets to avoid synchronous setState in effect
-      const t = window.setTimeout(() => {
-        setLiveMemories([])
-        setLiveRelationships([])
-        setLiveReflections([])
-      }, 0)
-      return () => window.clearTimeout(t)
+      return undefined
     }
 
-    // Fetch all three in parallel; silently ignore errors (backend may not be running)
-    void Promise.allSettled([
-      getResidentMemories(selectedResidentId).then(setLiveMemories).catch(() => {}),
-      getResidentRelationships(selectedResidentId).then(setLiveRelationships).catch(() => {}),
-      getResidentReflections(selectedResidentId).then(setLiveReflections).catch(() => {}),
-    ])
+    const requestSequence = requestSequenceRef.current
+    let disposed = false
+
+    const applyIfCurrent = <T,>(setter: (value: T | null) => void) => (value: T | null) => {
+      if (disposed || requestSequenceRef.current !== requestSequence) {
+        return
+      }
+
+      setter(value)
+    }
+
+    const setMemories = applyIfCurrent(setLiveMemories)
+    const setRelationships = applyIfCurrent(setLiveRelationships)
+    const setReflections = applyIfCurrent(setLiveReflections)
+
+    void getResidentMemories(selectedResidentId).then(setMemories).catch(() => setMemories(null))
+    void getResidentRelationships(selectedResidentId)
+      .then(setRelationships)
+      .catch(() => setRelationships(null))
+    void getResidentReflections(selectedResidentId)
+      .then(setReflections)
+      .catch(() => setReflections(null))
+
+    return () => {
+      disposed = true
+    }
   }, [selectedResidentId])
 
   // Fallback: synthesised summary when live data is empty
@@ -237,7 +259,7 @@ export function TownChrome({
             <div className="flex items-center justify-between gap-3">
               <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">
                 记忆
-                {liveMemories.length > 0 && (
+                {liveMemories && liveMemories.length > 0 && (
                   <span className="ml-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5 text-[9px] text-cyan-300/70">
                     {liveMemories.length}
                   </span>
@@ -246,7 +268,7 @@ export function TownChrome({
               <span className="text-xs text-slate-500">{currentTime}</span>
             </div>
             <div className="mt-3 max-h-40 space-y-2 overflow-y-auto text-sm leading-6 text-slate-300 pr-1">
-              {liveMemories.length > 0 ? (
+              {liveMemories && liveMemories.length > 0 ? (
                 [...liveMemories].reverse().slice(0, 8).map((mem) => (
                   <div key={mem.id} className="rounded-2xl border border-white/6 bg-slate-900/60 px-3 py-2">
                     <div className="flex items-center justify-between gap-2">
@@ -267,7 +289,7 @@ export function TownChrome({
           </section>
 
           {/* ── Reflections ── */}
-          {liveReflections.length > 0 && (
+          {liveReflections && liveReflections.length > 0 && (
             <section className="mt-3 rounded-[22px] border border-violet-400/15 bg-violet-400/5 p-4">
               <p className="text-[11px] uppercase tracking-[0.28em] text-violet-300/70">
                 反思 · {liveReflections.length}
@@ -287,14 +309,14 @@ export function TownChrome({
           <section className="mt-3 flex-1 rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
             <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">
               关系
-              {liveRelationships.length > 0 && (
-                <span className="ml-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-1.5 py-0.5 text-[9px] text-amber-300/70">
-                  {liveRelationships.length}
-                </span>
+                {liveRelationships && liveRelationships.length > 0 && (
+                  <span className="ml-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-1.5 py-0.5 text-[9px] text-amber-300/70">
+                    {liveRelationships.length}
+                  </span>
               )}
             </p>
             <div className="mt-3 max-h-48 space-y-3 overflow-y-auto pr-1">
-              {liveRelationships.length > 0 ? (
+              {liveRelationships && liveRelationships.length > 0 ? (
                 liveRelationships.map((rel) => (
                   <article
                     key={`${rel.from_id}-${rel.to_id}-${rel.type}`}

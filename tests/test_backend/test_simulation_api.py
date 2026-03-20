@@ -21,6 +21,34 @@ def test_get_status_returns_fields(client):
     assert "speed" in data
 
 
+def test_get_stats_returns_aggregate_fields(client):
+    state = client.app.state.simulation_state
+    state.world.current_tick = 12
+    state._total_dialogue_count = 5
+    state._total_relationship_change_count = 8
+    state._events = [{"id": "queued-1", "description": "队列事件", "source": "user", "timestamp": "Day 1"}]
+    state._active_events = [
+        {
+            "id": "active-1",
+            "name": "持续事件",
+            "description": "持续中的事件",
+            "radius": 3,
+            "remaining_ticks": 2,
+            "source": "user",
+        },
+    ]
+
+    response = client.get("/api/simulation/stats")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "total_ticks": 12,
+        "total_dialogues": 5,
+        "total_relationship_changes": 8,
+        "active_events": 2,
+    }
+
+
 def test_start_simulation(client):
     response = client.post("/api/simulation/start")
     assert response.status_code == 200

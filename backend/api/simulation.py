@@ -7,7 +7,13 @@ from typing import Any, Literal, Optional
 from fastapi import APIRouter, Body, Request
 from pydantic import BaseModel
 
-from backend.api.schemas import ScenarioDataResponse, SimulationStatusResponse, api_error, error_responses
+from backend.api.schemas import (
+    ScenarioDataResponse,
+    SimulationStatsResponse,
+    SimulationStatusResponse,
+    api_error,
+    error_responses,
+)
 from backend.core.simulation import SimulationLoop
 from backend.llm.client import validate_llm_config
 from engine.types import EventUpdate
@@ -41,6 +47,8 @@ class SimulationState:
         self._active_dialogue_pairs: set[frozenset] = set()
         # Active persistent events: list of dicts with remaining_ticks, radius, description
         self._active_events: list[dict[str, Any]] = []
+        self._total_dialogue_count = 0
+        self._total_relationship_change_count = 0
 
     async def restore_from_neo4j(self) -> None:
         """Restore prior session state at startup.
@@ -183,6 +191,8 @@ class SimulationState:
         self._active_dialogue_pairs.clear()
         self._events.clear()
         self._active_events.clear()
+        self._total_dialogue_count = 0
+        self._total_relationship_change_count = 0
 
         self.world = load_scenario(template_path)
         self.loop = SimulationLoop(self.world, tick_handler=self._tick)
@@ -199,6 +209,8 @@ class SimulationState:
         self._active_dialogue_pairs.clear()
         self._events.clear()
         self._active_events.clear()
+        self._total_dialogue_count = 0
+        self._total_relationship_change_count = 0
 
         self.world = load_scenario_from_dict(scenario_data)
         self.loop = SimulationLoop(self.world, tick_handler=self._tick)
@@ -264,6 +276,8 @@ class SimulationState:
         self._active_dialogue_pairs.clear()
         self._events.clear()
         self._active_events.clear()
+        self._total_dialogue_count = 0
+        self._total_relationship_change_count = 0
 
         # Rebuild config
         cfg_data = data.get("config", {})
@@ -357,6 +371,21 @@ class SimulationState:
             "running": self.loop.running,
             "speed": int(self.loop.clock.speed) if self.loop.clock.speed else 0,
             "tick": self.world.current_tick,
+        }
+
+    def _ensure_stats_counters(self) -> None:
+        if not hasattr(self, "_total_dialogue_count"):
+            self._total_dialogue_count = 0
+        if not hasattr(self, "_total_relationship_change_count"):
+            self._total_relationship_change_count = 0
+
+    def get_stats(self) -> dict[str, int]:
+        self._ensure_stats_counters()
+        return {
+            "total_ticks": self.world.current_tick,
+            "total_dialogues": self._total_dialogue_count,
+            "total_relationship_changes": self._total_relationship_change_count,
+            "active_events": len(self._events) + len(self._active_events),
         }
 
     def snapshot(self) -> dict[str, Any]:
@@ -648,6 +677,9 @@ class SimulationState:
         tick_state = self.world.tick()
         tick_state.dialogues.extend(dialogue_updates)
         tick_state.relationships.extend(relationship_deltas)
+        self._ensure_stats_counters()
+        self._total_dialogue_count += len(tick_state.dialogues)
+        self._total_relationship_change_count += len(tick_state.relationships)
 
         # Collect current goals and include in tick diff
         from engine.types import GoalUpdate
@@ -875,3 +907,14 @@ async def get_simulation_status(request: Request) -> SimulationStatusResponse:
     """Return whether the simulation is running plus the current speed and tick."""
     state = get_simulation_state(request)
     return SimulationStatusResponse(**state.get_status())
+
+
+@router.get(
+    "/stats",
+    response_model=SimulationStatsResponse,
+    responses=error_responses(503),
+)
+async def get_simulation_stats(request: Request) -> SimulationStatsResponse:
+    """Return aggregate counters for ticks, dialogues, relationship changes, and active events."""
+    state = get_simulation_state(request)
+    return SimulationStatsResponse(**state.get_stats())

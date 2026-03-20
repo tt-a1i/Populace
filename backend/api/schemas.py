@@ -46,6 +46,13 @@ class SimulationStatusResponse(BaseModel):
     tick: int
 
 
+class SimulationStatsResponse(BaseModel):
+    total_ticks: int
+    total_dialogues: int
+    total_relationship_changes: int
+    active_events: int
+
+
 class WorldEventResponse(BaseModel):
     id: str
     description: str

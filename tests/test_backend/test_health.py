@@ -1,4 +1,6 @@
 """Tests for GET /health endpoint."""
+import logging
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -20,3 +22,15 @@ def test_health_returns_ok(client):
 def test_health_content_type(client):
     response = client.get("/health")
     assert "application/json" in response.headers["content-type"]
+
+
+def test_health_request_is_logged(client, caplog):
+    with caplog.at_level(logging.INFO):
+        response = client.get("/health")
+
+    assert response.status_code == 200
+    assert any(
+        record.levelno == logging.INFO
+        and record.message.startswith("HTTP GET /health -> 200 in ")
+        for record in caplog.records
+    )
