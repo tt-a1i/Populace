@@ -169,7 +169,7 @@ export function TownChrome({
       {selectedResident && (
         <aside
           data-testid="resident-sidebar"
-          className="absolute bottom-4 right-4 top-4 z-20 flex w-[min(22rem,calc(100%-2rem))] flex-col rounded-[26px] border border-cyan-300/18 bg-slate-950/92 p-5 text-slate-100 shadow-[0_28px_80px_rgba(8,15,31,0.44)] backdrop-blur"
+          className="absolute bottom-4 right-4 top-4 z-30 flex w-[min(22rem,calc(100%-2rem))] flex-col rounded-[26px] border border-cyan-300/18 bg-slate-950/92 p-5 text-slate-100 shadow-[0_28px_80px_rgba(8,15,31,0.44)] backdrop-blur"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -242,8 +242,8 @@ export function TownChrome({
 
       <section
         data-testid="town-minimap"
-        className="absolute bottom-4 z-20 overflow-hidden rounded-[22px] border border-white/10 bg-slate-950/88 p-3 text-slate-100 shadow-[0_20px_50px_rgba(8,15,31,0.4)] backdrop-blur"
-        style={{ right: selectedResident ? '24rem' : '1rem' }}
+        className="absolute bottom-4 z-10 overflow-hidden rounded-[22px] border border-white/10 bg-slate-950/88 p-3 text-slate-100 shadow-[0_20px_50px_rgba(8,15,31,0.4)] backdrop-blur"
+        style={{ right: '1rem' }}
       >
         <div className="flex items-center justify-between gap-3">
           <div>

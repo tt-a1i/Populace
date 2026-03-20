@@ -71,3 +71,23 @@ def test_start_unknown_scene_falls_back_to_default(client: TestClient) -> None:
 
     residents = client.get("/api/residents").json()
     assert len(residents) == 10, "Unknown scene should fall back to 10-resident modern_community"
+
+
+def test_active_events_cleared_on_scene_switch(client: TestClient) -> None:
+    """Active events from a previous scene must not leak into the new scene."""
+    # Inject a multi-tick preset event
+    resp = client.post("/api/world/events", json={"preset_id": "storm"})
+    assert resp.status_code == 200
+
+    # Verify event is active
+    active = client.get("/api/world/events/active").json()
+    assert len(active) >= 1, "storm event should appear in active events"
+
+    # Switch scene — active events must be cleared
+    resp2 = client.post("/api/simulation/start", json={"scene": "seaside_village"})
+    assert resp2.status_code == 200
+
+    active_after = client.get("/api/world/events/active").json()
+    assert len(active_after) == 0, (
+        f"Active events should be cleared after scene switch, got {active_after}"
+    )

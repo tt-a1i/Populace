@@ -181,6 +181,7 @@ class SimulationState:
         self._pending_dialogues.clear()
         self._active_dialogue_pairs.clear()
         self._events.clear()
+        self._active_events.clear()
 
         self.world = load_scenario(template_path)
         self.loop = SimulationLoop(self.world, tick_handler=self._tick)
@@ -196,6 +197,7 @@ class SimulationState:
         self._pending_dialogues.clear()
         self._active_dialogue_pairs.clear()
         self._events.clear()
+        self._active_events.clear()
 
         self.world = load_scenario_from_dict(scenario_data)
         self.loop = SimulationLoop(self.world, tick_handler=self._tick)
@@ -260,6 +262,7 @@ class SimulationState:
         self._pending_dialogues.clear()
         self._active_dialogue_pairs.clear()
         self._events.clear()
+        self._active_events.clear()
 
         # Rebuild config
         cfg_data = data.get("config", {})

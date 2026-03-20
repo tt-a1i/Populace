@@ -141,7 +141,7 @@ describe('TownChrome', () => {
     expect(screen.getByText('小明')).toBeInTheDocument()
     expect(screen.getByText('外向、热情')).toBeInTheDocument()
     expect(screen.getByText('happy')).toBeInTheDocument()
-    expect(screen.getByText(/今天真热闹/)).toBeInTheDocument()
+    expect(screen.getAllByText(/今天真热闹/)[0]).toBeInTheDocument()
     expect(screen.getByText(/friendship/i)).toBeInTheDocument()
     expect(screen.getByText(/晨曦咖啡馆/)).toBeInTheDocument()
     expect(screen.getByTestId('town-inspection')).toBeInTheDocument()

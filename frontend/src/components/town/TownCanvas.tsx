@@ -1,13 +1,23 @@
-import { useEffect, useMemo, useRef } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
 
 import { Application } from 'pixi.js'
 
-import { useSimulationStore } from '../../stores/simulation'
+import { getActiveEvents, injectEvent, type ActiveEvent } from '../../services/api'
 import { useRelationshipsStore } from '../../stores/relationships'
+import { useSimulationStore } from '../../stores/simulation'
+import { TownChrome, type TownContextMenuState, type TownInspectionState, type TownPlaceholder } from './TownChrome'
 import { TownRenderer } from './TownRenderer'
-import { type ActiveEvent, getActiveEvents } from '../../services/api'
+import { inspectTile } from './townMap'
 
 export function TownCanvas() {
+  const shellRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
   const rendererRef = useRef<TownRenderer | null>(null)
   const buildings = useSimulationStore((state) => state.buildings)
@@ -20,12 +30,27 @@ export function TownCanvas() {
   const speed = useSimulationStore((state) => state.speed)
   const hoveredPairIds = useSimulationStore((state) => state.hoveredPairIds)
   const weather = useSimulationStore((state) => state.weather)
+  const messageFeed = useSimulationStore((state) => state.messageFeed)
   const replayFrozenFrame = useSimulationStore((state) => state.replayFrozenFrame)
   const getFrameByTick = useSimulationStore((state) => state.getFrameByTick)
+  const selectResident = useSimulationStore((state) => state.selectResident)
+  const liveRelationships = useRelationshipsStore((state) => state.relationships)
+  const relationshipHistory = useRelationshipsStore((state) => state.history)
   const replayTick = useRelationshipsStore((state) => state.replayTick)
+  const [contextMenu, setContextMenu] = useState<TownContextMenuState | null>(null)
+  const [inspection, setInspection] = useState<TownInspectionState | null>(null)
+  const [placeholders, setPlaceholders] = useState<TownPlaceholder[]>([])
+
   const replayFrame = useMemo(
     () => (replayTick === null ? null : getFrameByTick(replayTick)),
     [getFrameByTick, replayTick],
+  )
+  const replayRelationshipSnapshot = useMemo(
+    () =>
+      replayTick === null
+        ? null
+        : relationshipHistory.find((snapshot) => snapshot.tick === replayTick) ?? null,
+    [relationshipHistory, replayTick],
   )
   const liveMeta = useMemo(
     () => ({
@@ -45,6 +70,11 @@ export function TownCanvas() {
         : liveResidents,
     [liveResidents, replayFrame, replayFrozenFrame, replayTick],
   )
+  const relationships = replayRelationshipSnapshot?.relationships ?? liveRelationships
+  const selectedResident = useMemo(
+    () => residents.find((resident) => resident.id === selectedResidentId) ?? null,
+    [residents, selectedResidentId],
+  )
   const simulationMeta = useMemo(
     () =>
       replayTick !== null
@@ -58,6 +88,92 @@ export function TownCanvas() {
         : liveMeta,
     [liveMeta, replayFrame, replayFrozenFrame, replayTick],
   )
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null)
+  }, [])
+
+  const handleContextMenu = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    const renderer = rendererRef.current
+    const shell = shellRef.current
+
+    if (!renderer || !shell) {
+      return
+    }
+
+    event.preventDefault()
+    const bounds = shell.getBoundingClientRect()
+    const localX = event.clientX - bounds.left
+    const localY = event.clientY - bounds.top
+    const tile = renderer.screenToTile(localX, localY)
+
+    if (!tile) {
+      setContextMenu(null)
+      return
+    }
+
+    setContextMenu({
+      screenX: Math.min(localX, Math.max(24, bounds.width - 216)),
+      screenY: Math.min(localY, Math.max(24, bounds.height - 220)),
+      tileX: tile.tileX,
+      tileY: tile.tileY,
+      tileKind: tile.tileKind,
+    })
+  }, [])
+
+  const handleInspectTile = useCallback(() => {
+    if (!contextMenu) {
+      return
+    }
+
+    setInspection(inspectTile(contextMenu.tileX, contextMenu.tileY, buildings, residents))
+    setContextMenu(null)
+  }, [buildings, contextMenu, residents])
+
+  const handlePlacePlaceholder = useCallback(() => {
+    if (!contextMenu) {
+      return
+    }
+
+    setPlaceholders((current) => {
+      const exists = current.some(
+        (placeholder) =>
+          placeholder.tileX === contextMenu.tileX && placeholder.tileY === contextMenu.tileY,
+      )
+
+      if (exists) {
+        return current
+      }
+
+      return [
+        ...current,
+        {
+          id: `placeholder-${contextMenu.tileX}-${contextMenu.tileY}`,
+          tileX: contextMenu.tileX,
+          tileY: contextMenu.tileY,
+          label: '预留地块',
+        },
+      ]
+    })
+    setContextMenu(null)
+  }, [contextMenu])
+
+  const handleInjectEvent = useCallback(async () => {
+    if (!contextMenu) {
+      return
+    }
+
+    try {
+      await injectEvent({
+        description: `地图 Tile ${contextMenu.tileX},${contextMenu.tileY} 出现新的街坊传闻。`,
+        source: 'map_context_menu',
+      })
+    } catch {
+      // Ignore request failures so the map tools remain interactive offline.
+    } finally {
+      setContextMenu(null)
+    }
+  }, [contextMenu])
 
   useEffect(() => {
     const host = hostRef.current
@@ -186,32 +302,80 @@ export function TownCanvas() {
     rendererRef.current?.updateWeather(weather)
   }, [weather])
 
-  // Poll active events and draw radius circles on the map
+  useEffect(() => {
+    rendererRef.current?.setPlaceholderBuildings(placeholders)
+  }, [placeholders])
+
   useEffect(() => {
     const updateRadii = (events: ActiveEvent[]) => {
-      // Position circles at map centre when no specific origin known
       const cx = Math.floor(40 / 2)
       const cy = Math.floor(30 / 2)
-      rendererRef.current?.showEventRadii(
-        events.map((ev) => ({ x: cx, y: cy, radius: ev.radius })),
-      )
+      rendererRef.current?.showEventRadii(events.map((event) => ({ x: cx, y: cy, radius: event.radius })))
     }
+
     const poll = async () => {
       try {
-        const events = await getActiveEvents() as ActiveEvent[]
+        const events = (await getActiveEvents()) as ActiveEvent[]
         updateRadii(events)
       } catch {
         updateRadii([])
       }
     }
+
     void poll()
-    const id = setInterval(() => { void poll() }, 3000)
+    const id = setInterval(() => {
+      void poll()
+    }, 3000)
     return () => clearInterval(id)
   }, [])
 
+  useEffect(() => {
+    if (!contextMenu) {
+      return undefined
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (target instanceof HTMLElement && target.closest('[data-town-context-menu="true"]')) {
+        return
+      }
+
+      setContextMenu(null)
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown)
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown)
+    }
+  }, [contextMenu])
+
   return (
-    <div className="relative mt-5 flex min-h-[30rem] flex-1 overflow-hidden rounded-[24px] border border-cyan-300/30 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.22),_rgba(15,23,42,0.42)_38%,_rgba(2,6,23,0.96)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+    <div
+      ref={shellRef}
+      data-testid="town-canvas-shell"
+      onContextMenu={handleContextMenu}
+      className="relative mt-5 flex min-h-[30rem] flex-1 overflow-hidden rounded-[24px] border border-cyan-300/30 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.22),_rgba(15,23,42,0.42)_38%,_rgba(2,6,23,0.96)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+    >
       <div id="town-canvas" ref={hostRef} className="h-full min-h-[30rem] w-full" />
+      <TownChrome
+        residents={residents}
+        buildings={buildings}
+        relationships={relationships}
+        selectedResidentId={selectedResident?.id ?? null}
+        currentTime={simulationMeta.time}
+        messageFeed={messageFeed}
+        contextMenu={contextMenu}
+        inspection={inspection}
+        placeholders={placeholders}
+        onCloseContextMenu={closeContextMenu}
+        onInjectEvent={() => {
+          void handleInjectEvent()
+        }}
+        onInspectTile={handleInspectTile}
+        onPlacePlaceholder={handlePlacePlaceholder}
+        onClearResidentSelection={() => selectResident(null)}
+        onDismissInspection={() => setInspection(null)}
+      />
       {residents.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/45 backdrop-blur-[2px]">
           <div className="rounded-[22px] border border-cyan-300/15 bg-slate-950/80 px-6 py-5 text-center shadow-[0_18px_44px_rgba(8,15,31,0.4)]">
