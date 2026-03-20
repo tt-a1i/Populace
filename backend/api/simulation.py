@@ -36,37 +36,62 @@ class SimulationState:
         self._active_dialogue_pairs: set[frozenset] = set()
 
     async def restore_from_neo4j(self) -> None:
-        """Attempt to restore memories/reflections/relationships from Neo4j.
+        """Restore prior session state at startup.
 
-        Before consulting Neo4j, tries Redis short-term memory cache for each
-        agent (faster).  Agent positions are reset to home building entrance
-        (spec §12).
+        Order (spec §12):
+          1. Redis — short-term memories (fast, but no positions yet)
+          2. Neo4j — long-term memories, reflections, relationships;
+                     home-position reset is skipped when Redis has positions
+          3. Redis — positions applied last so they override Neo4j's home reset
         """
-        # --- Step 1: Redis short-term memory (fast path) ---
-        await self._restore_from_redis()
+        # --- Step 1: Redis short-term memories (no position apply yet) ---
+        redis_positions = await self._restore_redis_memories()
 
-        # --- Step 2: Neo4j long-term memory / relationships ---
+        # --- Step 2: Neo4j long-term data ---
+        neo4j_ok = False
         try:
             from backend.db.neo4j import load_residents, restore_world_memories
             existing = await load_residents()
             if not existing:
                 self._log.info("Neo4j: no prior session data found, starting fresh.")
-                return
-            await restore_world_memories(self.world)
-            self._log.info("Neo4j: session restored (%d existing residents).", len(existing))
+            else:
+                # Skip home-reset if Redis will supply fresher positions
+                await restore_world_memories(
+                    self.world,
+                    skip_position_reset=bool(redis_positions),
+                )
+                self._log.info("Neo4j: session restored (%d residents).", len(existing))
+                neo4j_ok = True
         except Exception as exc:
             self._log.warning("Neo4j restore skipped: %s", exc)
 
-    async def _restore_from_redis(self) -> None:
-        """Re-hydrate short-term memory from Redis cache (spec §4.1).
+        # --- Step 3: Redis positions (override Neo4j home default) ---
+        if redis_positions:
+            agent_map = {a.resident.id: a for a in self.world.agents}
+            applied = 0
+            for rid, (x, y) in redis_positions.items():
+                if rid in agent_map:
+                    agent_map[rid].resident.x = x
+                    agent_map[rid].resident.y = y
+                    applied += 1
+            self._log.info(
+                "Redis: applied cached positions for %d/%d agents%s.",
+                applied, len(self.world.agents),
+                " (override Neo4j home reset)" if neo4j_ok else "",
+            )
 
-        Also applies cached agent positions.  Silently skips on failure.
+    async def _restore_redis_memories(self) -> dict:
+        """Re-hydrate short-term memories from Redis; return cached positions dict.
+
+        Returns the positions dict so the caller can apply them after Neo4j.
+        Silently skips on failure.
         """
+        positions: dict = {}
         try:
             from backend.db.redis import load_agent_positions, load_cached_memories
             from engine.types import Memory
 
-            # Restore short-term memories
+            # Short-term memories
             for agent in self.world.agents:
                 cached = await load_cached_memories(agent.resident.id)
                 for row in cached:
@@ -82,18 +107,14 @@ class SimulationState:
                     except Exception:
                         pass
 
-            # Restore cached positions
             positions = await load_agent_positions()
-            agent_map = {a.resident.id: a for a in self.world.agents}
-            for rid, (x, y) in positions.items():
-                if rid in agent_map:
-                    agent_map[rid].resident.x = x
-                    agent_map[rid].resident.y = y
-
-            if positions or any(positions):
-                self._log.info("Redis: restored positions for %d agents.", len(positions))
         except Exception as exc:
-            self._log.debug("Redis restore skipped: %s", exc)
+            self._log.debug("Redis memory restore skipped: %s", exc)
+        return positions
+
+    # Keep backward-compat alias used by _restore_from_redis callers in tests
+    async def _restore_from_redis(self) -> None:
+        await self._restore_redis_memories()
 
     @property
     def pending_events(self) -> list[dict[str, Any]]:

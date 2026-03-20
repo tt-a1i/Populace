@@ -303,15 +303,18 @@ async def persist_world_snapshot(world: Any) -> None:
         logger.warning("Neo4j snapshot failed (non-fatal): %s", exc)
 
 
-async def restore_world_memories(world: Any) -> None:
+async def restore_world_memories(world: Any, *, skip_position_reset: bool = False) -> None:
     """Re-hydrate long-term memories and reflections from Neo4j into *world*.
 
     Called at startup when Neo4j already contains data from a previous session.
-    Agent positions are reset to their home building entrance (spec §12).
+    Agent positions are reset to their home building entrance (spec §12) unless
+    *skip_position_reset* is True (used when Redis will apply fresher positions).
 
     Args:
-        world: A :class:`engine.world.World` instance whose agents are
-               already populated (residents loaded from the scenario template).
+        world:                A :class:`engine.world.World` instance.
+        skip_position_reset:  When True, skip resetting positions to home
+                              entrance so that a subsequent Redis restore can
+                              apply more recent coordinates.
     """
     from engine.types import Memory, Reflection, RelationType, Relationship
 
@@ -369,11 +372,13 @@ async def restore_world_memories(world: Any) -> None:
                 pass
 
         # -- Reset agent positions to home building entrance (spec §12) --
-        for agent in world.agents:
-            if agent.resident.location is not None:
-                home = world.get_building(agent.resident.location)
-                if home is not None:
-                    agent.resident.x, agent.resident.y = home.position
+        # Skipped when the caller will apply fresher Redis positions afterwards.
+        if not skip_position_reset:
+            for agent in world.agents:
+                if agent.resident.location is not None:
+                    home = world.get_building(agent.resident.location)
+                    if home is not None:
+                        agent.resident.x, agent.resident.y = home.position
 
         logger.info("Neo4j restore: hydrated memories/reflections/relationships for %d agents.",
                     len(world.agents))
