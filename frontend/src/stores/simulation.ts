@@ -26,6 +26,9 @@ export interface ResidentPosition {
   hairStyle?: string | null
   hairColor?: string | null
   outfitColor?: string | null
+  personality?: string
+  mood?: string
+  goals?: string[]
   dialogueText?: string | null
 }
 
@@ -72,6 +75,7 @@ export interface SimulationSnapshot {
     y?: number
     mood?: string
     personality?: string
+    goals?: string[]
     location?: string | null
     skin_color?: string | null
     hair_style?: string | null
@@ -264,6 +268,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           hairStyle: existingResident?.hairStyle ?? null,
           hairColor: existingResident?.hairColor ?? null,
           outfitColor: existingResident?.outfitColor ?? null,
+          personality: existingResident?.personality,
+          mood: existingResident?.mood,
+          goals: existingResident?.goals,
           dialogueText,
         })
       }
@@ -339,6 +346,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           hairStyle: r.hair_style ?? prev?.hairStyle ?? null,
           hairColor: r.hair_color ?? prev?.hairColor ?? null,
           outfitColor: r.outfit_color ?? prev?.outfitColor ?? null,
+          personality: r.personality ?? prev?.personality,
+          mood: r.mood ?? prev?.mood ?? 'neutral',
+          goals: r.goals ?? prev?.goals ?? [],
           dialogueText: prev?.dialogueText ?? null,
         }
       })

@@ -5,6 +5,7 @@ import { Application } from 'pixi.js'
 import { useSimulationStore } from '../../stores/simulation'
 import { useRelationshipsStore } from '../../stores/relationships'
 import { TownRenderer } from './TownRenderer'
+import { type ActiveEvent, getActiveEvents } from '../../services/api'
 
 export function TownCanvas() {
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -184,6 +185,29 @@ export function TownCanvas() {
   useEffect(() => {
     rendererRef.current?.updateWeather(weather)
   }, [weather])
+
+  // Poll active events and draw radius circles on the map
+  useEffect(() => {
+    const updateRadii = (events: ActiveEvent[]) => {
+      // Position circles at map centre when no specific origin known
+      const cx = Math.floor(40 / 2)
+      const cy = Math.floor(30 / 2)
+      rendererRef.current?.showEventRadii(
+        events.map((ev) => ({ x: cx, y: cy, radius: ev.radius })),
+      )
+    }
+    const poll = async () => {
+      try {
+        const events = await getActiveEvents() as ActiveEvent[]
+        updateRadii(events)
+      } catch {
+        updateRadii([])
+      }
+    }
+    void poll()
+    const id = setInterval(() => { void poll() }, 3000)
+    return () => clearInterval(id)
+  }, [])
 
   return (
     <div className="relative mt-5 flex min-h-[30rem] flex-1 overflow-hidden rounded-[24px] border border-cyan-300/30 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.22),_rgba(15,23,42,0.42)_38%,_rgba(2,6,23,0.96)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">

@@ -38,6 +38,8 @@ class SimulationState:
         self._pending_dialogues: list[asyncio.Task] = []
         # frozenset pairs of resident ids that have an in-flight dialogue task
         self._active_dialogue_pairs: set[frozenset] = set()
+        # Active persistent events: list of dicts with remaining_ticks, radius, description
+        self._active_events: list[dict[str, Any]] = []
 
     async def restore_from_neo4j(self) -> None:
         """Restore prior session state at startup.
@@ -376,6 +378,39 @@ class SimulationState:
         self._events.append(event)
         return event
 
+    def enqueue_preset_event(self, preset_id: str) -> dict[str, Any] | None:
+        """Activate a preset event by slug id.
+
+        Instant events (duration=1) are queued normally.  Multi-tick events
+        are added to ``_active_events`` so they persist across ticks.
+        Returns the activated event dict, or None if the slug is unknown.
+        """
+        from backend.world.events import get_preset_by_id
+        preset = get_preset_by_id(preset_id)
+        if preset is None:
+            return None
+
+        if preset.get("duration", 1) > 1:
+            self._active_events.append({
+                "id": preset["id"],
+                "name": preset["name"],
+                "description": preset["description"],
+                "radius": preset.get("radius", -1),
+                "remaining_ticks": preset["duration"],
+                "source": "user",
+            })
+        else:
+            # Instant — inject directly into the pending queue
+            self._events.append({
+                "description": preset["description"],
+                "source": "user",
+            })
+        return preset
+
+    def get_active_events(self) -> list[dict[str, Any]]:
+        """Return current active (multi-tick) events with remaining duration."""
+        return list(self._active_events)
+
     async def _tick(self) -> Any:
         import inspect
         import random
@@ -385,14 +420,38 @@ class SimulationState:
 
         queued_events = list(self._events)
         weather = self.world.weather
+        tick_time = self.world.simulation_time()
 
         # Inject user-queued events into world.pending_events so agent.perceive() picks them up
         for ev in queued_events:
             self.world.pending_events.append(EngineEvent(
                 id=str(uuid.uuid4()),
                 description=ev.get("description", ""),
-                timestamp=self.world.simulation_time(),
+                timestamp=tick_time,
                 source="user",
+            ))
+
+        # Inject active persistent events (multi-tick) and decrement their counters
+        still_active: list[dict[str, Any]] = []
+        for active_ev in getattr(self, "_active_events", []):
+            self.world.pending_events.append(EngineEvent(
+                id=str(uuid.uuid4()),
+                description=active_ev["description"],
+                timestamp=tick_time,
+                source="user",
+            ))
+            remaining = active_ev["remaining_ticks"] - 1
+            if remaining > 0:
+                still_active.append({**active_ev, "remaining_ticks": remaining})
+        self._active_events = still_active
+
+        # Stormy weather overrides event: inject storm description when active events absent
+        if weather is WeatherType.stormy and not self._active_events:
+            self.world.pending_events.append(EngineEvent(
+                id=str(uuid.uuid4()),
+                description="暴风雨仍在持续，所有人都应该找地方避雨。",
+                timestamp=tick_time,
+                source="system",
             ))
 
         cfg = self.world.config

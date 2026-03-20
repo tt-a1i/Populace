@@ -18,13 +18,31 @@ router = APIRouter(prefix="/api/world", tags=["world"])
 
 
 class WorldEventRequest(BaseModel):
-    description: str = Field(min_length=1)
+    description: str = Field(default="", min_length=0)
     source: str = Field(default="user")
+    preset_id: str = Field(default="")  # slug from PRESET_EVENTS, e.g. "storm"
 
 
 @router.post("/events")
 async def create_world_event(payload: WorldEventRequest, request: Request) -> dict[str, Any]:
+    """Inject an event.  Pass *preset_id* to activate a named preset event
+    with automatic duration and radius, or *description* for a custom one-shot."""
     state = get_simulation_state(request)
+
+    # Preset event path
+    if payload.preset_id:
+        result = state.enqueue_preset_event(payload.preset_id)
+        if result is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Unknown preset event '{payload.preset_id}'.",
+            )
+        return result
+
+    # Custom event path (description required)
+    if not payload.description.strip():
+        raise HTTPException(status_code=422, detail="description is required for custom events.")
+
     event = {
         "id": str(uuid4()),
         "description": payload.description,
@@ -32,6 +50,20 @@ async def create_world_event(payload: WorldEventRequest, request: Request) -> di
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     return state.enqueue_event(event)
+
+
+@router.get("/events/active")
+async def get_active_events(request: Request) -> list[dict[str, Any]]:
+    """Return currently active multi-tick events with remaining duration."""
+    state = get_simulation_state(request)
+    return state.get_active_events()
+
+
+@router.get("/events/presets")
+async def list_preset_events(request: Request) -> list[dict[str, Any]]:  # noqa: ARG001
+    """Return all available preset events."""
+    from backend.world.events import PRESET_EVENTS
+    return PRESET_EVENTS
 
 
 class GenerateScenarioRequest(BaseModel):

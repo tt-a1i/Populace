@@ -20,8 +20,25 @@ interface SpeedPayload {
 }
 
 interface EventPayload {
-  description: string
+  description?: string
   source?: string
+  preset_id?: string
+}
+
+export interface ActiveEvent {
+  id: string
+  name: string
+  description: string
+  radius: number
+  remaining_ticks: number
+}
+
+export interface PresetEvent {
+  id: string
+  name: string
+  description: string
+  radius: number
+  duration: number
 }
 
 interface ResidentUpdatePayload {
@@ -111,6 +128,21 @@ export function injectEvent(payload: EventPayload) {
     method: 'POST',
     body: JSON.stringify(payload),
   })
+}
+
+export function injectPresetEvent(preset_id: string) {
+  return request('/api/world/events', {
+    method: 'POST',
+    body: JSON.stringify({ preset_id }),
+  })
+}
+
+export function getActiveEvents() {
+  return request<ActiveEvent[]>('/api/world/events/active')
+}
+
+export function getPresetEvents() {
+  return request<PresetEvent[]>('/api/world/events/presets')
 }
 
 export function getResidents() {

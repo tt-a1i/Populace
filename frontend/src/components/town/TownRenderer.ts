@@ -85,6 +85,7 @@ export class TownRenderer {
   private readonly weatherContainer = new Container()
   private currentWeatherEffect: WeatherEffect | null = null
   private currentWeather = 'sunny'
+  private readonly eventRadiusGraphics = new Graphics()
   private readonly hudLabel: Text
   private readonly hintLabel: Text
   private highlightedResidentIds = new Set<string>()
@@ -132,7 +133,10 @@ export class TownRenderer {
 
     this.tileLayer.addChild(this.tileGraphics)
     this.buildingLayer.addChild(this.buildingGraphics)
-    this.effectLayer.addChild(this.ambientAccent, this.dayNightOverlay, this.weatherContainer)
+    this.effectLayer.addChild(
+      this.ambientAccent, this.dayNightOverlay,
+      this.eventRadiusGraphics, this.weatherContainer,
+    )
 
     this.tileLayer.eventMode = 'static'
     this.tileLayer.hitArea = new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
@@ -347,6 +351,27 @@ export class TownRenderer {
 
   tickWeatherEffect(deltaMs: number): void {
     this.currentWeatherEffect?.update(deltaMs)
+  }
+
+  /** Draw translucent circles showing active event influence radii.
+   *
+   * @param events  Array of active events with x/y tile origin and radius.
+   *                Pass an empty array to clear all circles.
+   *                radius=-1 means whole-map (no circle drawn).
+   */
+  showEventRadii(events: Array<{ x: number; y: number; radius: number; color?: number }>): void {
+    this.eventRadiusGraphics.clear()
+    for (const ev of events) {
+      if (ev.radius <= 0) continue
+      const cx = (ev.x + 0.5) * TILE_SIZE
+      const cy = (ev.y + 0.5) * TILE_SIZE
+      const r = ev.radius * TILE_SIZE
+      const col = ev.color ?? 0xfbbf24
+      this.eventRadiusGraphics.circle(cx, cy, r)
+      this.eventRadiusGraphics.fill({ color: col, alpha: 0.12 })
+      this.eventRadiusGraphics.circle(cx, cy, r)
+      this.eventRadiusGraphics.stroke({ color: col, width: 2, alpha: 0.35 })
+    }
   }
 
   setFollowTarget(residentId: string | null): void {

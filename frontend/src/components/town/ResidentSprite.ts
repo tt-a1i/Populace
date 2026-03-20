@@ -100,6 +100,7 @@ function statusIconFor(status: ResidentStatus): string | null {
 
 interface ResidentSpriteOptions {
   onFocusRequest?: (residentId: string) => void
+  onSelectRequest?: (residentId: string) => void
 }
 
 export class ResidentSprite extends Container {
@@ -114,6 +115,7 @@ export class ResidentSprite extends Container {
   private readonly bubbleLabel: Text
   private readonly nameLabel: Text
   private onFocusRequest?: (residentId: string) => void
+  private onSelectRequest?: (residentId: string) => void
 
   private currentAppearance: ResidentAppearance
   private currentAppearanceSignature: string
@@ -139,6 +141,7 @@ export class ResidentSprite extends Container {
     this.currentAppearanceSignature = appearanceSignature(this.currentAppearance)
     this.currentStatus = resident.status
     this.onFocusRequest = options.onFocusRequest
+    this.onSelectRequest = options.onSelectRequest
     this.sortableChildren = true
     this.eventMode = 'static'
     this.cursor = 'pointer'
@@ -188,6 +191,7 @@ export class ResidentSprite extends Container {
   reuse(resident: ResidentPosition, options: ResidentSpriteOptions = {}): void {
     this.residentId = resident.id
     this.onFocusRequest = options.onFocusRequest
+    this.onSelectRequest = options.onSelectRequest
     this.lastTapAt = 0
     this.dialogueUntil = 0
     this.externalHighlight = false
@@ -334,6 +338,8 @@ export class ResidentSprite extends Container {
     event.stopPropagation()
 
     const now = performance.now()
+
+    this.onSelectRequest?.(this.residentId)
 
     if (now - this.lastTapAt <= DOUBLE_TAP_MS) {
       this.onFocusRequest?.(this.residentId)
