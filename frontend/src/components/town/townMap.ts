@@ -24,6 +24,11 @@ export interface TileInspectionDetails {
   residentCount: number
 }
 
+export interface BuildingFootprint {
+  cols: number
+  rows: number
+}
+
 export function clampTileCoordinate(value: number, upperBound: number): number {
   return Math.max(0, Math.min(upperBound, value))
 }
@@ -55,13 +60,25 @@ export function formatTileKind(tileKind: TileKind): string {
   }
 }
 
+export function getBuildingFootprint(_building: Building): BuildingFootprint {
+  return { cols: 2, rows: 3 }
+}
+
 export function inspectTile(
   tileX: number,
   tileY: number,
   buildings: Array<Building & { occupants?: number }>,
   residents: ResidentPosition[],
 ): TileInspectionDetails {
-  const building = buildings.find((candidate) => candidate.position[0] === tileX && candidate.position[1] === tileY)
+  const building = buildings.find((candidate) => {
+    const footprint = getBuildingFootprint(candidate)
+    return (
+      tileX >= candidate.position[0] &&
+      tileX < candidate.position[0] + footprint.cols &&
+      tileY >= candidate.position[1] &&
+      tileY < candidate.position[1] + footprint.rows
+    )
+  })
   const residentCount = residents.filter((resident) => resident.targetX === tileX && resident.targetY === tileY).length
 
   return {

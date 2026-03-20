@@ -171,5 +171,9 @@ describe('TownChrome', () => {
     expect(screen.getByTestId('town-minimap')).toBeInTheDocument()
     expect(screen.getAllByTestId('minimap-resident-dot')).toHaveLength(2)
     expect(screen.getAllByTestId('minimap-placeholder-dot')).toHaveLength(1)
+    expect(screen.getByTestId('minimap-building-footprint')).toHaveStyle({
+      width: '5%',
+      height: '10%',
+    })
   })
 })

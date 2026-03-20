@@ -117,8 +117,8 @@ export function TownCanvas() {
     }
 
     setContextMenu({
-      screenX: Math.min(localX, Math.max(24, bounds.width - 216)),
-      screenY: Math.min(localY, Math.max(24, bounds.height - 220)),
+      screenX: Math.max(24, Math.min(localX, bounds.width - 216)),
+      screenY: Math.max(24, Math.min(localY, bounds.height - 220)),
       tileX: tile.tileX,
       tileY: tile.tileY,
       tileKind: tile.tileKind,

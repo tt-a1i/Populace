@@ -7,6 +7,7 @@ import {
   MAP_HEIGHT,
   MAP_WIDTH,
   formatTileKind,
+  getBuildingFootprint,
   type PlaceholderBuilding,
   type TileInspectionDetails,
   type TileKind,
@@ -256,19 +257,23 @@ export function TownChrome({
         </div>
 
         <div className="relative mt-3 h-32 w-40 rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.94))]">
-          {buildings.map((building) => (
-            <span
-              key={building.id}
-              className="absolute block rounded-[4px] border border-cyan-200/20 bg-cyan-200/15"
-              style={{
-                left: `${(building.position[0] / MAP_WIDTH) * 100}%`,
-                top: `${(building.position[1] / MAP_HEIGHT) * 100}%`,
-                width: '10px',
-                height: '10px',
-                transform: 'translate(-50%, -50%)',
-              }}
-            />
-          ))}
+          {buildings.map((building) => {
+            const footprint = getBuildingFootprint(building)
+
+            return (
+              <span
+                key={building.id}
+                data-testid="minimap-building-footprint"
+                className="absolute block rounded-[4px] border border-cyan-200/20 bg-cyan-200/15"
+                style={{
+                  left: `${(building.position[0] / MAP_WIDTH) * 100}%`,
+                  top: `${(building.position[1] / MAP_HEIGHT) * 100}%`,
+                  width: `${(footprint.cols / MAP_WIDTH) * 100}%`,
+                  height: `${(footprint.rows / MAP_HEIGHT) * 100}%`,
+                }}
+              />
+            )
+          })}
           {placeholders.map((placeholder) => (
             <span
               key={placeholder.id}

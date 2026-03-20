@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useSound } from '../../audio'
 import { type SaveMeta, deleteSave, listSaves, loadSave, saveGame } from '../../services/api'
 import { useToast } from '../ui/ToastProvider'
 
 export function SavesPanel() {
   const { t } = useTranslation()
   const { pushToast } = useToast()
+  const { play } = useSound()
   const [saves, setSaves] = useState<SaveMeta[]>([])
   const [saveName, setSaveName] = useState('')
   const [saving, setSaving] = useState(false)
@@ -30,6 +32,10 @@ export function SavesPanel() {
     setTimeout(() => setSuccessMsg(null), 2500)
   }
 
+  const playConfirmationSound = () => {
+    play('dialogue')
+  }
+
   const handleSave = async () => {
     setSaving(true)
     setError(null)
@@ -42,6 +48,7 @@ export function SavesPanel() {
         title: t('saves.success'),
         description: saveName.trim() || '已保存当前模拟状态。',
       })
+      playConfirmationSound()
       await fetchSaves()
     } catch (e) {
       setError(e instanceof Error ? e.message : '存档失败')
@@ -65,6 +72,7 @@ export function SavesPanel() {
         type: 'info',
         title: t('saves.load_success', { name }),
       })
+      playConfirmationSound()
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
       pushToast({
@@ -87,6 +95,7 @@ export function SavesPanel() {
         type: 'warning',
         title: '存档已删除',
       })
+      playConfirmationSound()
     } catch (e) {
       setError(e instanceof Error ? e.message : '删除失败')
       pushToast({
