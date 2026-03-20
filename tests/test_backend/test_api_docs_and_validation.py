@@ -61,6 +61,7 @@ def test_patch_missing_resident_returns_error_code(client: TestClient) -> None:
 
 
 def test_missing_report_returns_error_code(client: TestClient) -> None:
+    client.app.state.latest_report = None
     response = client.get("/api/report/latest")
 
     assert response.status_code == 404

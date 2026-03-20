@@ -4,10 +4,10 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from backend.api.schemas import api_error
+from backend.api.schemas import ExperimentReportResponse, GeneratedReportResponse, api_error, error_responses
 
 from backend.api.simulation import get_simulation_state
 from backend.llm.client import chat_completion
@@ -382,8 +382,13 @@ def _parse_experiment_report_response(content: str | None, fallback: dict[str, A
     return {"title": title, "sections": sections}
 
 
-@router.post("/generate")
-async def generate_report(request: Request) -> dict[str, Any]:
+@router.post(
+    "/generate",
+    response_model=GeneratedReportResponse,
+    responses=error_responses(503),
+)
+async def generate_report(request: Request) -> GeneratedReportResponse:
+    """Generate the current short-form town report and cache it as the latest report."""
     state = get_simulation_state(request)
     residents, events, relationships, tick_info = _extract_report_inputs(state)
     fallback = _fallback_report(residents, events, relationships, tick_info)
@@ -396,14 +401,19 @@ async def generate_report(request: Request) -> dict[str, Any]:
         "tick": tick_info["tick"],
     }
     request.app.state.latest_report = payload
-    return payload
+    return GeneratedReportResponse(**payload)
 
 
-@router.post("/experiment")
+@router.post(
+    "/experiment",
+    response_model=ExperimentReportResponse,
+    responses=error_responses(422, 503),
+)
 async def generate_experiment_report(
     payload: ExperimentReportRequest,
     request: Request,
-) -> dict[str, Any]:
+) -> ExperimentReportResponse:
+    """Generate a longer-horizon experiment report over the requested day window."""
     state = get_simulation_state(request)
     analysis = _build_experiment_analysis(state, payload.days)
     fallback = _fallback_experiment_report(analysis)
@@ -421,12 +431,17 @@ async def generate_experiment_report(
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     request.app.state.latest_experiment_report = experiment_payload
-    return experiment_payload
+    return ExperimentReportResponse(**experiment_payload)
 
 
-@router.get("/latest")
-async def get_latest_report(request: Request) -> dict[str, Any]:
+@router.get(
+    "/latest",
+    response_model=GeneratedReportResponse,
+    responses=error_responses(404, 503),
+)
+async def get_latest_report(request: Request) -> GeneratedReportResponse:
+    """Return the most recently generated short-form report."""
     latest_report = getattr(request.app.state, "latest_report", None)
     if latest_report is None:
         raise api_error(404, "latest report not found", "report_not_found")
-    return latest_report
+    return GeneratedReportResponse(**latest_report)
