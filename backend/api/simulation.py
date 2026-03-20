@@ -516,6 +516,7 @@ class SimulationState:
                 "memories": memories,
                 "reflections": agent.reflections,
                 "use_llm": use_llm,
+                "world": self.world,   # used by schedule-driven rule path
             }
             result = agent.plan(context)
             if inspect.isawaitable(result):

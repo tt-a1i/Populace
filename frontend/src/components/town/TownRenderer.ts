@@ -491,6 +491,10 @@ export class TownRenderer {
   }
 
   private readonly onPointerDown = (event: PointerEvent): void => {
+    if (event.button !== 0) {
+      return
+    }
+
     if (this.pinchActive) {
       return
     }
@@ -587,10 +591,33 @@ export class TownRenderer {
     this.clearFollowMode()
   }
 
+  screenToTile(screenX: number, screenY: number): { tileX: number; tileY: number; tileKind: TileKind } | null {
+    const worldX = (screenX - this.world.x) / this.zoom
+    const worldY = (screenY - this.world.y) / this.zoom
+
+    if (worldX < 0 || worldY < 0 || worldX > WORLD_WIDTH || worldY > WORLD_HEIGHT) {
+      return null
+    }
+
+    const tileX = clampTileCoordinate(Math.floor(worldX / TILE_SIZE), MAP_WIDTH - 1)
+    const tileY = clampTileCoordinate(Math.floor(worldY / TILE_SIZE), MAP_HEIGHT - 1)
+
+    return {
+      tileX,
+      tileY,
+      tileKind: getTileKind(tileX, tileY),
+    }
+  }
+
+  private readonly selectResident = (residentId: string): void => {
+    useSimulationStore.getState().selectResident(residentId)
+    this.renderHud()
+  }
+
   private readonly followResident = (residentId: string): void => {
     this.followedResidentId = residentId
     this.hasUserCameraOverride = true
-    useSimulationStore.getState().selectResident(residentId)
+    this.selectResident(residentId)
     this.centerOnResident(residentId, true)
     this.renderHud()
   }
@@ -714,7 +741,44 @@ export class TownRenderer {
       })
 
       label.position.set(x + width / 2, y + height / 2)
-      this.buildingLayer.addChild(label)
+      this.buildingLabelLayer.addChild(label)
+    }
+
+    this.drawPlaceholderBuildings()
+  }
+
+  private drawPlaceholderBuildings(): void {
+    while (this.placeholderLabelLayer.children.length > 0) {
+      const child = this.placeholderLabelLayer.children[0]
+      this.placeholderLabelLayer.removeChild(child)
+      child.destroy()
+    }
+
+    this.placeholderGraphics.clear()
+
+    for (const placeholder of this.placeholderBuildings) {
+      const x = placeholder.tileX * TILE_SIZE
+      const y = placeholder.tileY * TILE_SIZE
+      const width = TILE_SIZE * 1.5
+      const height = TILE_SIZE * 1.5
+
+      this.placeholderGraphics.roundRect(x + 4, y + 4, width, height, 10)
+      this.placeholderGraphics.fill({ color: 0xf59e0b, alpha: 0.18 })
+      this.placeholderGraphics.stroke({ color: 0xfcd34d, alpha: 0.8, width: 2 })
+
+      const label = new Text({
+        text: placeholder.label,
+        style: {
+          fill: 0xfef3c7,
+          fontFamily: 'Avenir Next, Helvetica Neue, sans-serif',
+          fontSize: 10,
+          fontWeight: '700',
+          stroke: { color: 0x020617, width: 3 },
+        },
+        anchor: { x: 0.5, y: 0.5 },
+      })
+      label.position.set(x + width / 2 + 4, y + height + 14)
+      this.placeholderLabelLayer.addChild(label)
     }
   }
 
@@ -743,19 +807,7 @@ export class TownRenderer {
   }
 
   private getTileKind(x: number, y: number): TileKind {
-    const isCentralRoad = y === 14 || y === 15 || x === 18 || x === 19
-    const isDiagonalRoad = y - x === 6 || x + y === 31
-    const isLake = x >= 23 && x <= 29 && y >= 9 && y <= 14
-
-    if (isLake) {
-      return 'water'
-    }
-
-    if (isCentralRoad || (isDiagonalRoad && y > 10 && y < 22)) {
-      return 'road'
-    }
-
-    return 'grass'
+    return getTileKind(x, y)
   }
 
   private getTilePalette(kind: TileKind, x: number, y: number): {

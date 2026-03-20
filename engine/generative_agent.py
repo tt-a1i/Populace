@@ -42,6 +42,8 @@ class GenerativeAgent(Agent):
     ) -> None:
         super().__init__(resident)
         self.llm_fn = llm_fn
+        from engine.schedule import DailySchedule
+        self.schedule: DailySchedule = DailySchedule(resident.personality)
 
     # ------------------------------------------------------------------
     # Step a — Perceive
@@ -76,7 +78,8 @@ class GenerativeAgent(Agent):
     async def plan(self, context: Dict) -> Dict:
         """Choose LLM or rule path based on context["use_llm"].
 
-        *context* keys: ``events``, ``memories``, ``reflections``, ``use_llm``.
+        *context* keys: ``events``, ``memories``, ``reflections``, ``use_llm``,
+        ``world`` (optional — used by the schedule-driven rule path).
         """
         if context.get("use_llm", False) or self.llm_fn is not None:
             from engine.plan import plan as _plan
@@ -86,7 +89,11 @@ class GenerativeAgent(Agent):
                 context.get("memories", []),
                 context.get("reflections", []),
             )
-        # Rule path: random walk (spec §8: "走路、日常通勤")
+        # Rule path: follow daily schedule instead of random walk (spec §8)
+        world = context.get("world")
+        if world is not None:
+            return self.schedule.rule_plan(self, world)
+        # Fallback when no world context available (e.g. isolated tests)
         return {"action": "move"}
 
     # ------------------------------------------------------------------
