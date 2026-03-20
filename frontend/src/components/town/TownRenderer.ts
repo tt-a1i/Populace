@@ -7,16 +7,21 @@ import { ResidentSpritePool } from './ResidentSpritePool'
 import { RainEffect } from './effects/RainEffect'
 import { SnowEffect } from './effects/SnowEffect'
 import { StormEffect } from './effects/StormEffect'
+import {
+  MAP_HEIGHT,
+  MAP_WIDTH,
+  TILE_SIZE,
+  WORLD_HEIGHT,
+  WORLD_WIDTH,
+  clampTileCoordinate,
+  getTileKind,
+  type PlaceholderBuilding,
+  type TileKind,
+} from './townMap'
 
 type WeatherEffect = RainEffect | SnowEffect | StormEffect
 
-const TILE_SIZE = 32
-const MAP_WIDTH = 40
-const MAP_HEIGHT = 30
-const WORLD_WIDTH = MAP_WIDTH * TILE_SIZE
-const WORLD_HEIGHT = MAP_HEIGHT * TILE_SIZE
 const CAMERA_PADDING = 56
-type TileKind = 'grass' | 'road' | 'water'
 const POOLED_RESIDENT_PLACEHOLDER: ResidentPosition = {
   id: '__pool__',
   name: '',
@@ -76,10 +81,14 @@ export class TownRenderer {
     () =>
       new ResidentSprite(POOLED_RESIDENT_PLACEHOLDER, {
         onFocusRequest: this.followResident,
+        onSelectRequest: this.selectResident,
       }),
   )
   private readonly tileGraphics = new Graphics()
   private readonly buildingGraphics = new Graphics()
+  private readonly buildingLabelLayer = new Container()
+  private readonly placeholderGraphics = new Graphics()
+  private readonly placeholderLabelLayer = new Container()
   private readonly ambientAccent = new Graphics()
   private readonly dayNightOverlay = new Graphics()
   private readonly weatherContainer = new Container()
@@ -90,6 +99,7 @@ export class TownRenderer {
   private readonly hintLabel: Text
   private highlightedResidentIds = new Set<string>()
   private currentBuildings: Array<Building & { occupants?: number }> = []
+  private placeholderBuildings: PlaceholderBuilding[] = []
 
   private dragging = false
   private dragPointerId: number | null = null
@@ -132,7 +142,12 @@ export class TownRenderer {
     this.residentLayer.sortableChildren = true
 
     this.tileLayer.addChild(this.tileGraphics)
-    this.buildingLayer.addChild(this.buildingGraphics)
+    this.buildingLayer.addChild(
+      this.buildingGraphics,
+      this.placeholderGraphics,
+      this.buildingLabelLayer,
+      this.placeholderLabelLayer,
+    )
     this.effectLayer.addChild(
       this.ambientAccent, this.dayNightOverlay,
       this.eventRadiusGraphics, this.weatherContainer,
@@ -202,10 +217,9 @@ export class TownRenderer {
   syncBuildings(buildings: Array<Building & { occupants?: number }>): void {
     this.currentBuildings = buildings
 
-    // Remove previously added building labels (Text children beyond the graphics object)
-    while (this.buildingLayer.children.length > 1) {
-      const child = this.buildingLayer.children[1]
-      this.buildingLayer.removeChild(child)
+    while (this.buildingLabelLayer.children.length > 0) {
+      const child = this.buildingLabelLayer.children[0]
+      this.buildingLabelLayer.removeChild(child)
       child.destroy()
     }
 
@@ -252,7 +266,7 @@ export class TownRenderer {
         anchor: { x: 0.5, y: 0.5 },
       })
       label.position.set(x + width / 2, y + height / 2 - 6)
-      this.buildingLayer.addChild(label)
+      this.buildingLabelLayer.addChild(label)
 
       const occupantLabel = new Text({
         text: `${b.occupants ?? 0}/${b.type === 'park' ? '∞' : b.capacity}`,
@@ -266,8 +280,10 @@ export class TownRenderer {
         anchor: { x: 0.5, y: 0.5 },
       })
       occupantLabel.position.set(x + width / 2, y + height - 10)
-      this.buildingLayer.addChild(occupantLabel)
+      this.buildingLabelLayer.addChild(occupantLabel)
     }
+
+    this.drawPlaceholderBuildings()
   }
 
   syncResidents(residents: ResidentPosition[]): void {
@@ -287,6 +303,7 @@ export class TownRenderer {
       const newSprite = this.residentSpritePool.acquire()
       newSprite.reuse(resident, {
         onFocusRequest: this.followResident,
+        onSelectRequest: this.selectResident,
       })
       newSprite.setSimulationSpeed(this.simulationMeta.speed)
       newSprite.setExternalHighlight(this.highlightedResidentIds.has(resident.id))
@@ -351,6 +368,11 @@ export class TownRenderer {
 
   tickWeatherEffect(deltaMs: number): void {
     this.currentWeatherEffect?.update(deltaMs)
+  }
+
+  setPlaceholderBuildings(placeholders: PlaceholderBuilding[]): void {
+    this.placeholderBuildings = placeholders
+    this.drawPlaceholderBuildings()
   }
 
   /** Draw translucent circles showing active event influence radii.

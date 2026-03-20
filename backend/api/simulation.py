@@ -816,8 +816,7 @@ async def start_simulation(
                        default template.
     """
     state = get_simulation_state(request)
-    if payload.scene != "modern_community":
-        await state.reset_with_scene(payload.scene)
+    await state.reset_with_scene(payload.scene)
     await state.start()
     return state.get_status()
 
