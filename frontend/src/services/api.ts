@@ -183,6 +183,34 @@ export interface ResidentReflection {
   derived_from: string[]
 }
 
+export interface SimulationResidentStat {
+  id: string
+  name: string
+  relationship_count: number
+  relationship_intensity: number
+}
+
+export interface StrongestRelationshipStat {
+  from_id: string
+  from_name: string
+  to_id: string
+  to_name: string
+  type: string
+  intensity: number
+}
+
+export interface SimulationStats {
+  total_ticks: number
+  total_dialogues: number
+  total_relationship_changes: number
+  active_events: number
+  average_mood_score: number
+  most_social_resident: SimulationResidentStat | null
+  loneliest_resident: SimulationResidentStat | null
+  strongest_relationship: StrongestRelationshipStat | null
+  total_memories: number
+}
+
 export function getResidentMemories(id: string) {
   return request<ResidentMemory[]>(`/api/residents/${id}/memories`)
 }
@@ -193,6 +221,10 @@ export function getResidentRelationships(id: string) {
 
 export function getResidentReflections(id: string) {
   return request<ResidentReflection[]>(`/api/residents/${id}/reflections`)
+}
+
+export function getSimulationStats() {
+  return request<SimulationStats>('/api/simulation/stats')
 }
 
 export function generateReport() {

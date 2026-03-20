@@ -30,6 +30,26 @@ class StartRequest(BaseModel):
     scene: str = "modern_community"   # template slug, e.g. "seaside_village"
 
 
+_MOOD_SCORES = {
+    "ecstatic": 1.0,
+    "excited": 0.8,
+    "happy": 1.0,
+    "content": 0.3,
+    "neutral": 0.0,
+    "calm": 0.1,
+    "tired": -0.2,
+    "sad": -1.0,
+    "angry": -0.9,
+    "fearful": -0.7,
+}
+
+
+def _mood_score(mood: str | None) -> float:
+    if not mood:
+        return 0.0
+    return _MOOD_SCORES.get(mood.strip().lower(), 0.0)
+
+
 class SimulationState:
     def __init__(self) -> None:
         import logging
@@ -379,13 +399,85 @@ class SimulationState:
         if not hasattr(self, "_total_relationship_change_count"):
             self._total_relationship_change_count = 0
 
-    def get_stats(self) -> dict[str, int]:
+    def get_stats(self) -> dict[str, Any]:
         self._ensure_stats_counters()
+        residents = [agent.resident for agent in self.world.agents]
+        resident_social = {
+            resident.id: {"count": 0, "intensity": 0.0, "name": resident.name}
+            for resident in residents
+        }
+        strongest_relationship: dict[str, Any] | None = None
+
+        for relationship in self.world.relationships.values():
+            intensity = float(relationship.intensity)
+            for resident_id in (relationship.from_id, relationship.to_id):
+                if resident_id in resident_social:
+                    resident_social[resident_id]["count"] += 1
+                    resident_social[resident_id]["intensity"] += intensity
+
+            if strongest_relationship is None or intensity > strongest_relationship["intensity"]:
+                strongest_relationship = {
+                    "from_id": relationship.from_id,
+                    "from_name": resident_social.get(relationship.from_id, {}).get("name", relationship.from_id),
+                    "to_id": relationship.to_id,
+                    "to_name": resident_social.get(relationship.to_id, {}).get("name", relationship.to_id),
+                    "type": relationship.type.value if hasattr(relationship.type, "value") else str(relationship.type),
+                    "intensity": intensity,
+                }
+
+        most_social_resident = None
+        loneliest_resident = None
+        if residents:
+            ranked_desc = sorted(
+                residents,
+                key=lambda resident: (
+                    -resident_social[resident.id]["count"],
+                    -resident_social[resident.id]["intensity"],
+                    resident.name,
+                    resident.id,
+                ),
+            )
+            ranked_asc = sorted(
+                residents,
+                key=lambda resident: (
+                    resident_social[resident.id]["count"],
+                    resident_social[resident.id]["intensity"],
+                    resident.name,
+                    resident.id,
+                ),
+            )
+            most = ranked_desc[0]
+            least = ranked_asc[0]
+            most_social_resident = {
+                "id": most.id,
+                "name": most.name,
+                "relationship_count": resident_social[most.id]["count"],
+                "relationship_intensity": round(resident_social[most.id]["intensity"], 2),
+            }
+            loneliest_resident = {
+                "id": least.id,
+                "name": least.name,
+                "relationship_count": resident_social[least.id]["count"],
+                "relationship_intensity": round(resident_social[least.id]["intensity"], 2),
+            }
+
+        average_mood_score = 0.0
+        if residents:
+            average_mood_score = round(
+                sum(_mood_score(resident.mood) for resident in residents) / len(residents),
+                2,
+            )
+
         return {
             "total_ticks": self.world.current_tick,
             "total_dialogues": self._total_dialogue_count,
             "total_relationship_changes": self._total_relationship_change_count,
             "active_events": len(self._events) + len(self._active_events),
+            "average_mood_score": average_mood_score,
+            "most_social_resident": most_social_resident,
+            "loneliest_resident": loneliest_resident,
+            "strongest_relationship": strongest_relationship,
+            "total_memories": sum(len(agent.memory_stream.all) for agent in self.world.agents),
         }
 
     def snapshot(self) -> dict[str, Any]:

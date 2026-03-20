@@ -39,6 +39,7 @@
     "persona": "人设编辑",
     "build": "建造模式",
     "report": "小镇日报",
+    "stats": "数据统计",
     "saves": "存档管理",
     "current_tool": "当前工具："
   },
@@ -105,6 +106,27 @@
     "generating": "生成中…",
     "latest": "查看最近一份",
     "share": "截图分享"
+  },
+  "stats": {
+    "badge": "Simulation Metrics",
+    "title": "模拟统计仪表盘",
+    "desc": "从后端统计接口读取当前模拟的关键指标，快速查看整体情绪、社交活跃度与记忆规模。",
+    "refresh": "刷新统计",
+    "refreshing": "刷新中…",
+    "loading": "正在读取最新统计…",
+    "load_failed": "统计接口暂不可用，请确认后端服务正在运行。",
+    "total_ticks": "总 Tick 数",
+    "total_dialogues": "总对话数",
+    "total_relationship_changes": "总关系变化",
+    "active_events": "活跃事件数",
+    "average_mood_score": "平均情绪分",
+    "total_memories": "总记忆数",
+    "most_social_resident": "最社交居民",
+    "loneliest_resident": "最孤独居民",
+    "strongest_relationship": "最强关系",
+    "relationship_summary": "关系数 {{count}} · 强度 {{intensity}}",
+    "empty_value": "暂无",
+    "empty_desc": "等待更多模拟数据积累。"
   },
   "saves": {
     "badge": "Saves",

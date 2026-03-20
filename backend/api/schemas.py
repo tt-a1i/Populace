@@ -46,11 +46,32 @@ class SimulationStatusResponse(BaseModel):
     tick: int
 
 
+class SimulationResidentStatResponse(BaseModel):
+    id: str
+    name: str
+    relationship_count: int
+    relationship_intensity: float
+
+
+class StrongestRelationshipResponse(BaseModel):
+    from_id: str
+    from_name: str
+    to_id: str
+    to_name: str
+    type: str
+    intensity: float
+
+
 class SimulationStatsResponse(BaseModel):
     total_ticks: int
     total_dialogues: int
     total_relationship_changes: int
     active_events: int
+    average_mood_score: float
+    most_social_resident: SimulationResidentStatResponse | None = None
+    loneliest_resident: SimulationResidentStatResponse | None = None
+    strongest_relationship: StrongestRelationshipResponse | None = None
+    total_memories: int
 
 
 class WorldEventResponse(BaseModel):

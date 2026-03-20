@@ -18,6 +18,9 @@ vi.mock('../components/toolbar/SoundToggleButton', () => ({
 vi.mock('../components/toolbar/SavesPanel', () => ({
   SavesPanel: () => <div data-testid="saves-panel">SavesPanel</div>,
 }))
+vi.mock('../components/toolbar/StatsPanel', () => ({
+  StatsPanel: () => <div data-testid="stats-panel">StatsPanel</div>,
+}))
 vi.mock('../components/report', () => ({
   ReportsPanel: () => <div data-testid="reports-panel">ReportsPanel</div>,
 }))
@@ -49,6 +52,11 @@ describe('Toolbar', () => {
     expect(screen.getByRole('button', { name: /小镇日报/ })).toBeInTheDocument()
   })
 
+  it('renders the 数据统计 tool button', () => {
+    render(<Toolbar />)
+    expect(screen.getByRole('button', { name: /数据统计/ })).toBeInTheDocument()
+  })
+
   it('shows EventInjector panel by default', () => {
     render(<Toolbar />)
     expect(screen.getByTestId('event-injector')).toBeInTheDocument()
@@ -70,6 +78,12 @@ describe('Toolbar', () => {
     render(<Toolbar />)
     await userEvent.click(screen.getByRole('button', { name: /小镇日报/ }))
     expect(screen.getByTestId('reports-panel')).toBeInTheDocument()
+  })
+
+  it('switches to StatsPanel when 数据统计 is clicked', async () => {
+    render(<Toolbar />)
+    await userEvent.click(screen.getByRole('button', { name: /数据统计/ }))
+    expect(screen.getByTestId('stats-panel')).toBeInTheDocument()
   })
 
   it('displays the active tool name in the status bar', () => {

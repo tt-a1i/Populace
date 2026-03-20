@@ -39,6 +39,7 @@
     "persona": "Persona",
     "build": "Build",
     "report": "Gazette",
+    "stats": "Stats",
     "saves": "Saves",
     "current_tool": "Active Tool: "
   },
@@ -105,6 +106,27 @@
     "generating": "Generating…",
     "latest": "Load Latest",
     "share": "Screenshot & Share"
+  },
+  "stats": {
+    "badge": "Simulation Metrics",
+    "title": "Simulation Dashboard",
+    "desc": "Reads the backend stats endpoint and surfaces the key town-wide metrics in one compact panel.",
+    "refresh": "Refresh stats",
+    "refreshing": "Refreshing…",
+    "loading": "Loading the latest simulation metrics…",
+    "load_failed": "Stats are temporarily unavailable. Make sure the backend is running.",
+    "total_ticks": "Total Ticks",
+    "total_dialogues": "Total Dialogues",
+    "total_relationship_changes": "Relationship Shifts",
+    "active_events": "Active Events",
+    "average_mood_score": "Average Mood",
+    "total_memories": "Total Memories",
+    "most_social_resident": "Most Social Resident",
+    "loneliest_resident": "Loneliest Resident",
+    "strongest_relationship": "Strongest Relationship",
+    "relationship_summary": "{{count}} links · intensity {{intensity}}",
+    "empty_value": "No data",
+    "empty_desc": "Waiting for the simulation to accumulate more signals."
   },
   "saves": {
     "badge": "Saves",
