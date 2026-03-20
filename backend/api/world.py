@@ -4,12 +4,22 @@ import json
 import re
 from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Union
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Request
+from pydantic import BaseModel, Field, field_validator, model_validator
 
+from backend.api.schemas import (
+    ActiveWorldEventResponse,
+    BuildingResponse,
+    PresetEventResponse,
+    ScenarioDataResponse,
+    WeatherResponse,
+    WorldEventResponse,
+    api_error,
+    error_responses,
+)
 from backend.api.simulation import get_simulation_state
 from engine.types import WeatherType
 
@@ -18,13 +28,30 @@ router = APIRouter(prefix="/api/world", tags=["world"])
 
 
 class WorldEventRequest(BaseModel):
-    description: str = Field(default="", min_length=0)
+    description: str = Field(default="")
     source: str = Field(default="user")
     preset_id: str = Field(default="")  # slug from PRESET_EVENTS, e.g. "storm"
 
+    @field_validator("description", "source", "preset_id", mode="before")
+    @classmethod
+    def strip_string_fields(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip()
+        return value
 
-@router.post("/events")
-async def create_world_event(payload: WorldEventRequest, request: Request) -> dict[str, Any]:
+    @model_validator(mode="after")
+    def validate_custom_event_description(self) -> "WorldEventRequest":
+        if not self.preset_id and not self.description:
+            raise ValueError("description is required when preset_id is empty")
+        return self
+
+
+@router.post(
+    "/events",
+    response_model=Union[WorldEventResponse, PresetEventResponse],
+    responses=error_responses(404, 422, 503),
+)
+async def create_world_event(payload: WorldEventRequest, request: Request) -> Union[WorldEventResponse, PresetEventResponse]:
     """Inject an event.  Pass *preset_id* to activate a named preset event
     with automatic duration and radius, or *description* for a custom one-shot."""
     state = get_simulation_state(request)
@@ -33,15 +60,8 @@ async def create_world_event(payload: WorldEventRequest, request: Request) -> di
     if payload.preset_id:
         result = state.enqueue_preset_event(payload.preset_id)
         if result is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Unknown preset event '{payload.preset_id}'.",
-            )
-        return result
-
-    # Custom event path (description required)
-    if not payload.description.strip():
-        raise HTTPException(status_code=422, detail="description is required for custom events.")
+            raise api_error(404, f"Unknown preset event '{payload.preset_id}'.", "preset_event_not_found")
+        return PresetEventResponse(**result)
 
     event = {
         "id": str(uuid4()),
@@ -49,29 +69,37 @@ async def create_world_event(payload: WorldEventRequest, request: Request) -> di
         "source": payload.source,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-    return state.enqueue_event(event)
+    return WorldEventResponse(**state.enqueue_event(event))
 
 
-@router.get("/events/active")
-async def get_active_events(request: Request) -> list[dict[str, Any]]:
+@router.get(
+    "/events/active",
+    response_model=list[ActiveWorldEventResponse],
+    responses=error_responses(503),
+)
+async def get_active_events(request: Request) -> list[ActiveWorldEventResponse]:
     """Return currently active multi-tick events with remaining duration."""
     state = get_simulation_state(request)
-    return state.get_active_events()
+    return [ActiveWorldEventResponse(**event) for event in state.get_active_events()]
 
 
-@router.get("/events/presets")
-async def list_preset_events(request: Request) -> list[dict[str, Any]]:  # noqa: ARG001
+@router.get("/events/presets", response_model=list[PresetEventResponse])
+async def list_preset_events(request: Request) -> list[PresetEventResponse]:  # noqa: ARG001
     """Return all available preset events."""
     from backend.world.events import PRESET_EVENTS
-    return PRESET_EVENTS
+    return [PresetEventResponse(**event) for event in PRESET_EVENTS]
 
 
 class GenerateScenarioRequest(BaseModel):
     description: str = Field(min_length=1, max_length=500)
 
 
-@router.post("/generate-scenario")
-async def generate_scenario(payload: GenerateScenarioRequest) -> dict[str, Any]:
+@router.post(
+    "/generate-scenario",
+    response_model=ScenarioDataResponse,
+    responses=error_responses(422),
+)
+async def generate_scenario(payload: GenerateScenarioRequest) -> ScenarioDataResponse:
     """Generate a scenario from a user description using LLM (or mock fallback).
 
     Returns the scenario JSON preview without starting the simulation.
@@ -96,7 +124,7 @@ async def generate_scenario(payload: GenerateScenarioRequest) -> dict[str, Any]:
     if not scenario.get("buildings") or not scenario.get("residents"):
         scenario = _mock_scenario(payload.description)
 
-    return scenario
+    return ScenarioDataResponse(**scenario)
 
 
 def _parse_scenario_json(raw: str) -> dict[str, Any] | None:
@@ -167,34 +195,47 @@ def _mock_scenario(description: str) -> dict[str, Any]:
     }
 
 
-@router.get("/buildings")
-async def list_buildings(request: Request) -> list[dict[str, Any]]:
+@router.get(
+    "/buildings",
+    response_model=list[BuildingResponse],
+    responses=error_responses(503),
+)
+async def list_buildings(request: Request) -> list[BuildingResponse]:
+    """Return the currently loaded buildings and their map positions."""
     state = get_simulation_state(request)
-    return [asdict(building) for building in state.world.buildings]
+    return [BuildingResponse(**asdict(building)) for building in state.world.buildings]
 
 
 class SetWeatherRequest(BaseModel):
     type: str = Field(description="Weather type: sunny|cloudy|rainy|stormy|snowy")
 
 
-@router.post("/weather")
-async def set_weather(payload: SetWeatherRequest, request: Request) -> dict[str, Any]:
+@router.post(
+    "/weather",
+    response_model=WeatherResponse,
+    responses=error_responses(400, 422, 503),
+)
+async def set_weather(payload: SetWeatherRequest, request: Request) -> WeatherResponse:
     """Set current weather and broadcast on next tick (spec §4.2, §14)."""
     state = get_simulation_state(request)
     try:
         weather = WeatherType(payload.type)
     except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown weather type '{payload.type}'. "
-                   f"Valid: {[w.value for w in WeatherType]}",
+        raise api_error(
+            400,
+            f"Unknown weather type '{payload.type}'. Valid: {[w.value for w in WeatherType]}",
+            "invalid_weather_type",
         )
     state.world.weather = weather
-    return {"weather": weather.value}
+    return WeatherResponse(weather=weather.value)
 
 
-@router.get("/weather")
-async def get_weather(request: Request) -> dict[str, Any]:
+@router.get(
+    "/weather",
+    response_model=WeatherResponse,
+    responses=error_responses(503),
+)
+async def get_weather(request: Request) -> WeatherResponse:
     """Return the current weather."""
     state = get_simulation_state(request)
-    return {"weather": state.world.weather.value}
+    return WeatherResponse(weather=state.world.weather.value)

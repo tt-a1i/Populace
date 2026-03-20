@@ -42,7 +42,7 @@ def test_set_speed_valid(client):
 
 def test_set_speed_invalid(client):
     response = client.post("/api/simulation/speed", json={"speed": 3})
-    assert response.status_code == 400
+    assert response.status_code in (400, 422)  # Pydantic Literal validation returns 422
 
 
 def test_snapshot_contains_residents(client):

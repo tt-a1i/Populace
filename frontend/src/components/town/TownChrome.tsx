@@ -1,7 +1,15 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import type { GraphRelationship } from '../../stores/relationships'
 import type { ResidentPosition } from '../../stores/simulation'
+import {
+  type ResidentMemory,
+  type ResidentReflection,
+  type ResidentRelationship,
+  getResidentMemories,
+  getResidentReflections,
+  getResidentRelationships,
+} from '../../services/api'
 import type { Building } from '../../types'
 import {
   MAP_HEIGHT,
@@ -119,6 +127,32 @@ export function TownChrome({
     () => residents.find((resident) => resident.id === selectedResidentId) ?? null,
     [residents, selectedResidentId],
   )
+
+  // Real data from API (fetched when a resident is selected)
+  const [liveMemories, setLiveMemories] = useState<ResidentMemory[]>([])
+  const [liveRelationships, setLiveRelationships] = useState<ResidentRelationship[]>([])
+  const [liveReflections, setLiveReflections] = useState<ResidentReflection[]>([])
+
+  useEffect(() => {
+    if (!selectedResidentId) {
+      // Defer state resets to avoid synchronous setState in effect
+      const t = window.setTimeout(() => {
+        setLiveMemories([])
+        setLiveRelationships([])
+        setLiveReflections([])
+      }, 0)
+      return () => window.clearTimeout(t)
+    }
+
+    // Fetch all three in parallel; silently ignore errors (backend may not be running)
+    void Promise.allSettled([
+      getResidentMemories(selectedResidentId).then(setLiveMemories).catch(() => {}),
+      getResidentRelationships(selectedResidentId).then(setLiveRelationships).catch(() => {}),
+      getResidentReflections(selectedResidentId).then(setLiveReflections).catch(() => {}),
+    ])
+  }, [selectedResidentId])
+
+  // Fallback: synthesised summary when live data is empty
   const memorySummary = useMemo(
     () =>
       selectedResident ? buildMemorySummary(selectedResident, messageFeed, currentTime) : [],
@@ -198,29 +232,90 @@ export function TownChrome({
             </div>
           </div>
 
+          {/* ── Memories (live from API, fallback to synthesised) ── */}
           <section className="mt-5 rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">记忆摘要</p>
+              <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">
+                记忆
+                {liveMemories.length > 0 && (
+                  <span className="ml-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5 text-[9px] text-cyan-300/70">
+                    {liveMemories.length}
+                  </span>
+                )}
+              </p>
               <span className="text-xs text-slate-500">{currentTime}</span>
             </div>
-            <div className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
-              {memorySummary.map((entry) => (
-                <p key={entry} className="rounded-2xl border border-white/6 bg-slate-900/60 px-3 py-2">
-                  {entry}
-                </p>
-              ))}
+            <div className="mt-3 max-h-40 space-y-2 overflow-y-auto text-sm leading-6 text-slate-300 pr-1">
+              {liveMemories.length > 0 ? (
+                [...liveMemories].reverse().slice(0, 8).map((mem) => (
+                  <div key={mem.id} className="rounded-2xl border border-white/6 bg-slate-900/60 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-slate-500">{mem.timestamp}</span>
+                      <span className="text-[10px] text-slate-500">重要度 {(mem.importance * 100).toFixed(0)}%</span>
+                    </div>
+                    <p className="mt-1">{mem.content}</p>
+                  </div>
+                ))
+              ) : (
+                memorySummary.map((entry) => (
+                  <p key={entry} className="rounded-2xl border border-white/6 bg-slate-900/60 px-3 py-2">
+                    {entry}
+                  </p>
+                ))
+              )}
             </div>
           </section>
 
-          <section className="mt-5 flex-1 rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
-            <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">关系列表</p>
-            <div className="mt-3 space-y-3 overflow-y-auto pr-1">
-              {relationshipEntries.length > 0 ? (
-                relationshipEntries.map((entry) => (
+          {/* ── Reflections ── */}
+          {liveReflections.length > 0 && (
+            <section className="mt-3 rounded-[22px] border border-violet-400/15 bg-violet-400/5 p-4">
+              <p className="text-[11px] uppercase tracking-[0.28em] text-violet-300/70">
+                反思 · {liveReflections.length}
+              </p>
+              <div className="mt-3 max-h-32 space-y-2 overflow-y-auto pr-1">
+                {[...liveReflections].reverse().slice(0, 4).map((rf) => (
+                  <div key={rf.id} className="rounded-2xl border border-violet-400/15 bg-slate-900/60 px-3 py-2 text-sm text-slate-300">
+                    <p className="text-[10px] text-slate-500 mb-1">{rf.timestamp}</p>
+                    <p>{rf.summary}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── Relationships (live from API or fallback from graph store) ── */}
+          <section className="mt-3 flex-1 rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
+            <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">
+              关系
+              {liveRelationships.length > 0 && (
+                <span className="ml-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-1.5 py-0.5 text-[9px] text-amber-300/70">
+                  {liveRelationships.length}
+                </span>
+              )}
+            </p>
+            <div className="mt-3 max-h-48 space-y-3 overflow-y-auto pr-1">
+              {liveRelationships.length > 0 ? (
+                liveRelationships.map((rel) => (
                   <article
-                    key={entry.id}
+                    key={`${rel.from_id}-${rel.to_id}-${rel.type}`}
                     className="rounded-2xl border border-white/6 bg-slate-900/60 px-3 py-3"
                   >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium text-white">{rel.counterpart_name}</p>
+                      <span className="rounded-full border border-amber-200/20 bg-amber-200/10 px-2 py-0.5 text-[11px] uppercase tracking-[0.18em] text-amber-100">
+                        {rel.type}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-3 text-xs text-slate-400">
+                      <span>强度 {(rel.intensity * 100).toFixed(0)}%</span>
+                      <span>熟悉度 {(rel.familiarity * 100).toFixed(0)}%</span>
+                    </div>
+                    {rel.reason && <p className="mt-2 text-sm leading-6 text-slate-300">{rel.reason}</p>}
+                  </article>
+                ))
+              ) : relationshipEntries.length > 0 ? (
+                relationshipEntries.map((entry) => (
+                  <article key={entry.id} className="rounded-2xl border border-white/6 bg-slate-900/60 px-3 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-medium text-white">{entry.name}</p>
                       <span className="rounded-full border border-amber-200/20 bg-amber-200/10 px-2 py-0.5 text-[11px] uppercase tracking-[0.18em] text-amber-100">

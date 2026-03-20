@@ -156,6 +156,45 @@ export function updateResident(id: string, payload: ResidentUpdatePayload) {
   })
 }
 
+export interface ResidentMemory {
+  id: string
+  content: string
+  timestamp: string
+  importance: number
+  emotion: string
+}
+
+export interface ResidentRelationship {
+  from_id: string
+  to_id: string
+  type: string
+  intensity: number
+  familiarity: number
+  reason: string
+  since: string
+  counterpart_name: string
+  direction: 'outgoing' | 'incoming'
+}
+
+export interface ResidentReflection {
+  id: string
+  summary: string
+  timestamp: string
+  derived_from: string[]
+}
+
+export function getResidentMemories(id: string) {
+  return request<ResidentMemory[]>(`/api/residents/${id}/memories`)
+}
+
+export function getResidentRelationships(id: string) {
+  return request<ResidentRelationship[]>(`/api/residents/${id}/relationships`)
+}
+
+export function getResidentReflections(id: string) {
+  return request<ResidentReflection[]>(`/api/residents/${id}/reflections`)
+}
+
 export function generateReport() {
   return request<ReportPayload>('/api/report/generate', { method: 'POST' })
 }

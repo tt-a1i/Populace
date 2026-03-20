@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import asdict, is_dataclass
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Body, Request
 from pydantic import BaseModel
 
+from backend.api.schemas import ScenarioDataResponse, SimulationStatusResponse, api_error, error_responses
 from backend.core.simulation import SimulationLoop
 from backend.llm.client import validate_llm_config
 from engine.types import EventUpdate
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/api/simulation", tags=["simulation"])
 
 
 class SpeedRequest(BaseModel):
-    speed: int
+    speed: Literal[1, 2, 5]
 
 
 class StartRequest(BaseModel):
@@ -153,7 +154,7 @@ class SimulationState:
 
     def set_speed(self, speed: int) -> None:
         if speed not in {1, 2, 5}:
-            raise ValueError("speed must be one of 1, 2, or 5")
+            raise ValueError("Input should be 1, 2 or 5")
         self.loop.clock.set_speed(float(speed))
 
     async def reset_with_scene(self, scene_slug: str) -> None:
@@ -790,35 +791,39 @@ def _serialize(value: Any) -> Any:
 def get_simulation_state(request: Request) -> SimulationState:
     state = getattr(request.app.state, "simulation_state", None)
     if state is None:
-        raise HTTPException(status_code=503, detail="simulation state not initialized")
+        raise api_error(503, "simulation state not initialized", "simulation_state_unavailable")
     return state
 
 
-class CustomScenarioRequest(BaseModel):
-    name: str = ""
-    description: str = ""
-    buildings: list = []
-    residents: list = []
-    map: Optional[dict] = None
+class CustomScenarioRequest(ScenarioDataResponse):
+    pass
 
 
-@router.post("/start-custom")
+@router.post(
+    "/start-custom",
+    response_model=SimulationStatusResponse,
+    responses=error_responses(422, 503),
+)
 async def start_custom_simulation(
     payload: CustomScenarioRequest, request: Request
-) -> dict[str, Any]:
-    """Replace the current world with *payload* scenario and start the simulation."""
+) -> SimulationStatusResponse:
+    """Replace the current world with a custom scenario payload and start ticking."""
     state = get_simulation_state(request)
     scenario_data = payload.model_dump()
     await state.reset_with_scenario(scenario_data)
     await state.start()
-    return state.get_status()
+    return SimulationStatusResponse(**state.get_status())
 
 
-@router.post("/start")
+@router.post(
+    "/start",
+    response_model=SimulationStatusResponse,
+    responses=error_responses(422, 503),
+)
 async def start_simulation(
     request: Request,
-    payload: StartRequest = StartRequest(),
-) -> dict[str, Any]:
+    payload: StartRequest = Body(default_factory=StartRequest),
+) -> SimulationStatusResponse:
     """Start the simulation, optionally loading a specific preset scene.
 
     Args:
@@ -829,29 +834,44 @@ async def start_simulation(
     state = get_simulation_state(request)
     await state.reset_with_scene(payload.scene)
     await state.start()
-    return state.get_status()
+    return SimulationStatusResponse(**state.get_status())
 
 
-@router.post("/stop")
-async def stop_simulation(request: Request) -> dict[str, Any]:
+@router.post(
+    "/stop",
+    response_model=SimulationStatusResponse,
+    responses=error_responses(503),
+)
+async def stop_simulation(request: Request) -> SimulationStatusResponse:
+    """Stop the active simulation loop and return the latest runtime status."""
     state = get_simulation_state(request)
     await state.stop()
-    return state.get_status()
+    return SimulationStatusResponse(**state.get_status())
 
 
-@router.post("/speed")
-async def set_simulation_speed(payload: SpeedRequest, request: Request) -> dict[str, Any]:
+@router.post(
+    "/speed",
+    response_model=SimulationStatusResponse,
+    responses=error_responses(400, 422, 503),
+)
+async def set_simulation_speed(payload: SpeedRequest, request: Request) -> SimulationStatusResponse:
+    """Update the simulation clock speed; accepted values are 1x, 2x, and 5x."""
     state = get_simulation_state(request)
 
     try:
         state.set_speed(payload.speed)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise api_error(400, str(exc), "invalid_speed") from exc
 
-    return state.get_status()
+    return SimulationStatusResponse(**state.get_status())
 
 
-@router.get("/status")
-async def get_simulation_status(request: Request) -> dict[str, Any]:
+@router.get(
+    "/status",
+    response_model=SimulationStatusResponse,
+    responses=error_responses(503),
+)
+async def get_simulation_status(request: Request) -> SimulationStatusResponse:
+    """Return whether the simulation is running plus the current speed and tick."""
     state = get_simulation_state(request)
-    return state.get_status()
+    return SimulationStatusResponse(**state.get_status())

@@ -1,8 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
+from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +15,7 @@ try:
         report_router,
         residents_router,
         saves_router,
+        schemas,
         simulation_router,
         world_router,
         ws_router,
@@ -19,7 +23,7 @@ try:
     from backend.db import close_driver, close_redis, get_driver, get_redis, initialize_constraints
     from backend.core.config import settings
 except ModuleNotFoundError:
-    from api import SimulationState, report_router, residents_router, saves_router, simulation_router, world_router, ws_router
+    from api import SimulationState, report_router, residents_router, saves_router, schemas, simulation_router, world_router, ws_router
     from db import close_driver, close_redis, get_driver, get_redis, initialize_constraints
     from core.config import settings
 
@@ -65,6 +69,41 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
+
+def _normalise_error_detail(detail: Any) -> str:
+    message = str(detail)
+    if message.startswith("Value error, "):
+        return message[len("Value error, ") :]
+    return message
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
+    first_error = exc.errors()[0] if exc.errors() else {"msg": "Validation error"}
+    payload = schemas.ErrorResponse(
+        detail=_normalise_error_detail(first_error.get("msg", "Validation error")),
+        code="validation_error",
+    )
+    return JSONResponse(status_code=422, content=payload.model_dump())
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:
+    if isinstance(exc.detail, dict) and {"detail", "code"} <= set(exc.detail):
+        payload = schemas.ErrorResponse(**exc.detail)
+    else:
+        payload = schemas.ErrorResponse(
+            detail=_normalise_error_detail(exc.detail or "Request failed"),
+            code={
+                400: "bad_request",
+                404: "not_found",
+                422: "validation_error",
+                503: "service_unavailable",
+            }.get(exc.status_code, "http_error"),
+        )
+    return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
+
+
 _cors_origins = [
     origin.strip()
     for origin in settings.cors_allowed_origins.split(",")
@@ -83,9 +122,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+@app.get("/health", response_model=schemas.HealthResponse)
+async def health() -> schemas.HealthResponse:
+    """Return a lightweight readiness probe for local health checks."""
+    return schemas.HealthResponse(status="ok")
 
 
 app.include_router(simulation_router)

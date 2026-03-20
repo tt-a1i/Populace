@@ -15,6 +15,8 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from backend.api.schemas import api_error
+
 from backend.api.simulation import get_simulation_state
 
 router = APIRouter(prefix="/api/saves", tags=["saves"])
@@ -34,7 +36,7 @@ def _save_path(save_id: str) -> pathlib.Path:
 def _read_save(save_id: str) -> dict[str, Any]:
     path = _save_path(save_id)
     if not path.exists():
-        raise HTTPException(status_code=404, detail=f"Save '{save_id}' not found")
+        raise api_error(404, f"Save '{save_id}' not found", "save_not_found")
     with open(path, encoding="utf-8") as fh:
         return json.load(fh)
 
@@ -110,5 +112,5 @@ async def delete_save(save_id: str) -> None:
     """Permanently delete a save file."""
     path = _save_path(save_id)
     if not path.exists():
-        raise HTTPException(status_code=404, detail=f"Save '{save_id}' not found")
+        raise api_error(404, f"Save '{save_id}' not found", "save_not_found")
     path.unlink()

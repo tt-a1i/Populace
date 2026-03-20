@@ -7,6 +7,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from backend.api.schemas import api_error
+
 from backend.api.simulation import get_simulation_state
 from backend.llm.client import chat_completion
 from backend.llm.prompts import build_experiment_report_prompt, build_report_prompt
@@ -426,5 +428,5 @@ async def generate_experiment_report(
 async def get_latest_report(request: Request) -> dict[str, Any]:
     latest_report = getattr(request.app.state, "latest_report", None)
     if latest_report is None:
-        raise HTTPException(status_code=404, detail="latest report not found")
+        raise api_error(404, "latest report not found", "report_not_found")
     return latest_report

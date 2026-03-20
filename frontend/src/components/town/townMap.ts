@@ -60,6 +60,7 @@ export function formatTileKind(tileKind: TileKind): string {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function getBuildingFootprint(_building: Building): BuildingFootprint {
   return { cols: 2, rows: 3 }
 }
