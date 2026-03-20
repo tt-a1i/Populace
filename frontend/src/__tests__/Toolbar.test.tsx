@@ -12,6 +12,9 @@ vi.mock('../components/toolbar/PersonaEditor', () => ({
 vi.mock('../components/toolbar/SpeedControl', () => ({
   SpeedControl: () => <div data-testid="speed-control">SpeedControl</div>,
 }))
+vi.mock('../components/toolbar/SoundToggleButton', () => ({
+  SoundToggleButton: () => <div data-testid="sound-toggle">SoundToggle</div>,
+}))
 vi.mock('../components/toolbar/SavesPanel', () => ({
   SavesPanel: () => <div data-testid="saves-panel">SavesPanel</div>,
 }))
@@ -49,6 +52,11 @@ describe('Toolbar', () => {
   it('shows EventInjector panel by default', () => {
     render(<Toolbar />)
     expect(screen.getByTestId('event-injector')).toBeInTheDocument()
+  })
+
+  it('renders the sound toggle button in the top controls', () => {
+    render(<Toolbar />)
+    expect(screen.getByTestId('sound-toggle')).toBeInTheDocument()
   })
 
   it('switches to PersonaEditor panel when 人设编辑 is clicked', async () => {

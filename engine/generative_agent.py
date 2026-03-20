@@ -83,12 +83,19 @@ class GenerativeAgent(Agent):
         """
         if context.get("use_llm", False) or self.llm_fn is not None:
             from engine.plan import plan as _plan
-            return await _plan(
+            result = await _plan(
                 self,
                 context.get("events", []),
                 context.get("memories", []),
                 context.get("reflections", []),
             )
+            # Extract a short goal hint from the LLM's raw output
+            raw = result.get("raw", "")
+            if raw and hasattr(self.resident, "current_goal"):
+                # Use first 10 chars of raw LLM text as the goal hint
+                self.resident.current_goal = raw.strip()[:10].rstrip("，。！？,.!?")
+            return result
+
         # Rule path: follow daily schedule instead of random walk (spec §8)
         world = context.get("world")
         if world is not None:

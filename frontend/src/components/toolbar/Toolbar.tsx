@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { SoundToggleButton } from './SoundToggleButton'
 import { EventInjector } from './EventInjector'
 import { PersonaEditor } from './PersonaEditor'
 import { SavesPanel } from './SavesPanel'
@@ -66,6 +67,7 @@ export function Toolbar() {
           </div>
           <div className="flex items-center gap-3">
             <SpeedControl />
+            <SoundToggleButton />
             <LanguageSwitcher />
           </div>
         </div>

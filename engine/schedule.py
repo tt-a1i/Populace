@@ -135,6 +135,22 @@ class DailySchedule:
         phase = self.current_phase(hour)
         resident = agent.resident  # type: ignore[attr-defined]
 
+        # Phase → default goal text (used when no specific building found)
+        _PHASE_GOALS = {
+            "sleep":     "睡觉休息",
+            "home":      "回家休息",
+            "morning":   "出门透气",
+            "work":      "去工作",
+            "lunch":     "吃午饭",
+            "afternoon": "下午活动",
+            "evening":   "晚间社交",
+        }
+
+        def _set_goal(text: str) -> None:
+            """Set resident.current_goal if the attribute exists."""
+            if hasattr(resident, "current_goal"):
+                resident.current_goal = text
+
         # ------------------------------------------------------------------
         # Sleep / home phase: return to own home building
         # ------------------------------------------------------------------
@@ -143,18 +159,19 @@ class DailySchedule:
             if home_id:
                 home_building = world.get_building(home_id)
                 if home_building is not None:
-                    # Already home → stay
                     if resident.location == home_id:
+                        _set_goal("在家休息")
                         return {"action": "idle"}
+                    _set_goal("回家休息")
                     return {"action": "move", "target": list(home_building.position)}
+            _set_goal("找地方休息")
             return {"action": "idle"}
 
         # ------------------------------------------------------------------
         # Morning phase: leave home and wander briefly
         # ------------------------------------------------------------------
         if phase.name == "morning":
-            if resident.location is not None:
-                return {"action": "move"}  # leave building, random direction
+            _set_goal("出门透气")
             return {"action": "move"}
 
         # ------------------------------------------------------------------
@@ -172,13 +189,18 @@ class DailySchedule:
                 occupants = len(world.get_occupants(building.id))
                 if occupants < building.capacity:
                     if resident.location == building.id:
-                        return {"action": "idle"}  # already there
+                        _set_goal(f"在{building.name}")
+                        return {"action": "idle"}
+                    _set_goal(f"去{building.name}")
                     return {"action": "move", "target": list(building.position)}
-            # All full — target first one anyway (agent will queue at entrance)
+            # All full — target first one anyway
             target = candidates[0]
             if resident.location == target.id:
+                _set_goal(f"在{target.name}")
                 return {"action": "idle"}
+            _set_goal(f"去{target.name}")
             return {"action": "move", "target": list(target.position)}
 
         # Fallback: random wander
+        _set_goal(_PHASE_GOALS.get(phase.name, "四处逛逛"))
         return {"action": "move"}

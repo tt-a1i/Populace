@@ -30,6 +30,7 @@ export interface ResidentPosition {
   mood?: string
   goals?: string[]
   dialogueText?: string | null
+  currentGoal?: string | null   // active short-term goal for thought bubble
 }
 
 export interface TickMovement extends Omit<MovementUpdate, 'action'> {
@@ -272,7 +273,16 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           mood: existingResident?.mood,
           goals: existingResident?.goals,
           dialogueText,
+          currentGoal: existingResident?.currentGoal ?? null,
         })
+      }
+
+      // Apply goal updates from this tick
+      for (const goalUpdate of ((tickState as unknown as Record<string, unknown>).goals ?? []) as Array<{ id: string; goal: string }>) {
+        const existing = residentMap.get(goalUpdate.id)
+        if (existing) {
+          residentMap.set(goalUpdate.id, { ...existing, currentGoal: goalUpdate.goal })
+        }
       }
 
       for (const resident of state.residents) {

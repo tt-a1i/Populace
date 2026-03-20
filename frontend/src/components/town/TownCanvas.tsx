@@ -9,7 +9,9 @@ import {
 
 import { Application } from 'pixi.js'
 
+import { useSound } from '../../audio'
 import { getActiveEvents, injectEvent, type ActiveEvent } from '../../services/api'
+import { useToast } from '../ui/ToastProvider'
 import { useRelationshipsStore } from '../../stores/relationships'
 import { useSimulationStore } from '../../stores/simulation'
 import { TownChrome, type TownContextMenuState, type TownInspectionState, type TownPlaceholder } from './TownChrome'
@@ -34,6 +36,8 @@ export function TownCanvas() {
   const replayFrozenFrame = useSimulationStore((state) => state.replayFrozenFrame)
   const getFrameByTick = useSimulationStore((state) => state.getFrameByTick)
   const selectResident = useSimulationStore((state) => state.selectResident)
+  const { play } = useSound()
+  const { pushToast } = useToast()
   const liveRelationships = useRelationshipsStore((state) => state.relationships)
   const relationshipHistory = useRelationshipsStore((state) => state.history)
   const replayTick = useRelationshipsStore((state) => state.replayTick)
@@ -168,12 +172,22 @@ export function TownCanvas() {
         description: `地图 Tile ${contextMenu.tileX},${contextMenu.tileY} 出现新的街坊传闻。`,
         source: 'map_context_menu',
       })
+      play('event')
+      pushToast({
+        type: 'success',
+        title: '事件已投放',
+        description: `Tile ${contextMenu.tileX}, ${contextMenu.tileY} 的地图事件已加入队列。`,
+      })
     } catch {
-      // Ignore request failures so the map tools remain interactive offline.
+      pushToast({
+        type: 'error',
+        title: '事件投放失败',
+        description: '请确认后端服务可用后重试。',
+      })
     } finally {
       setContextMenu(null)
     }
-  }, [contextMenu])
+  }, [contextMenu, play, pushToast])
 
   useEffect(() => {
     const host = hostRef.current

@@ -73,6 +73,7 @@ else:
         hair_style: Optional[str] = None
         hair_color: Optional[str] = None
         outfit_color: Optional[str] = None
+        current_goal: Optional[str] = None   # active short-term goal text
 
 
     @dataclass
@@ -161,6 +162,13 @@ else:
 
 
     @dataclass
+    class GoalUpdate:
+        """Agent's current active goal, pushed with each tick."""
+        id: str    # resident id
+        goal: str  # short goal text, e.g. "去咖啡馆找小红聊天"
+
+
+    @dataclass
     class TickState:
         """Complete diff pushed to the frontend each tick."""
 
@@ -171,6 +179,7 @@ else:
         relationships: List[RelationshipDelta] = field(default_factory=list)
         events: List[EventUpdate] = field(default_factory=list)
         weather: str = WeatherType.sunny.value
+        goals: List["GoalUpdate"] = field(default_factory=list)
 
 
     # ---------------------------------------------------------------------------

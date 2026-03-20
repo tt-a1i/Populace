@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 
+import { useSound } from '../../audio'
 import { generateReport, getLatestReport, type ReportPayload } from '../../services/api'
+import { useToast } from '../ui/ToastProvider'
 import { ReportShare } from './ReportShare'
 
 const fallbackReport: ReportPayload = {
@@ -16,6 +18,8 @@ const fallbackReport: ReportPayload = {
 }
 
 export function DailyReport() {
+  const { play } = useSound()
+  const { pushToast } = useToast()
   const [report, setReport] = useState<ReportPayload>(fallbackReport)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -27,8 +31,19 @@ export function DailyReport() {
     try {
       const nextReport = await generateReport()
       setReport(nextReport)
+      play('report')
+      pushToast({
+        type: 'success',
+        title: '日报已生成',
+        description: nextReport.title,
+      })
     } catch {
       setMessage('生成失败，已保留当前日报内容。')
+      pushToast({
+        type: 'error',
+        title: '日报生成失败',
+        description: '已保留当前日报内容。',
+      })
     } finally {
       setBusy(false)
     }
@@ -40,8 +55,17 @@ export function DailyReport() {
     try {
       const latest = await getLatestReport()
       setReport(latest)
+      pushToast({
+        type: 'info',
+        title: '已载入最近日报',
+        description: latest.title,
+      })
     } catch {
       setMessage('暂无已生成日报，请先点击“生成日报”。')
+      pushToast({
+        type: 'warning',
+        title: '暂无最近日报',
+      })
     } finally {
       setBusy(false)
     }

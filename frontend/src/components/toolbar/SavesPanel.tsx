@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { type SaveMeta, deleteSave, listSaves, loadSave, saveGame } from '../../services/api'
+import { useToast } from '../ui/ToastProvider'
 
 export function SavesPanel() {
   const { t } = useTranslation()
+  const { pushToast } = useToast()
   const [saves, setSaves] = useState<SaveMeta[]>([])
   const [saveName, setSaveName] = useState('')
   const [saving, setSaving] = useState(false)
@@ -35,9 +37,19 @@ export function SavesPanel() {
       await saveGame(saveName.trim())
       setSaveName('')
       flash(t('saves.success'))
+      pushToast({
+        type: 'success',
+        title: t('saves.success'),
+        description: saveName.trim() || '已保存当前模拟状态。',
+      })
       await fetchSaves()
     } catch (e) {
       setError(e instanceof Error ? e.message : '存档失败')
+      pushToast({
+        type: 'error',
+        title: '存档失败',
+        description: e instanceof Error ? e.message : '请稍后重试。',
+      })
     } finally {
       setSaving(false)
     }
@@ -49,8 +61,17 @@ export function SavesPanel() {
     try {
       await loadSave(id)
       flash(t('saves.load_success', { name }))
+      pushToast({
+        type: 'info',
+        title: t('saves.load_success', { name }),
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
+      pushToast({
+        type: 'error',
+        title: '加载失败',
+        description: e instanceof Error ? e.message : '请稍后重试。',
+      })
     } finally {
       setLoading(null)
     }
@@ -62,8 +83,17 @@ export function SavesPanel() {
     try {
       await deleteSave(id)
       setSaves((prev) => prev.filter((s) => s.id !== id))
+      pushToast({
+        type: 'warning',
+        title: '存档已删除',
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : '删除失败')
+      pushToast({
+        type: 'error',
+        title: '删除失败',
+        description: e instanceof Error ? e.message : '请稍后重试。',
+      })
     } finally {
       setDeleting(null)
     }

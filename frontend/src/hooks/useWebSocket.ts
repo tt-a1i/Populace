@@ -11,6 +11,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { useSound } from '../audio'
+import { useToast } from '../components/ui/ToastProvider'
 import { useRelationshipsStore } from '../stores/relationships'
 import { useSimulationStore } from '../stores/simulation'
 
@@ -38,6 +40,8 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
   const [hasInitialSnapshot, setHasInitialSnapshot] = useState(false)
   const [startupTimedOut, setStartupTimedOut] = useState(false)
+  const { pushToast } = useToast()
+  const { play } = useSound()
 
   const wsRef = useRef<WebSocket | null>(null)
   const backoffRef = useRef<number>(MIN_BACKOFF_MS)
@@ -46,6 +50,8 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
   const mountedRef = useRef<boolean>(true)
   const frameRef = useRef<number | null>(null)
   const pendingTicksRef = useRef<Array<Record<string, unknown>>>([])
+  const hasConnectedOnceRef = useRef(false)
+  const shouldAnnounceReconnectRef = useRef(false)
 
   const simUpdateFromTick = useSimulationStore((s) => s.updateFromTick)
   const simInitFromSnapshot = useSimulationStore((s) => s.initFromSnapshot)
@@ -66,7 +72,7 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
 
       const { type, data } = msg
 
-      const commitTick = (tickData: Record<string, unknown>) => {
+      const commitTick = (tickData: Record<string, unknown>, playSounds = true) => {
         pendingTicksRef.current.push(tickData)
 
         if (frameRef.current !== null) {
@@ -76,15 +82,30 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
         frameRef.current = window.requestAnimationFrame(() => {
           frameRef.current = null
           const queuedTicks = pendingTicksRef.current.splice(0)
+          let sawDialogue = false
+          let sawRelationshipDelta = false
 
           for (const queuedTick of queuedTicks) {
+            const dialogues = Array.isArray(queuedTick.dialogues) ? queuedTick.dialogues : []
+            const relationships = Array.isArray(queuedTick.relationships) ? queuedTick.relationships : []
+            sawDialogue = sawDialogue || dialogues.length > 0
+            sawRelationshipDelta = sawRelationshipDelta || relationships.length > 0
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             simUpdateFromTick(queuedTick as any)
             relUpdateFromTick({
               tick: typeof queuedTick.tick === 'number' ? queuedTick.tick : undefined,
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              relationships: queuedTick.relationships as any,
+              relationships: relationships as any,
             })
+          }
+
+          if (playSounds) {
+            if (sawDialogue) {
+              play('dialogue')
+            }
+            if (sawRelationshipDelta) {
+              play('relationship')
+            }
           }
         })
       }
@@ -100,14 +121,14 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
         // Rebuild graph store from backend residents, clearing mock data
         relInitFromSnapshot(snapshot.residents ?? [])
         if (snapshot.last_tick) {
-          commitTick(snapshot.last_tick as Record<string, unknown>)
+          commitTick(snapshot.last_tick as Record<string, unknown>, false)
         }
       } else if (type === 'tick') {
         // Incremental diff
         commitTick(data as Record<string, unknown>)
       }
     },
-    [simUpdateFromTick, simInitFromSnapshot, relUpdateFromTick, relInitFromSnapshot],
+    [play, relInitFromSnapshot, relUpdateFromTick, simInitFromSnapshot, simUpdateFromTick],
   )
 
   // -------------------------------------------------------------------------
@@ -129,6 +150,15 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
       // Reset backoff on successful connection
       backoffRef.current = MIN_BACKOFF_MS
       setStatus('connected')
+      if (shouldAnnounceReconnectRef.current) {
+        pushToast({
+          type: 'success',
+          title: '重新连接成功',
+          description: '实时同步已恢复。',
+        })
+        shouldAnnounceReconnectRef.current = false
+      }
+      hasConnectedOnceRef.current = true
       // Ask backend for full snapshot (spec §13: full sync on connect)
       ws.send(JSON.stringify({ type: 'get_snapshot' }))
     }
@@ -138,6 +168,14 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
     ws.onclose = () => {
       if (!mountedRef.current) return
       setStatus('disconnected')
+      if (hasConnectedOnceRef.current) {
+        shouldAnnounceReconnectRef.current = true
+        pushToast({
+          type: 'warning',
+          title: '连接中断',
+          description: '正在尝试重新连接 WebSocket。',
+        })
+      }
       // Exponential backoff: 1 s → 2 s → 4 s → … → 10 s max
       const delay = backoffRef.current
       backoffRef.current = Math.min(delay * 2, MAX_BACKOFF_MS)
@@ -150,7 +188,7 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
       // onclose fires immediately after onerror, so reconnect is handled there
       ws.close()
     }
-  }, [enabled, handleMessage])
+  }, [enabled, handleMessage, pushToast])
 
   const retry = useCallback(() => {
     setStartupTimedOut(false)
@@ -193,7 +231,9 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
       mountedRef.current = false
       if (timerRef.current !== null) clearTimeout(timerRef.current)
       if (frameRef.current !== null) {
-        window.cancelAnimationFrame(frameRef.current)
+        if (typeof window.cancelAnimationFrame === 'function') {
+          window.cancelAnimationFrame(frameRef.current)
+        }
       }
       pendingTicksRef.current = []
       wsRef.current?.close()

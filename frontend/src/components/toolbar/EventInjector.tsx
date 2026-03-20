@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useSound } from '../../audio'
 import {
   type ActiveEvent,
   type PresetEvent,
@@ -9,6 +10,7 @@ import {
   injectEvent,
   injectPresetEvent,
 } from '../../services/api'
+import { useToast } from '../ui/ToastProvider'
 
 // Static icon + colour map for known preset IDs
 const PRESET_META: Record<string, { icon: string; color: string }> = {
@@ -25,6 +27,8 @@ const DEFAULT_META = { icon: '⚡', color: 'border-cyan-300/20 bg-cyan-300/10 te
 
 export function EventInjector() {
   const { t } = useTranslation()
+  const { pushToast } = useToast()
+  const { play } = useSound()
   const [customEvent, setCustomEvent] = useState('')
   const [lastEvent, setLastEvent] = useState('')
   const [busy, setBusy] = useState(false)
@@ -57,6 +61,12 @@ export function EventInjector() {
     try {
       await injectPresetEvent(presetId)
       setLastEvent(presetName)
+      play('event')
+      pushToast({
+        type: 'success',
+        title: '事件已投放',
+        description: `预设事件「${presetName}」已进入当前回合。`,
+      })
     } finally {
       setBusy(false)
     }
@@ -70,6 +80,12 @@ export function EventInjector() {
       await injectEvent({ description: desc })
       setLastEvent(desc)
       setCustomEvent('')
+      play('event')
+      pushToast({
+        type: 'success',
+        title: '事件已投放',
+        description: desc,
+      })
     } finally {
       setBusy(false)
     }

@@ -113,6 +113,11 @@ export class ResidentSprite extends Container {
   private readonly bubble = new Container()
   private readonly bubbleBackground = new Graphics()
   private readonly bubbleLabel: Text
+  // Thought bubble — violet/purple tint, shown when agent has a current_goal
+  private readonly thoughtBubble = new Container()
+  private readonly thoughtBackground = new Graphics()
+  private readonly thoughtLabel: Text
+
   private readonly nameLabel: Text
   private onFocusRequest?: (residentId: string) => void
   private onSelectRequest?: (residentId: string) => void
@@ -182,7 +187,25 @@ export class ResidentSprite extends Container {
     this.bubble.position.set(0, -28)
     this.bubble.zIndex = 5
 
-    this.addChild(this.shadow, this.highlightGlow, this.body, this.emotionAccent, this.bubble, this.nameLabel)
+    // Thought bubble — sits above dialogue bubble, lighter violet tint
+    this.thoughtLabel = new Text({
+      text: '',
+      anchor: { x: 0.5, y: 0.5 },
+      style: {
+        fill: 0x1e1b4b,
+        fontFamily: 'Avenir Next, Helvetica Neue, sans-serif',
+        fontSize: 10,
+        fontWeight: '600',
+        wordWrap: true,
+        wordWrapWidth: 100,
+      },
+    })
+    this.thoughtBubble.addChild(this.thoughtBackground, this.thoughtLabel)
+    this.thoughtBubble.position.set(0, -44)
+    this.thoughtBubble.zIndex = 4
+    this.thoughtBubble.visible = false
+
+    this.addChild(this.shadow, this.highlightGlow, this.body, this.emotionAccent, this.thoughtBubble, this.bubble, this.nameLabel)
     this.on('pointertap', this.handlePointerTap)
 
     this.applyResident(resident, true)
@@ -233,6 +256,7 @@ export class ResidentSprite extends Container {
     this.nameLabel.text = resident.name
     this.moveTo(resident.targetX, resident.targetY, immediate)
     this.updateStatus(resident.status, resident.dialogueText)
+    this.updateGoal(resident.currentGoal)
   }
 
   setSimulationSpeed(speed: SimulationSpeed): void {
@@ -279,6 +303,12 @@ export class ResidentSprite extends Container {
   showDialogue(text: string): void {
     this.dialogueUntil = performance.now() + DIALOGUE_DURATION_MS
     this.renderBubble(text)
+  }
+
+  /** Update the thought bubble with the agent's current short-term goal. */
+  updateGoal(goal: string | null | undefined): void {
+    const text = goal ? goal.slice(0, 10) : null
+    this._renderThoughtBubble(text)
   }
 
   updateStatus(status: ResidentStatus, dialogueText?: string | null): void {
@@ -372,6 +402,30 @@ export class ResidentSprite extends Container {
     this.bubbleBackground.lineTo(0, height / 2 + 7)
     this.bubbleBackground.lineTo(5, height / 2 - 1)
     this.bubbleBackground.fill({ color: 0xf8fafc, alpha: 0.94 })
+  }
+
+  /** Render the thought bubble (violet tint) with a small cloud-style pointer. */
+  private _renderThoughtBubble(content: string | null): void {
+    if (!content) {
+      this.thoughtBubble.visible = false
+      return
+    }
+    this.thoughtBubble.visible = true
+    this.thoughtLabel.text = `💭 ${content}`
+
+    const width = Math.max(32, Math.min(120, this.thoughtLabel.width + 16))
+    const height = Math.max(20, this.thoughtLabel.height + 10)
+
+    this.thoughtBackground.clear()
+    // Soft violet bubble
+    this.thoughtBackground.roundRect(-width / 2, -height / 2, width, height, 9).fill({
+      color: 0xede9fe,
+      alpha: 0.92,
+    })
+    this.thoughtBackground.stroke({ color: 0x7c3aed, alpha: 0.30, width: 1 })
+    // Small cloud dots pointing down
+    this.thoughtBackground.circle(0, height / 2 + 3, 2).fill({ color: 0xede9fe, alpha: 0.85 })
+    this.thoughtBackground.circle(2, height / 2 + 6, 1.5).fill({ color: 0xede9fe, alpha: 0.65 })
   }
 
   private redrawAvatar(): void {

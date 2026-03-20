@@ -648,6 +648,13 @@ class SimulationState:
         tick_state.dialogues.extend(dialogue_updates)
         tick_state.relationships.extend(relationship_deltas)
 
+        # Collect current goals and include in tick diff
+        from engine.types import GoalUpdate
+        for agent in self.world.agents:
+            goal = getattr(agent.resident, "current_goal", None)
+            if goal:
+                tick_state.goals.append(GoalUpdate(id=agent.resident.id, goal=goal))
+
         if queued_events:
             tick_state.events.extend(
                 EventUpdate(description=event["description"])
