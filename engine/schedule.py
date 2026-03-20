@@ -78,7 +78,12 @@ class DailySchedule:
         Returns:
             :class:`SchedulePhase` with name and preferred building types.
         """
-        home_start = 21.0 if self._ptype == "extrovert" else 18.0
+        if self._ptype == "extrovert":
+            home_start = 21.0
+        elif self._ptype == "introvert":
+            home_start = 18.0
+        else:
+            home_start = 20.0  # neutral
         evening_end = home_start  # evening → home boundary
 
         if hour < 6.0 or hour >= 22.0:

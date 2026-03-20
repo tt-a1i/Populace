@@ -59,6 +59,24 @@ def test_home_phase_earlier_for_introvert():
     assert phase.name == "home"     # introvert goes home from 18:00
 
 
+def test_neutral_still_evening_at_19():
+    """Neutral personality should still be in evening phase at 19:00."""
+    sched = DailySchedule("普通居民")   # no extrovert/introvert keyword
+    phase = sched.current_phase(19.0)
+    assert phase.name == "evening", (
+        f"Neutral agent at 19:00 should be 'evening', got '{phase.name}'"
+    )
+
+
+def test_neutral_home_phase_at_20():
+    """Neutral personality should enter home phase at 20:00."""
+    sched = DailySchedule("普通居民")
+    phase = sched.current_phase(20.0)
+    assert phase.name == "home", (
+        f"Neutral agent at 20:00 should be 'home', got '{phase.name}'"
+    )
+
+
 def test_sleep_phase_at_23():
     sched = DailySchedule("外向")
     phase = sched.current_phase(23.0)
