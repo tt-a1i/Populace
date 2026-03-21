@@ -120,7 +120,7 @@ export function TownChrome({
 
       <section
         data-testid="town-minimap"
-        className="absolute bottom-14 right-3 z-10 overflow-hidden rounded-xl border border-white/8 bg-slate-950/70 p-2 text-slate-100 shadow-lg backdrop-blur-sm"
+        className={`absolute bottom-14 right-3 z-10 overflow-hidden rounded-xl border border-white/8 bg-slate-950/70 p-2 text-slate-100 shadow-lg backdrop-blur-sm transition-opacity duration-200 ${selectedResidentId ? 'pointer-events-none opacity-0' : ''}`}
       >
 
         <div className="relative h-28 w-36 rounded-lg border border-white/8 bg-slate-950/60">

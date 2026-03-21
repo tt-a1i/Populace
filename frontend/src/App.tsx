@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Toolbar } from './components/toolbar/Toolbar'
@@ -71,6 +71,13 @@ function SimulationView() {
   const [showToolbar, setShowToolbar] = useState(false)
   const [activeQuickTool, setActiveQuickTool] = useState<string | null>(null)
 
+  // Auto-close graph drawer when resident sidebar opens
+  const prevSelectedRef = useRef(selectedResidentId)
+  if (selectedResidentId && selectedResidentId !== prevSelectedRef.current && showGraph) {
+    setShowGraph(false)
+  }
+  prevSelectedRef.current = selectedResidentId
+
   const toggleTool = (tool: string, eventName?: string) => {
     if (showToolbar && activeQuickTool === tool) {
       setShowToolbar(false)
@@ -84,6 +91,7 @@ function SimulationView() {
     }
   }
 
+  const selectedResidentId = useSimulationStore((s) => s.selectedResidentId)
   const time = useSimulationStore((s) => s.time)
   const weather = useSimulationStore((s) => s.weather)
   const season = useSimulationStore((s) => s.season)
