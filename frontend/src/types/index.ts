@@ -9,6 +9,16 @@ export interface DialogueUpdate {
   from_id: string
   to_id: string
   text: string
+  kind?: 'dialogue' | 'gossip' | 'monologue'
+}
+
+export interface GossipUpdate {
+  speaker_id: string
+  listener_id: string
+  target_id: string
+  target_name: string
+  content: string
+  is_positive: boolean
 }
 
 export interface RelationshipDelta {
@@ -37,6 +47,7 @@ export interface TickState {
   weather: string
   season?: string
   energy_updates?: EnergyUpdate[]
+  gossips?: GossipUpdate[]
 }
 
 export interface Resident {

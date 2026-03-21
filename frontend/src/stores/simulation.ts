@@ -38,6 +38,7 @@ export interface ResidentPosition {
   mood?: string
   goals?: string[]
   dialogueText?: string | null
+  dialogueKind?: 'dialogue' | 'gossip' | 'monologue'
   currentGoal?: string | null   // active short-term goal for thought bubble
   coins?: number
   occupation?: string
@@ -246,18 +247,24 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   updateFromTick: (tickState) => {
     set((state) => {
       const residentMap = new Map(state.residents.map((resident) => [resident.id, resident]))
-      const dialogueByResident = new Map<string, string>()
+      const dialogueByResident = new Map<string, { text: string; kind: string }>()
       const freshMessages: FeedMessage[] = []
       const seenResidents = new Set<string>()
 
       for (const dialogue of tickState.dialogues ?? []) {
         if (!dialogueByResident.has(dialogue.to_id)) {
-          dialogueByResident.set(dialogue.to_id, '💬')
+          dialogueByResident.set(dialogue.to_id, { text: '💬', kind: 'dialogue' })
         }
-        dialogueByResident.set(dialogue.from_id, dialogue.text)
+        dialogueByResident.set(dialogue.from_id, { text: dialogue.text, kind: dialogue.kind ?? 'dialogue' })
         const fromName = residentMap.get(dialogue.from_id)?.name ?? dialogue.from_id
         const toName = residentMap.get(dialogue.to_id)?.name ?? dialogue.to_id
         freshMessages.push({ id: _feedId(), kind: 'dialogue', text: `${fromName} 对 ${toName} 说：${dialogue.text}` })
+      }
+
+      for (const g of tickState.gossips ?? []) {
+        dialogueByResident.set(g.listener_id, { text: g.content, kind: 'gossip' })
+        const speakerName = residentMap.get(g.speaker_id)?.name ?? g.speaker_id
+        freshMessages.push({ id: _feedId(), kind: 'event', text: `👂 ${speakerName} 传播了关于 ${g.target_name} 的八卦` })
       }
 
       for (const event of tickState.events ?? []) {
@@ -267,7 +274,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       for (const movement of tickState.movements) {
         seenResidents.add(movement.id)
         const existingResident = residentMap.get(movement.id)
-        const dialogueText = dialogueByResident.get(movement.id) ?? movement.dialogueText ?? null
+        const dialogueEntry = dialogueByResident.get(movement.id)
+        const dialogueText = dialogueEntry?.text ?? movement.dialogueText ?? null
+        const dialogueKind = dialogueEntry?.kind ?? 'dialogue'
         const nextX = clampTilePosition(movement.x, 39)
         const nextY = clampTilePosition(movement.y, 29)
         const previousTargetX = existingResident?.targetX ?? existingResident?.x ?? nextX
@@ -291,6 +300,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           mood: existingResident?.mood,
           goals: existingResident?.goals,
           dialogueText,
+          dialogueKind,
           currentGoal: existingResident?.currentGoal ?? null,
           coins: existingResident?.coins ?? 100,
         })
@@ -324,7 +334,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         })
       }
 
-      for (const [residentId, dialogueText] of dialogueByResident.entries()) {
+      for (const [residentId, dialogueEntry] of dialogueByResident.entries()) {
         const resident = residentMap.get(residentId)
 
         if (!resident) {
@@ -333,7 +343,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
 
         residentMap.set(residentId, {
           ...resident,
-          dialogueText,
+          dialogueText: dialogueEntry.text,
+          dialogueKind: dialogueEntry.kind as ResidentPosition['dialogueKind'],
           status: 'chatting',
         })
       }
