@@ -4,14 +4,14 @@ import { useTranslation } from 'react-i18next'
 import { createResident, getResidents, type ApiResident } from '../../services/api'
 import { useSimulationStore } from '../../stores'
 
-const PERSONALITY_PRESETS = [
-  '外向开朗，热爱社交，充满活力',
-  '内向安静，温和细腻，喜欢独处',
-  '好奇心旺盛，爱探索，思维活跃',
-  '认真负责，勤劳踏实，值得信赖',
-  '幽默风趣，乐观开朗，擅长化解尴尬',
-  '神秘低调，城府深，难以看透',
-]
+const PERSONALITY_PRESET_KEYS = [
+  'create_resident.personality_preset_1',
+  'create_resident.personality_preset_2',
+  'create_resident.personality_preset_3',
+  'create_resident.personality_preset_4',
+  'create_resident.personality_preset_5',
+  'create_resident.personality_preset_6',
+] as const
 
 const MOOD_OPTIONS = ['neutral', 'happy', 'content', 'excited', 'sad', 'tired', 'angry']
 const REL_TYPES = ['knows', 'friendship', 'love', 'rivalry']
@@ -173,20 +173,23 @@ export function ResidentCreationWizard() {
         <div className="grid gap-4">
           <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">{t('create_resident.personality')}</p>
           <div className="flex flex-wrap gap-2">
-            {PERSONALITY_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => setPersonality(preset)}
-                className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                  personality === preset
-                    ? 'border-emerald-300/45 bg-emerald-300/16 text-emerald-50'
-                    : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
-                }`}
-              >
-                {preset}
-              </button>
-            ))}
+            {PERSONALITY_PRESET_KEYS.map((key) => {
+              const label = t(key)
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setPersonality(label)}
+                  className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                    personality === label
+                      ? 'border-emerald-300/45 bg-emerald-300/16 text-emerald-50'
+                      : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
 
           <label className="grid gap-2 text-sm text-slate-300">

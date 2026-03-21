@@ -74,7 +74,12 @@
     "title": "世界时间线",
     "refresh": "刷新",
     "all": "全部",
-    "empty": "暂无世界事件记录，继续模拟后会出现关系里程碑、天气变化等事件"
+    "empty": "暂无世界事件记录，继续模拟后会出现关系里程碑、天气变化等事件",
+    "type_relationship_milestone": "关系里程碑",
+    "type_weather_change": "天气变化",
+    "type_custom_event": "自定义事件",
+    "type_preset_event": "预设事件",
+    "type_achievement": "成就解锁"
   },
   "create_resident": {
     "badge": "Resident Creator",
@@ -97,7 +102,13 @@
     "error": "创建失败，请检查后端服务。",
     "success_title": "居民已创建！",
     "success_desc": "「{{name}}」已成功加入小镇。",
-    "add_another": "+ 再创建一位"
+    "add_another": "+ 再创建一位",
+    "personality_preset_1": "外向开朗，热爱社交，充满活力",
+    "personality_preset_2": "内向安静，温和细腻，喜欢独处",
+    "personality_preset_3": "好奇心旺盛，爱探索，思维活跃",
+    "personality_preset_4": "认真负责，勤劳踏实，值得信赖",
+    "personality_preset_5": "幽默风趣，乐观开朗，擅长化解尴尬",
+    "personality_preset_6": "神秘低调，城府深，难以看透"
   },
   "speed": {
     "pause": "⏸ 暂停",
@@ -139,7 +150,9 @@
     "save": "保存人设",
     "hint": "simulation store 当前有 {{count}} 个默认占位居民；编辑器仅使用后端返回的真实居民。",
     "loading": "加载中…",
-    "load_failed": "加载居民列表失败，请确认后端服务正在运行。"
+    "load_failed": "加载居民列表失败，请确认后端服务正在运行。",
+    "default_personality": "温和、好奇、爱打听",
+    "default_goals": "想搞清楚湖边的传闻, 今晚想约朋友散步"
   },
   "build": {
     "badge": "Build Mode",
@@ -192,7 +205,11 @@
     "strongest_relationship": "最强关系",
     "relationship_summary": "关系数 {{count}} · 强度 {{intensity}}",
     "empty_value": "暂无",
-    "empty_desc": "等待更多模拟数据积累。"
+    "empty_desc": "等待更多模拟数据积累。",
+    "mood_trend_title": "情绪趋势（最近 100 ticks）",
+    "network_rank_title": "社会网络影响力排行",
+    "waiting_ticks": "等待更多 tick 数据…",
+    "relationships_suffix": "关系"
   },
   "saves": {
     "badge": "Saves",
@@ -312,7 +329,16 @@
     "feedback_emotion": "{{name}} 的心情变为 {{emotion}}",
     "feedback_encounter": "{{a}} 和 {{b}} 在 {{location}} 偶遇了",
     "feedback_rumor": "关于 {{name}} 的谣言已传播",
-    "feedback_jealousy": "{{name}} 对 {{rival}} 心生嫉妒"
+    "feedback_jealousy": "{{name}} 对 {{rival}} 心生嫉妒",
+    "emotion_happy": "开心",
+    "emotion_sad": "难过",
+    "emotion_angry": "愤怒",
+    "emotion_fearful": "恐惧",
+    "emotion_excited": "兴奋",
+    "toast_event_injected": "事件已投放",
+    "toast_preset_desc": "预设事件「{{name}}」已进入当前回合。",
+    "active_events_label": "进行中的事件",
+    "latest_event": "最新: {{event}}"
   },
   "quest": {
     "badge": "Quest Panel",

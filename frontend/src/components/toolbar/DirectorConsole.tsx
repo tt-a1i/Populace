@@ -32,12 +32,12 @@ const DEFAULT_META = { icon: '\u26A1', color: 'border-cyan-300/20 bg-cyan-300/10
 
 type TabKey = 'scene' | 'emotion' | 'relationship' | 'events'
 
-const EMOTIONS: Array<{ key: string; icon: string; label: string }> = [
-  { key: 'happy', icon: '\uD83D\uDE0A', label: '\u5F00\u5FC3' },
-  { key: 'sad', icon: '\uD83D\uDE22', label: '\u96BE\u8FC7' },
-  { key: 'angry', icon: '\uD83D\uDE20', label: '\u6124\u6012' },
-  { key: 'fearful', icon: '\uD83D\uDE28', label: '\u6050\u60E7' },
-  { key: 'excited', icon: '\uD83E\uDD29', label: '\u5174\u596B' },
+const EMOTIONS: Array<{ key: string; icon: string; labelKey: string }> = [
+  { key: 'happy', icon: '\uD83D\uDE0A', labelKey: 'director.emotion_happy' },
+  { key: 'sad', icon: '\uD83D\uDE22', labelKey: 'director.emotion_sad' },
+  { key: 'angry', icon: '\uD83D\uDE20', labelKey: 'director.emotion_angry' },
+  { key: 'fearful', icon: '\uD83D\uDE28', labelKey: 'director.emotion_fearful' },
+  { key: 'excited', icon: '\uD83E\uDD29', labelKey: 'director.emotion_excited' },
 ]
 
 export function DirectorConsole() {
@@ -117,7 +117,7 @@ export function DirectorConsole() {
       await injectPresetEvent(presetId)
       setLastEvent(presetName)
       flashSuccess()
-      pushToast({ type: 'success', title: '\u4E8B\u4EF6\u5DF2\u6295\u653E', description: `\u9884\u8BBE\u4E8B\u4EF6\u300C${presetName}\u300D\u5DF2\u8FDB\u5165\u5F53\u524D\u56DE\u5408\u3002` })
+      pushToast({ type: 'success', title: t('director.toast_event_injected'), description: t('director.toast_preset_desc', { name: presetName }) })
     } finally {
       setBusy(false)
     }
@@ -132,7 +132,7 @@ export function DirectorConsole() {
       setLastEvent(desc)
       setCustomEvent('')
       flashSuccess()
-      pushToast({ type: 'success', title: '\u4E8B\u4EF6\u5DF2\u6295\u653E', description: desc })
+      pushToast({ type: 'success', title: t('director.toast_event_injected'), description: desc })
     } finally {
       setBusy(false)
     }
@@ -145,7 +145,8 @@ export function DirectorConsole() {
     try {
       const result = await injectEmotion(emotionResidentId, selectedEmotion, emotionReason)
       flashSuccess()
-      const emotionLabel = EMOTIONS.find((e) => e.key === selectedEmotion)?.label ?? selectedEmotion
+      const emotionEntry = EMOTIONS.find((e) => e.key === selectedEmotion)
+      const emotionLabel = emotionEntry ? t(emotionEntry.labelKey) : selectedEmotion
       pushToast({
         type: 'success',
         title: '\u2713 ' + t('director.feedback_emotion', { name: result.name, emotion: emotionLabel }),
@@ -318,7 +319,7 @@ export function DirectorConsole() {
           {/* Active events countdown */}
           {activeEvents.length > 0 && (
             <div className="rounded-2xl border border-amber-400/20 bg-amber-400/8 p-3">
-              <p className="mb-2 text-[10px] uppercase tracking-[0.3em] text-amber-300/70">{'\u8FDB\u884C\u4E2D\u7684\u4E8B\u4EF6'}</p>
+              <p className="mb-2 text-[10px] uppercase tracking-[0.3em] text-amber-300/70">{t('director.active_events_label')}</p>
               <div className="flex flex-col gap-1.5">
                 {activeEvents.map((ev) => (
                   <div key={ev.id} className="flex items-center justify-between gap-2">
@@ -363,7 +364,7 @@ export function DirectorConsole() {
           </label>
 
           <p className="text-xs uppercase tracking-[0.26em] text-slate-400">
-            {lastEvent ? `Latest: ${lastEvent}` : t('event_injector.empty')}
+            {lastEvent ? t('director.latest_event', { event: lastEvent }) : t('event_injector.empty')}
           </p>
         </div>
       )}
@@ -392,7 +393,7 @@ export function DirectorConsole() {
                 ].join(' ')}
               >
                 <span className="text-2xl">{em.icon}</span>
-                <span className="text-[11px] font-medium">{em.label}</span>
+                <span className="text-[11px] font-medium">{t(em.labelKey)}</span>
               </button>
             ))}
           </div>

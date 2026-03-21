@@ -12,9 +12,9 @@ export function PersonaEditor() {
   const [residents, setResidents] = useState<ApiResident[]>([])
   const [residentId, setResidentId] = useState('')
   const [name, setName] = useState('')
-  const [personality, setPersonality] = useState('温和、好奇、爱打听')
+  const [personality, setPersonality] = useState('')
   const [mood, setMood] = useState('neutral')
-  const [goals, setGoals] = useState('想搞清楚湖边的传闻, 今晚想约朋友散步')
+  const [goals, setGoals] = useState('')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -66,9 +66,9 @@ export function PersonaEditor() {
 
     setResidentId(selectedResident.id)
     setName(selectedResident.name)
-    setPersonality(selectedResident.personality ?? '温和、好奇、爱打听')
+    setPersonality(selectedResident.personality ?? t('persona.default_personality'))
     setMood(selectedResident.mood ?? 'neutral')
-    setGoals((selectedResident.goals ?? ['想搞清楚湖边的传闻', '今晚想约朋友散步']).join(', '))
+    setGoals((selectedResident.goals ?? t('persona.default_goals').split(', ')).join(', '))
   }, [selectedResident])
 
   const handleSave = async () => {

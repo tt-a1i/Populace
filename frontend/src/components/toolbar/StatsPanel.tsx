@@ -26,7 +26,7 @@ const RESIDENT_COLORS = [
 ]
 
 // ── Inline SVG mood trend chart ─────────────────────────────────────────────
-function MoodTrendChart({ history }: { history: MoodHistoryEntry[] }) {
+function MoodTrendChart({ history, waitingLabel }: { history: MoodHistoryEntry[]; waitingLabel: string }) {
   const W = 480, H = 140, PAD = { t: 8, r: 8, b: 20, l: 28 }
   const chartW = W - PAD.l - PAD.r
   const chartH = H - PAD.t - PAD.b
@@ -42,7 +42,7 @@ function MoodTrendChart({ history }: { history: MoodHistoryEntry[] }) {
   }, [history])
 
   const ticks = useMemo(() => [...new Set(history.map(e => e.tick))].sort((a, b) => a - b), [history])
-  if (ticks.length < 2) return <p className="text-xs text-slate-500 py-4">等待更多 tick 数据…</p>
+  if (ticks.length < 2) return <p className="text-xs text-slate-500 py-4">{waitingLabel}</p>
 
   const minTick = ticks[0], maxTick = ticks[ticks.length - 1]
   const xScale = (t: number) => PAD.l + ((t - minTick) / (maxTick - minTick)) * chartW
@@ -76,7 +76,7 @@ function MoodTrendChart({ history }: { history: MoodHistoryEntry[] }) {
 }
 
 // ── Inline SVG influence bar chart ──────────────────────────────────────────
-function NetworkRankChart({ data }: { data: NetworkAnalysisEntry[] }) {
+function NetworkRankChart({ data, relationshipsSuffix }: { data: NetworkAnalysisEntry[]; relationshipsSuffix: string }) {
   const top = data.slice(0, 8)
   const maxScore = Math.max(...top.map(d => d.influence_score), 0.01)
   const barH = 22, gap = 6, padL = 60, padR = 12
@@ -92,7 +92,7 @@ function NetworkRankChart({ data }: { data: NetworkAnalysisEntry[] }) {
             <text x={padL - 6} y={y + barH / 2 + 4} textAnchor="end" fontSize="10" fill="#94a3b8">{entry.name}</text>
             <rect x={padL} y={y} width={bw} height={barH} rx="4" fill={RESIDENT_COLORS[i % RESIDENT_COLORS.length]} opacity="0.75" />
             <text x={padL + bw + 4} y={y + barH / 2 + 4} fontSize="9" fill="#64748b">
-              {entry.influence_score.toFixed(2)} · {entry.relationship_count}关系
+              {entry.influence_score.toFixed(2)} · {entry.relationship_count} {relationshipsSuffix}
             </text>
           </g>
         )
@@ -269,8 +269,8 @@ export function StatsPanel() {
           {/* ── Mood Trend Chart ── */}
           {moodHistory.length > 0 && (
             <div className="rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-4">
-              <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500 mb-3">情绪趋势（最近 100 ticks）</p>
-              <MoodTrendChart history={moodHistory} />
+              <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500 mb-3">{t('stats.mood_trend_title')}</p>
+              <MoodTrendChart history={moodHistory} waitingLabel={t('stats.waiting_ticks')} />
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
                 {[...new Map(moodHistory.map(e => [e.resident_id, e.resident_name])).entries()].slice(0, 10).map(([id, name], i) => (
                   <span key={id} className="flex items-center gap-1 text-[10px] text-slate-400">
@@ -285,8 +285,8 @@ export function StatsPanel() {
           {/* ── Network Influence Ranking ── */}
           {networkData.length > 0 && (
             <div className="rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-4">
-              <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500 mb-3">社会网络影响力排行</p>
-              <NetworkRankChart data={networkData} />
+              <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500 mb-3">{t('stats.network_rank_title')}</p>
+              <NetworkRankChart data={networkData} relationshipsSuffix={t('stats.relationships_suffix')} />
             </div>
           )}
         </>

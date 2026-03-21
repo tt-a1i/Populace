@@ -74,7 +74,12 @@
     "title": "World Timeline",
     "refresh": "Refresh",
     "all": "All",
-    "empty": "No world events recorded yet — keep simulating to see relationship milestones, weather changes, and more"
+    "empty": "No world events recorded yet — keep simulating to see relationship milestones, weather changes, and more",
+    "type_relationship_milestone": "Relationship Milestone",
+    "type_weather_change": "Weather Change",
+    "type_custom_event": "Custom Event",
+    "type_preset_event": "Preset Event",
+    "type_achievement": "Achievement"
   },
   "create_resident": {
     "badge": "Resident Creator",
@@ -97,7 +102,13 @@
     "error": "Failed to create resident. Make sure the backend is running.",
     "success_title": "Resident Created!",
     "success_desc": "\"{{name}}\" has joined the town.",
-    "add_another": "+ Add Another"
+    "add_another": "+ Add Another",
+    "personality_preset_1": "Outgoing, social, and energetic",
+    "personality_preset_2": "Introverted, gentle, and prefers solitude",
+    "personality_preset_3": "Curious, loves exploring, quick-minded",
+    "personality_preset_4": "Responsible, hardworking, and trustworthy",
+    "personality_preset_5": "Witty, optimistic, good at breaking awkward tension",
+    "personality_preset_6": "Mysterious, reserved, and hard to read"
   },
   "speed": {
     "pause": "⏸ Pause",
@@ -139,7 +150,9 @@
     "save": "Save Persona",
     "hint": "Store has {{count}} placeholder residents; editor only uses real residents from the backend.",
     "loading": "Loading…",
-    "load_failed": "Failed to load residents. Make sure the backend is running."
+    "load_failed": "Failed to load residents. Make sure the backend is running.",
+    "default_personality": "Gentle, curious, loves to ask around",
+    "default_goals": "Investigate the lake rumors, Take an evening walk with friends"
   },
   "build": {
     "badge": "Build Mode",
@@ -192,7 +205,11 @@
     "strongest_relationship": "Strongest Relationship",
     "relationship_summary": "{{count}} links · intensity {{intensity}}",
     "empty_value": "No data",
-    "empty_desc": "Waiting for the simulation to accumulate more signals."
+    "empty_desc": "Waiting for the simulation to accumulate more signals.",
+    "mood_trend_title": "Mood Trend (last 100 ticks)",
+    "network_rank_title": "Social Network Influence Ranking",
+    "waiting_ticks": "Waiting for more tick data…",
+    "relationships_suffix": "links"
   },
   "saves": {
     "badge": "Saves",
@@ -312,7 +329,16 @@
     "feedback_emotion": "{{name}}'s mood changed to {{emotion}}",
     "feedback_encounter": "{{a}} and {{b}} had an encounter at {{location}}",
     "feedback_rumor": "Rumor about {{name}} has been spread",
-    "feedback_jealousy": "{{name}} is now jealous of {{rival}}"
+    "feedback_jealousy": "{{name}} is now jealous of {{rival}}",
+    "emotion_happy": "Happy",
+    "emotion_sad": "Sad",
+    "emotion_angry": "Angry",
+    "emotion_fearful": "Fearful",
+    "emotion_excited": "Excited",
+    "toast_event_injected": "Event Injected",
+    "toast_preset_desc": "Preset event \"{{name}}\" has entered the current round.",
+    "active_events_label": "Active Events",
+    "latest_event": "Latest: {{event}}"
   },
   "quest": {
     "badge": "Quest Panel",

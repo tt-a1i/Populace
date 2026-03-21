@@ -4,24 +4,26 @@ import { useTranslation } from 'react-i18next'
 import type { TimelineEvent } from '../../services/api'
 import { getTimeline } from '../../services/api'
 
-const EVENT_TYPE_CONFIG: Record<string, { icon: string; color: string; label: string }> = {
-  relationship_milestone: { icon: '💫', color: 'text-pink-300', label: '关系里程碑' },
-  weather_change: { icon: '🌤', color: 'text-sky-300', label: '天气变化' },
-  custom_event: { icon: '⚡', color: 'text-cyan-300', label: '自定义事件' },
-  preset_event: { icon: '🎭', color: 'text-amber-300', label: '预设事件' },
-  achievement: { icon: '🏆', color: 'text-yellow-300', label: '成就解锁' },
+const EVENT_TYPE_CONFIG: Record<string, { icon: string; color: string; labelKey: string }> = {
+  relationship_milestone: { icon: '💫', color: 'text-pink-300', labelKey: 'timeline.type_relationship_milestone' },
+  weather_change: { icon: '🌤', color: 'text-sky-300', labelKey: 'timeline.type_weather_change' },
+  custom_event: { icon: '⚡', color: 'text-cyan-300', labelKey: 'timeline.type_custom_event' },
+  preset_event: { icon: '🎭', color: 'text-amber-300', labelKey: 'timeline.type_preset_event' },
+  achievement: { icon: '🏆', color: 'text-yellow-300', labelKey: 'timeline.type_achievement' },
 }
 
 const ALL_TYPES = Object.keys(EVENT_TYPE_CONFIG)
 
 function EventCard({ event }: { event: TimelineEvent }) {
-  const cfg = EVENT_TYPE_CONFIG[event.event_type] ?? { icon: '📌', color: 'text-slate-300', label: event.event_type }
+  const { t } = useTranslation()
+  const cfg = EVENT_TYPE_CONFIG[event.event_type] ?? { icon: '📌', color: 'text-slate-300', labelKey: '' }
+  const label = cfg.labelKey ? t(cfg.labelKey) : event.event_type
   return (
     <div className="flex gap-3 rounded-xl border border-white/6 bg-white/4 px-3 py-2.5">
       <div className="mt-0.5 text-base">{cfg.icon}</div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-2">
-          <span className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</span>
+          <span className={`text-xs font-medium ${cfg.color}`}>{label}</span>
           <span className="text-[10px] text-slate-500">Tick {event.tick} · {event.time}</span>
         </div>
         <p className="mt-0.5 text-sm leading-5 text-slate-200">{event.description}</p>
@@ -87,7 +89,7 @@ export function TimelinePanel() {
               onClick={() => setFilter(type)}
               className={`rounded-full border px-3 py-1 text-xs transition ${filter === type ? 'border-white/20 bg-white/10 text-white' : 'border-white/8 text-slate-400 hover:bg-white/6'}`}
             >
-              {cfg.icon} {cfg.label}
+              {cfg.icon} {t(cfg.labelKey)}
             </button>
           )
         })}
