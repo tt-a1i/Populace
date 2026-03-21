@@ -32,6 +32,7 @@ export interface ResidentPosition {
   dialogueText?: string | null
   currentGoal?: string | null   // active short-term goal for thought bubble
   coins?: number
+  occupation?: string
 }
 
 export interface TickMovement extends Omit<MovementUpdate, 'action'> {
@@ -365,6 +366,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           goals: r.goals ?? prev?.goals ?? [],
           dialogueText: prev?.dialogueText ?? null,
           coins: (r as { coins?: number }).coins ?? prev?.coins ?? 100,
+          occupation: (r as { occupation?: string }).occupation ?? prev?.occupation ?? 'unemployed',
         }
       })
 

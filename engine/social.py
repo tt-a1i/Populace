@@ -412,6 +412,12 @@ async def initiate_dialogue(
         )
         agent_b.memory_stream.add(mem_b)
 
+    # Gossip: speaker A may share info about an absent third party
+    from engine.gossip import generate_gossip, spread_gossip
+    gossip = generate_gossip(agent_a, world)
+    if gossip is not None:
+        spread_gossip(agent_b, gossip, world)
+
     return DialogueResult(
         messages=messages,
         relationship_delta=delta,

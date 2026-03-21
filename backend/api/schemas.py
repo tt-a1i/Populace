@@ -123,6 +123,7 @@ class ResidentResponse(BaseModel):
     outfit_color: str | None = None
     current_goal: str | None = None
     coins: int = 100
+    occupation: str = "unemployed"
 
 
 class DiaryEntryResponse(BaseModel):
@@ -266,3 +267,16 @@ class LoadSaveResponse(BaseModel):
 class DeleteSaveResponse(BaseModel):
     ok: bool
     id: str
+
+
+class OccupationDistEntry(BaseModel):
+    occupation: str
+    count: int
+
+
+class EconomyStatsResponse(BaseModel):
+    total_coins: int
+    avg_coins: float
+    richest: str | None = None
+    poorest: str | None = None
+    occupation_distribution: list[OccupationDistEntry] = Field(default_factory=list)

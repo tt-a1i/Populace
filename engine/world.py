@@ -273,11 +273,22 @@ class World:
         if building is None:
             return
 
+        _OCCUPATION_MAP = {
+            "cafe": ("barista", 3),
+            "school": ("teacher", 4),
+            "shop": ("shopkeeper", 5),
+        }
         if building.type == "home":
             agent.resident.mood = "neutral"
-        elif building.type in ("school", "shop"):
-            # Work income: +2 coins per tick while in a work building
-            agent.resident.coins += 2
+            agent.resident.occupation = "unemployed"
+        elif building.type in _OCCUPATION_MAP:
+            occupation, income = _OCCUPATION_MAP[building.type]
+            agent.resident.occupation = occupation
+            # Give income only during work (08–12) and afternoon (13–17) hours
+            tick_per_day = self.config.tick_per_day
+            hour = (self.current_tick % tick_per_day) * 24.0 / tick_per_day
+            if 8.0 <= hour < 12.0 or 13.0 <= hour < 17.0:
+                agent.resident.coins += income
 
     def building_stay_duration(self) -> int:
         """Return the random number of ticks an agent stays indoors."""

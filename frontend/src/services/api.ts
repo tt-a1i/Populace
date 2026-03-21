@@ -14,6 +14,7 @@ export interface ApiResident {
   hair_color?: string | null
   outfit_color?: string | null
   coins?: number
+  occupation?: string
 }
 
 interface SpeedPayload {
@@ -457,4 +458,21 @@ export function transferCoins(fromId: string, toId: string, amount: number) {
     method: 'POST',
     body: JSON.stringify({ to_id: toId, amount }),
   })
+}
+
+export interface OccupationDistEntry {
+  occupation: string
+  count: number
+}
+
+export interface EconomyStats {
+  total_coins: number
+  avg_coins: number
+  richest: string | null
+  poorest: string | null
+  occupation_distribution: OccupationDistEntry[]
+}
+
+export function getEconomyStats() {
+  return request<EconomyStats>('/api/simulation/economy-stats')
 }

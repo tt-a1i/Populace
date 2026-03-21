@@ -8,6 +8,8 @@ from fastapi import APIRouter, Body, Request
 from pydantic import BaseModel
 
 from backend.api.schemas import (
+    EconomyStatsResponse,
+    OccupationDistEntry,
     ScenarioDataResponse,
     SimulationStatsResponse,
     SimulationStatusResponse,
@@ -1107,3 +1109,31 @@ async def get_network_analysis(request: Request) -> list[dict[str, Any]]:
     # Sort by influence descending
     result.sort(key=lambda x: x["influence_score"], reverse=True)
     return result
+
+
+@router.get("/economy-stats", response_model=EconomyStatsResponse, responses=error_responses(503))
+async def get_economy_stats(request: Request) -> EconomyStatsResponse:
+    """Return total coins, averages, richest/poorest resident, and occupation distribution."""
+    state = get_simulation_state(request)
+    agents = state.world.agents
+    if not agents:
+        return EconomyStatsResponse(total_coins=0, avg_coins=0.0)
+
+    total = sum(a.resident.coins for a in agents)
+    avg = round(total / len(agents), 2)
+    richest = max(agents, key=lambda a: a.resident.coins).resident.name
+    poorest = min(agents, key=lambda a: a.resident.coins).resident.name
+
+    occ_count: dict[str, int] = {}
+    for a in agents:
+        occ = getattr(a.resident, "occupation", "unemployed")
+        occ_count[occ] = occ_count.get(occ, 0) + 1
+
+    dist = [OccupationDistEntry(occupation=k, count=v) for k, v in sorted(occ_count.items())]
+    return EconomyStatsResponse(
+        total_coins=total,
+        avg_coins=avg,
+        richest=richest,
+        poorest=poorest,
+        occupation_distribution=dist,
+    )

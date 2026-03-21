@@ -441,7 +441,12 @@ export function TownChrome({
               <p className="mt-2 text-lg font-semibold text-amber-200">🪙 {selectedResident.coins ?? 100}</p>
             </div>
           </div>
-
+          <div className="mt-3 grid grid-cols-1 gap-3">
+            <div className="rounded-2xl border border-sky-400/15 bg-sky-400/[0.06] px-4 py-3">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-sky-400/70">Occupation</p>
+              <p className="mt-2 text-base font-semibold text-sky-200" data-testid="occupation-badge">{selectedResident.occupation ?? 'unemployed'}</p>
+            </div>
+          </div>
           {/* ── Tab switcher: memories / diary / relationships / achievements ── */}
           <div className="mt-5 inline-flex flex-wrap gap-1 rounded-full border border-white/10 bg-white/5 p-1">
             {(['memories', 'diary', 'relationships', 'achievements'] as const).map((tab) => (
