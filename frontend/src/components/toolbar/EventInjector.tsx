@@ -73,8 +73,8 @@ export function EventInjector() {
       play('event')
       pushToast({
         type: 'success',
-        title: '事件已投放',
-        description: `预设事件「${presetName}」已进入当前回合。`,
+        title: t('director.toast_event_injected'),
+        description: t('director.toast_preset_desc', { name: presetName }),
       })
     } finally {
       setBusy(false)
@@ -95,7 +95,7 @@ export function EventInjector() {
       play('event')
       pushToast({
         type: 'success',
-        title: '事件已投放',
+        title: t('director.toast_event_injected'),
         description: desc,
       })
     } finally {
@@ -148,7 +148,7 @@ export function EventInjector() {
       {/* ── Active events countdown ── */}
       {activeEvents.length > 0 && (
         <div className="rounded-2xl border border-amber-400/20 bg-amber-400/8 p-3">
-          <p className="mb-2 text-[10px] uppercase tracking-[0.3em] text-amber-300/70">进行中的事件</p>
+          <p className="mb-2 text-[10px] uppercase tracking-[0.3em] text-amber-300/70">{t('director.active_events_label')}</p>
           <div className="flex flex-col gap-1.5">
             {activeEvents.map((ev) => (
               <div key={ev.id} className="flex items-center justify-between gap-2">

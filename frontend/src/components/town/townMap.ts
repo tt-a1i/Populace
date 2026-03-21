@@ -1,3 +1,4 @@
+import i18n from '../../i18n/config'
 import type { Building } from '../../types'
 import type { ResidentPosition } from '../../stores/simulation'
 
@@ -52,11 +53,11 @@ export function getTileKind(x: number, y: number): TileKind {
 export function formatTileKind(tileKind: TileKind): string {
   switch (tileKind) {
     case 'road':
-      return '道路'
+      return i18n.t('chrome.terrain_road')
     case 'water':
-      return '水域'
+      return i18n.t('chrome.terrain_water')
     default:
-      return '草地'
+      return i18n.t('chrome.terrain_grass')
   }
 }
 

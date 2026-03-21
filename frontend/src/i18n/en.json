@@ -154,6 +154,22 @@
     "tip2": "Use the toolbar below to inject events, edit personas, and view the live feed.",
     "close": "Close"
   },
+  "tutorial": {
+    "skip": "Skip",
+    "prev": "← Previous",
+    "next": "Next →",
+    "finish": "Start Exploring ✓",
+    "step1_title": "Map Navigation",
+    "step1_desc": "Scroll to zoom, drag to pan. Double-click a resident to follow them; right-click anywhere for context actions.",
+    "step2_title": "View Residents",
+    "step2_desc": "Click the coloured dots on the map or minimap — a sidebar appears with memories, personality, and live relationships.",
+    "step3_title": "Inject Events",
+    "step3_desc": "Right-click the map and choose Inject Event, or use the Event tab in the toolbar below to trigger dramatic moments.",
+    "step4_title": "Relationship Graph",
+    "step4_desc": "The right-side force-directed graph shows social network evolution. Hover edges to see type and intensity; timeline replay supported.",
+    "step5_title": "Speed Control",
+    "step5_desc": "Adjust simulation speed (1×–50×) or pause for closer observation. Build, export, and god mode are in the toolbar tabs."
+  },
   "event_injector": {
     "badge": "Event Injector",
     "title": "Stir Up Drama",
@@ -491,6 +507,9 @@
     "tile_label": "Tile {{x}}, {{y}}",
     "close": "Close",
     "terrain": "Terrain",
+    "terrain_road": "Road",
+    "terrain_water": "Water",
+    "terrain_grass": "Grass",
     "building_label": "Building",
     "no_building": "None",
     "resident_count": "Residents",

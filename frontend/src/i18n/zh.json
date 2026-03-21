@@ -154,6 +154,22 @@
     "tip2": "底部工具栏可投放事件、编辑人设，也能查看最新事件流。",
     "close": "关闭"
   },
+  "tutorial": {
+    "skip": "跳过",
+    "prev": "← 上一步",
+    "next": "下一步 →",
+    "finish": "开始探索 ✓",
+    "step1_title": "地图导航",
+    "step1_desc": "鼠标滚轮缩放地图，拖拽平移视角。双击居民头像可锁定跟随模式，右键任意位置打开上下文菜单。",
+    "step2_title": "查看居民",
+    "step2_desc": "点击地图或小地图中的彩色圆点，右侧弹出居民侧栏：记忆流、性格描述、实时关系网络。",
+    "step3_title": "投放事件",
+    "step3_desc": "右键地图选择「投放事件」，或在下方工具栏的「事件投放」标签注入戏剧导火索，实时影响所有居民行为。",
+    "step4_title": "关系图谱",
+    "step4_desc": "页面右侧是力导向关系图谱，实时展示居民社交网络演化。悬停边线可查看类型与强度，支持时间轴回放。",
+    "step5_title": "速度控制",
+    "step5_desc": "工具栏右侧可调整模拟速度（1×~50×）或随时暂停精细观察。建造、导出、上帝模式均在工具栏各标签中。"
+  },
   "event_injector": {
     "badge": "Event Injector",
     "title": "让小镇起风波",
@@ -491,6 +507,9 @@
     "tile_label": "位置 {{x}}, {{y}}",
     "close": "关闭",
     "terrain": "地形",
+    "terrain_road": "道路",
+    "terrain_water": "水域",
+    "terrain_grass": "草地",
     "building_label": "建筑",
     "no_building": "暂无",
     "resident_count": "角色数",

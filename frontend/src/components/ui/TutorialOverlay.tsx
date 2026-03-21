@@ -7,6 +7,7 @@
  */
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 
 export const TUTORIAL_STORAGE_KEY = 'populace:tutorial_done'
 
@@ -18,51 +19,20 @@ export function resetTutorial(): void {
   window.dispatchEvent(new CustomEvent(RESET_EVENT))
 }
 
-interface Step {
-  title: string
-  desc: string
+interface StepDef {
+  titleKey: string
+  descKey: string
   icon: string
-  /** CSS selector for the element to spotlight; null = center card */
   selector: string | null
   tooltipSide: 'below' | 'above' | 'center'
 }
 
-const STEPS: Step[] = [
-  {
-    title: '地图导航',
-    desc: '鼠标滚轮缩放地图，拖拽平移视角。双击居民头像可锁定跟随模式，右键任意位置打开上下文菜单。',
-    icon: '🗺️',
-    selector: '[data-testid="town-canvas-shell"]',
-    tooltipSide: 'below',
-  },
-  {
-    title: '查看居民',
-    desc: '点击地图或小地图中的彩色圆点，右侧弹出居民侧栏：记忆流、性格描述、实时关系网络。',
-    icon: '👤',
-    selector: '[data-testid="town-minimap"]',
-    tooltipSide: 'above',
-  },
-  {
-    title: '投放事件',
-    desc: '右键地图选择「投放事件」，或在下方工具栏的「事件投放」标签注入戏剧导火索，实时影响所有居民行为。',
-    icon: '⚡',
-    selector: null,
-    tooltipSide: 'center',
-  },
-  {
-    title: '关系图谱',
-    desc: '页面右侧是力导向关系图谱，实时展示居民社交网络演化。悬停边线可查看类型与强度，支持时间轴回放。',
-    icon: '🕸️',
-    selector: null,
-    tooltipSide: 'center',
-  },
-  {
-    title: '速度控制',
-    desc: '工具栏右侧可调整模拟速度（1×~50×）或随时暂停精细观察。建造、导出、上帝模式均在工具栏各标签中。',
-    icon: '⏩',
-    selector: null,
-    tooltipSide: 'center',
-  },
+const STEP_DEFS: StepDef[] = [
+  { titleKey: 'tutorial.step1_title', descKey: 'tutorial.step1_desc', icon: '\uD83D\uDDFA\uFE0F', selector: '[data-testid="town-canvas-shell"]', tooltipSide: 'below' },
+  { titleKey: 'tutorial.step2_title', descKey: 'tutorial.step2_desc', icon: '\uD83D\uDC64', selector: '[data-testid="town-minimap"]', tooltipSide: 'above' },
+  { titleKey: 'tutorial.step3_title', descKey: 'tutorial.step3_desc', icon: '\u26A1', selector: null, tooltipSide: 'center' },
+  { titleKey: 'tutorial.step4_title', descKey: 'tutorial.step4_desc', icon: '\uD83D\uDD78\uFE0F', selector: null, tooltipSide: 'center' },
+  { titleKey: 'tutorial.step5_title', descKey: 'tutorial.step5_desc', icon: '\u23E9', selector: null, tooltipSide: 'center' },
 ]
 
 interface SpotlightRect {
@@ -73,6 +43,7 @@ interface SpotlightRect {
 }
 
 export function TutorialOverlay() {
+  const { t } = useTranslation()
   // Lazy initializer avoids setState-in-effect anti-pattern for the initial show
   const [visible, setVisible] = useState(() => !localStorage.getItem(TUTORIAL_STORAGE_KEY))
   const [step, setStep] = useState(0)
@@ -95,7 +66,7 @@ export function TutorialOverlay() {
   useLayoutEffect(() => {
     let rect: SpotlightRect | null = null
     if (visible) {
-      const sel = STEPS[step]?.selector
+      const sel = STEP_DEFS[step]?.selector
       if (sel) {
         const el = document.querySelector(sel)
         if (el) {
@@ -115,7 +86,7 @@ export function TutorialOverlay() {
 
   const goNext = () => {
     const next = step + 1
-    if (next < STEPS.length) setStep(next)
+    if (next < STEP_DEFS.length) setStep(next)
     else finish()
   }
 
@@ -125,14 +96,14 @@ export function TutorialOverlay() {
 
   if (!visible) return null
 
-  const cur = STEPS[step]
-  const isLast = step === STEPS.length - 1
+  const curDef = STEP_DEFS[step]
+  const isLast = step === STEP_DEFS.length - 1
 
   // ── Tooltip position ──────────────────────────────────────────
   let cardStyle: React.CSSProperties = {}
-  if (spotlight && cur.tooltipSide !== 'center') {
+  if (spotlight && curDef.tooltipSide !== 'center') {
     const left = Math.max(16, Math.min(spotlight.left, window.innerWidth - 380))
-    if (cur.tooltipSide === 'below') {
+    if (curDef.tooltipSide === 'below') {
       cardStyle = { left, top: spotlight.top + spotlight.height + 18 }
     } else {
       cardStyle = { left, top: Math.max(16, spotlight.top - 218) }
@@ -166,7 +137,7 @@ export function TutorialOverlay() {
       >
         {/* Progress pills */}
         <div className="mb-4 flex items-center gap-1.5">
-          {STEPS.map((_, i) => (
+          {STEP_DEFS.map((_, i) => (
             <div
               key={i}
               className={`h-1.5 rounded-full transition-all duration-300 ${
@@ -178,15 +149,15 @@ export function TutorialOverlay() {
               }`}
             />
           ))}
-          <span className="ml-auto shrink-0 text-[11px] text-slate-500">{step + 1} / {STEPS.length}</span>
+          <span className="ml-auto shrink-0 text-[11px] text-slate-500">{step + 1} / {STEP_DEFS.length}</span>
         </div>
 
         {/* Content */}
         <div className="flex items-start gap-3">
-          <span className="shrink-0 text-3xl leading-none">{cur.icon}</span>
+          <span className="shrink-0 text-3xl leading-none">{curDef.icon}</span>
           <div>
-            <h3 className="font-display text-xl text-white">{cur.title}</h3>
-            <p className="mt-2 text-sm leading-[1.7] text-slate-300">{cur.desc}</p>
+            <h3 className="font-display text-xl text-white">{t(curDef.titleKey)}</h3>
+            <p className="mt-2 text-sm leading-[1.7] text-slate-300">{t(curDef.descKey)}</p>
           </div>
         </div>
 
@@ -197,7 +168,7 @@ export function TutorialOverlay() {
             onClick={finish}
             className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition duration-200 hover:bg-white/8 active:scale-95"
           >
-            跳过
+            {t('tutorial.skip')}
           </button>
           <div className="flex flex-1 justify-end gap-2">
             {step > 0 && (
@@ -206,7 +177,7 @@ export function TutorialOverlay() {
                 onClick={goPrev}
                 className="rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm text-slate-200 transition duration-200 hover:bg-white/10 active:scale-95"
               >
-                ← 上一步
+                {t('tutorial.prev')}
               </button>
             )}
             <button
@@ -214,7 +185,7 @@ export function TutorialOverlay() {
               onClick={goNext}
               className="rounded-full bg-cyan-500/90 px-5 py-1.5 text-sm font-semibold text-white transition duration-200 hover:bg-cyan-400 active:scale-95"
             >
-              {isLast ? '开始探索 ✓' : '下一步 →'}
+              {isLast ? t('tutorial.finish') : t('tutorial.next')}
             </button>
           </div>
         </div>
