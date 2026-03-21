@@ -80,8 +80,8 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
     } catch (err) {
       setError(
         err instanceof Error
-          ? `后端连接失败：${err.message}`
-          : '后端连接失败，请确认服务已启动后重试。',
+          ? `${t('scene.backend_error', 'Backend connection failed')}: ${err.message}`
+          : t('scene.backend_error_hint', 'Backend connection failed. Please make sure the service is running.'),
       )
       setLoading(false)
       return  // Stay on picking page — do NOT enter simulation
@@ -99,7 +99,7 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
       const scenario = await generateScenario(customDesc.trim())
       setGeneratedScenario(scenario)
     } catch (err) {
-      setCustomError(err instanceof Error ? err.message : '生成失败，请重试。')
+      setCustomError(err instanceof Error ? err.message : t('scene.generate_failed', 'Generation failed. Please try again.'))
     } finally {
       setCustomGenerating(false)
     }
@@ -113,7 +113,7 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
       await startCustomSimulation(generatedScenario)
       onEnter()
     } catch (err) {
-      setCustomError(err instanceof Error ? `启动失败：${err.message}` : '启动失败，请重试。')
+      setCustomError(err instanceof Error ? `${t('scene.start_failed', 'Start failed')}: ${err.message}` : t('scene.start_failed_hint', 'Start failed. Please try again.'))
       setCustomStarting(false)
     }
   }
@@ -247,7 +247,7 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
         {/* ── Custom scene ── */}
         <div className="mt-4 rounded-3xl border border-white/8 bg-white/[0.02] p-6">
           <span className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-            自定义场景
+            {t('scene.custom_label')}
           </span>
           <h3 className="mt-2 text-lg font-bold text-white">{t('scene.custom_title')}</h3>
 
