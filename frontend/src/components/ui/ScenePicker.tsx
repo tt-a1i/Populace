@@ -15,49 +15,42 @@ interface PreviewItem { emoji: string; x: number; y: number }
 const PRESET_SCENES = [
   {
     id: 'modern_community',
-    name: '现代小区',
-    nameEn: 'Modern Community',
-    description: '一个充满故事的都市小区，十位居民各有各的性格与秘密。',
+    i18nKey: 'modern_community',
     residents: 10,
     buildings: 8,
-    tags: ['社交', '爱恨情仇', '八卦'],
     color: 'from-cyan-500/20 to-violet-500/10',
     border: 'border-cyan-400/30',
     accent: 'text-cyan-300',
     recommended: true,
     preview: [
-      { emoji: '🏢', x: 8,  y: 12 },
-      { emoji: '☕', x: 55, y: 8  },
-      { emoji: '🌳', x: 80, y: 30 },
-      { emoji: '🏪', x: 30, y: 50 },
-      { emoji: '👩', x: 20, y: 70 },
-      { emoji: '👨', x: 65, y: 65 },
-      { emoji: '💬', x: 42, y: 38 },
+      { emoji: '\uD83C\uDFE2', x: 8,  y: 12 },
+      { emoji: '\u2615', x: 55, y: 8  },
+      { emoji: '\uD83C\uDF33', x: 80, y: 30 },
+      { emoji: '\uD83C\uDFEA', x: 30, y: 50 },
+      { emoji: '\uD83D\uDC69', x: 20, y: 70 },
+      { emoji: '\uD83D\uDC68', x: 65, y: 65 },
+      { emoji: '\uD83D\uDCAC', x: 42, y: 38 },
     ] as PreviewItem[],
   },
   {
     id: 'seaside_village',
-    name: '海边渔村',
-    nameEn: 'Seaside Village',
-    description: '宁静的海边小渔村，渔夫与商人在海风中演绎各自的故事。',
+    i18nKey: 'seaside_village',
     residents: 6,
     buildings: 6,
-    tags: ['渔村', '海边', '慢生活'],
     color: 'from-blue-500/20 to-teal-500/10',
     border: 'border-blue-400/30',
     accent: 'text-blue-300',
     recommended: false,
     preview: [
-      { emoji: '⛵', x: 55, y: 10 },
-      { emoji: '🌊', x: 20, y: 68 },
-      { emoji: '🏠', x: 8,  y: 30 },
-      { emoji: '🐟', x: 75, y: 55 },
-      { emoji: '🏮', x: 45, y: 42 },
-      { emoji: '👨‍🦳', x: 30, y: 72 },
+      { emoji: '\u26F5', x: 55, y: 10 },
+      { emoji: '\uD83C\uDF0A', x: 20, y: 68 },
+      { emoji: '\uD83C\uDFE0', x: 8,  y: 30 },
+      { emoji: '\uD83D\uDC1F', x: 75, y: 55 },
+      { emoji: '\uD83C\uDFEE', x: 45, y: 42 },
+      { emoji: '\uD83D\uDC74', x: 30, y: 72 },
     ] as PreviewItem[],
   },
 ]
-
 
 export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
   const { t } = useTranslation()
@@ -80,8 +73,8 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
     } catch (err) {
       setError(
         err instanceof Error
-          ? `${t('scene.backend_error', 'Backend connection failed')}: ${err.message}`
-          : t('scene.backend_error_hint', 'Backend connection failed. Please make sure the service is running.'),
+          ? `${t('scene.backend_error')}: ${err.message}`
+          : t('scene.backend_error_hint'),
       )
       setLoading(false)
       return  // Stay on picking page — do NOT enter simulation
@@ -99,7 +92,7 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
       const scenario = await generateScenario(customDesc.trim())
       setGeneratedScenario(scenario)
     } catch (err) {
-      setCustomError(err instanceof Error ? err.message : t('scene.generate_failed', 'Generation failed. Please try again.'))
+      setCustomError(err instanceof Error ? err.message : t('scene.generate_failed'))
     } finally {
       setCustomGenerating(false)
     }
@@ -113,7 +106,7 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
       await startCustomSimulation(generatedScenario)
       onEnter()
     } catch (err) {
-      setCustomError(err instanceof Error ? `${t('scene.start_failed', 'Start failed')}: ${err.message}` : t('scene.start_failed_hint', 'Start failed. Please try again.'))
+      setCustomError(err instanceof Error ? `${t('scene.start_failed')}: ${err.message}` : t('scene.start_failed_hint'))
       setCustomStarting(false)
     }
   }
@@ -188,8 +181,7 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
                         </span>
                       )}
                     </div>
-                    <h3 className="mt-2 text-xl font-bold text-white">{scene.name}</h3>
-                    <p className="mt-1 text-xs text-slate-400">{scene.nameEn}</p>
+                    <h3 className="mt-2 text-xl font-bold text-white">{t(`scene.${scene.i18nKey}_name`)}</h3>
                   </div>
                   {/* Selection indicator */}
                   <div className={[
@@ -216,7 +208,7 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
                   ))}
                 </div>
 
-                <p className="mt-3 text-sm leading-relaxed text-slate-300">{scene.description}</p>
+                <p className="mt-3 text-sm leading-relaxed text-slate-300">{t(`scene.${scene.i18nKey}_desc`)}</p>
 
                 <div className="mt-5 flex items-center gap-4">
                   <div className="flex items-center gap-1.5 text-xs text-slate-300">
@@ -230,7 +222,7 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {scene.tags.map((tag) => (
+                  {(t(`scene.${scene.i18nKey}_tags`, { returnObjects: true }) as string[]).map((tag) => (
                     <span
                       key={tag}
                       className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[11px] text-slate-300"

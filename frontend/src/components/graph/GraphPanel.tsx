@@ -174,8 +174,9 @@ export function GraphPanel() {
                 <button
                   key={type}
                   type="button"
+                  aria-pressed={activeType === type}
                   onClick={() => setActiveType(type)}
-                  className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                  className={`rounded-full border px-3 py-1.5 text-xs transition duration-200 active:scale-95 ${
                     activeType === type
                       ? 'border-cyan-300/45 bg-cyan-300/16 text-cyan-50'
                       : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'

@@ -32,7 +32,18 @@
     "generate": "✦ Generate Scene",
     "generating": "AI generating…",
     "use_scene": "Use This Scene →",
-    "starting": "Starting…"
+    "starting": "Starting…",
+    "backend_error": "Backend connection failed",
+    "backend_error_hint": "Backend connection failed. Please make sure the service is running.",
+    "generate_failed": "Generation failed. Please try again.",
+    "start_failed": "Start failed",
+    "start_failed_hint": "Start failed. Please try again.",
+    "modern_community_name": "Modern Community",
+    "modern_community_desc": "A drama-filled urban community — ten residents, each with their own secrets.",
+    "modern_community_tags": ["Social", "Love & Rivalry", "Gossip"],
+    "seaside_village_name": "Seaside Village",
+    "seaside_village_desc": "A peaceful fishing village by the sea — fishermen and merchants unfolding stories in the ocean breeze.",
+    "seaside_village_tags": ["Fishing Village", "Seaside", "Slow Life"]
   },
   "toolbar": {
     "director": "Director",

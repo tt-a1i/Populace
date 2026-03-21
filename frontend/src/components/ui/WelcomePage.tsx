@@ -51,6 +51,7 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
       {PARTICLES.map((p, i) => (
         <span
           key={i}
+          aria-hidden="true"
           className="pointer-events-none absolute rounded-full bg-cyan-400"
           style={{
             left: p.left,
@@ -92,6 +93,7 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
         <div
           className="animate-fade-up mt-5 flex items-center gap-2 opacity-50"
           style={{ animationDelay: '220ms' }}
+          aria-hidden="true"
         >
           {Array.from({ length: 12 }, (_, i) => (
             <span

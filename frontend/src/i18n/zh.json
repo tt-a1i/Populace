@@ -32,7 +32,18 @@
     "generate": "✦ 生成场景",
     "generating": "AI 生成中…",
     "use_scene": "使用此场景 →",
-    "starting": "启动中…"
+    "starting": "启动中…",
+    "backend_error": "后端连接失败",
+    "backend_error_hint": "后端连接失败，请确认服务正在运行。",
+    "generate_failed": "生成失败，请重试。",
+    "start_failed": "启动失败",
+    "start_failed_hint": "启动失败，请重试。",
+    "modern_community_name": "现代小区",
+    "modern_community_desc": "一个充满故事的都市小区，十位居民各有各的性格与秘密。",
+    "modern_community_tags": ["社交", "爱恨情仇", "八卦"],
+    "seaside_village_name": "海边渔村",
+    "seaside_village_desc": "宁静的海边小渔村，渔夫与商人在海风中演绎各自的故事。",
+    "seaside_village_tags": ["渔村", "海边", "慢生活"]
   },
   "toolbar": {
     "director": "导演台",
