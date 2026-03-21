@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Toolbar } from './components/toolbar/Toolbar'
@@ -64,6 +64,11 @@ function SimulationView() {
   } = useWebSocket()
   useKeyboardShortcuts(true)
 
+  const selectedResidentId = useSimulationStore((s) => s.selectedResidentId)
+  const time = useSimulationStore((s) => s.time)
+  const weather = useSimulationStore((s) => s.weather)
+  const season = useSimulationStore((s) => s.season)
+
   const [showOnboarding, setShowOnboarding] = useState(
     () => !localStorage.getItem('populace:onboarding_done'),
   )
@@ -71,12 +76,8 @@ function SimulationView() {
   const [showToolbar, setShowToolbar] = useState(false)
   const [activeQuickTool, setActiveQuickTool] = useState<string | null>(null)
 
-  // Auto-close graph drawer when resident sidebar opens
-  const prevSelectedRef = useRef(selectedResidentId)
-  if (selectedResidentId && selectedResidentId !== prevSelectedRef.current && showGraph) {
-    setShowGraph(false)
-  }
-  prevSelectedRef.current = selectedResidentId
+  // Hide graph when sidebar is open (they share the right side)
+  const graphVisible = showGraph && !selectedResidentId
 
   const toggleTool = (tool: string, eventName?: string) => {
     if (showToolbar && activeQuickTool === tool) {
@@ -90,11 +91,6 @@ function SimulationView() {
       }
     }
   }
-
-  const selectedResidentId = useSimulationStore((s) => s.selectedResidentId)
-  const time = useSimulationStore((s) => s.time)
-  const weather = useSimulationStore((s) => s.weather)
-  const season = useSimulationStore((s) => s.season)
 
 
   const isZh = i18n.language === 'zh'
@@ -212,7 +208,7 @@ function SimulationView() {
           <button
             type="button"
             onClick={() => setShowGraph((v) => !v)}
-            className={`rounded-lg border px-2 py-1.5 text-xs transition ${showGraph ? 'border-amber-300/40 bg-amber-300/15 text-amber-50' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+            className={`rounded-lg border px-2 py-1.5 text-xs transition ${graphVisible ? 'border-amber-300/40 bg-amber-300/15 text-amber-50' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
             title={t('app.relationship_graph')}
           >
             {'\uD83D\uDD78\uFE0F'}
@@ -228,7 +224,7 @@ function SimulationView() {
 
       {/* -- RIGHT DRAWER: Graph Panel -- */}
       <div
-        className={`fixed right-0 top-0 bottom-0 z-30 w-full transform transition-transform duration-300 sm:w-96 ${showGraph ? 'translate-x-0' : 'translate-x-full'} pointer-events-auto`}
+        className={`fixed right-0 top-0 bottom-0 z-30 w-full transform transition-transform duration-300 sm:w-96 ${graphVisible ? 'translate-x-0' : 'translate-x-full'} pointer-events-auto`}
       >
         <div className="h-full border-l border-white/10 bg-slate-950/92 p-3 backdrop-blur-md sm:p-4">
           <div className="mb-4 flex items-center justify-between">
