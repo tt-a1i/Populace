@@ -158,7 +158,7 @@ export function OnboardingDrama({ onComplete }: OnboardingDramaProps) {
 
     if (firstResident) {
       injectEvent({
-        description: `${firstResident.name}在广场遇到了邻居`,
+        description: t('onboarding.meet_event', { name: firstResident.name }),
       }).catch(() => {
         // API may not be available; non-blocking
       })
@@ -236,7 +236,7 @@ export function OnboardingDrama({ onComplete }: OnboardingDramaProps) {
         onClick={finish}
         className="fixed right-6 top-6 z-[60] rounded-full border border-white/20 bg-slate-900/80 px-4 py-2 text-sm text-slate-300 backdrop-blur transition duration-200 hover:bg-slate-800/90 hover:text-white active:scale-95"
       >
-        {t('onboarding.skip', '跳过 →')}
+        {t('onboarding.skip')}
       </button>
       {/* ── INTRO phase ── */}
       {phase === 'intro' && (

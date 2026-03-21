@@ -371,7 +371,8 @@
     "conflict": "挑起矛盾",
     "conflict_desc": "引入一个神秘陌生人，搅动小镇平静",
     "watch": "随便看看",
-    "watch_desc": "放手让 AI 居民自由发展"
+    "watch_desc": "放手让 AI 居民自由发展",
+    "meet_event": "{{name}}在广场遇到了邻居"
   },
   "director": {
     "badge": "Director's Console",

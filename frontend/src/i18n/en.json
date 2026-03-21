@@ -371,7 +371,8 @@
     "conflict": "Stir Conflict",
     "conflict_desc": "Bring a mysterious stranger to shake things up",
     "watch": "Just Watch",
-    "watch_desc": "Let the AI residents roam free"
+    "watch_desc": "Let the AI residents roam free",
+    "meet_event": "{{name}} ran into a neighbour at the plaza"
   },
   "director": {
     "badge": "Director's Console",
