@@ -10,6 +10,7 @@ import {
   ThemeToggle,
   WelcomePage,
 } from './components/ui'
+import { OnboardingDrama } from './components/ui/OnboardingDrama'
 import { TutorialOverlay } from './components/ui/TutorialOverlay'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useWebSocket } from './hooks/useWebSocket'
@@ -206,6 +207,9 @@ function SimulationView() {
   const [activeMobilePane, setActiveMobilePane] = useState<MobilePane>('town')
   const [mobileToolbarOpen, setMobileToolbarOpen] = useState(false)
   const mobileToolbarVisible = isMobile && mobileToolbarOpen
+  const [showOnboarding, setShowOnboarding] = useState(
+    () => !localStorage.getItem('populace:onboarding_done'),
+  )
 
   const townPanel = useMemo(
     () => (
@@ -378,6 +382,14 @@ function SimulationView() {
       </div>
       <FirstRunGuide enabled={hasInitialSnapshot} />
       {hasInitialSnapshot && <TutorialOverlay />}
+      {hasInitialSnapshot && showOnboarding && (
+        <OnboardingDrama
+          onComplete={() => {
+            localStorage.setItem('populace:onboarding_done', '1')
+            setShowOnboarding(false)
+          }}
+        />
+      )}
     </main>
   )
 }
