@@ -238,7 +238,7 @@ function SimulationView() {
 
       {/* -- RIGHT DRAWER: Graph Panel -- */}
       <div
-        className={`fixed right-0 top-0 bottom-0 z-30 w-full transform transition-transform duration-300 will-change-transform sm:w-96 ${graphVisible ? 'translate-x-0' : 'translate-x-full'} pointer-events-auto`}
+        className={`fixed right-0 top-0 bottom-0 z-20 w-full transform transition-transform duration-300 will-change-transform sm:w-96 ${graphVisible ? 'translate-x-0' : 'translate-x-full'} pointer-events-auto`}
       >
         <div className="h-full border-l border-white/10 bg-slate-950/92 p-3 backdrop-blur-md sm:p-4">
           <div className="mb-4 flex items-center justify-between">
