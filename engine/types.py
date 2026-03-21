@@ -158,6 +158,7 @@ else:
         from_id: str
         to_id: str
         text: str
+        kind: str = "dialogue"
 
 
     @dataclass
