@@ -3,11 +3,14 @@ import { useTranslation } from 'react-i18next'
 
 import { type ScenarioData, generateScenario, startCustomSimulation, startSimulation } from '../../services/api'
 import { LanguageSwitcher } from './LanguageSwitcher'
+import { ThemeToggle } from './ThemeToggle'
 
 interface ScenePickerProps {
   onEnter: () => void
   onBack: () => void
 }
+
+interface PreviewItem { emoji: string; x: number; y: number }
 
 const PRESET_SCENES = [
   {
@@ -22,6 +25,15 @@ const PRESET_SCENES = [
     border: 'border-cyan-400/30',
     accent: 'text-cyan-300',
     recommended: true,
+    preview: [
+      { emoji: '🏢', x: 8,  y: 12 },
+      { emoji: '☕', x: 55, y: 8  },
+      { emoji: '🌳', x: 80, y: 30 },
+      { emoji: '🏪', x: 30, y: 50 },
+      { emoji: '👩', x: 20, y: 70 },
+      { emoji: '👨', x: 65, y: 65 },
+      { emoji: '💬', x: 42, y: 38 },
+    ] as PreviewItem[],
   },
   {
     id: 'seaside_village',
@@ -35,6 +47,14 @@ const PRESET_SCENES = [
     border: 'border-blue-400/30',
     accent: 'text-blue-300',
     recommended: false,
+    preview: [
+      { emoji: '⛵', x: 55, y: 10 },
+      { emoji: '🌊', x: 20, y: 68 },
+      { emoji: '🏠', x: 8,  y: 30 },
+      { emoji: '🐟', x: 75, y: 55 },
+      { emoji: '🏮', x: 45, y: 42 },
+      { emoji: '👨‍🦳', x: 30, y: 72 },
+    ] as PreviewItem[],
   },
 ]
 
@@ -130,7 +150,10 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
             <h2 className="font-mono text-2xl font-bold text-white sm:text-3xl">{t('scene.title')}</h2>
             <p className="mt-2 text-sm text-slate-400">{t('scene.subtitle')}</p>
           </div>
-          <LanguageSwitcher />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <LanguageSwitcher />
+          </div>
         </div>
 
         {/* ── Preset scene cards ── */}
@@ -179,7 +202,21 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
                   </div>
                 </div>
 
-                <p className="mt-4 text-sm leading-relaxed text-slate-300">{scene.description}</p>
+                {/* Emoji mini-map preview */}
+                <div className="relative mt-4 h-16 w-full overflow-hidden rounded-xl border border-white/8 bg-black/20">
+                  {scene.preview.map((item, pi) => (
+                    <span
+                      key={pi}
+                      className="pointer-events-none absolute text-lg leading-none"
+                      style={{ left: `${item.x}%`, top: `${item.y}%` }}
+                      aria-hidden="true"
+                    >
+                      {item.emoji}
+                    </span>
+                  ))}
+                </div>
+
+                <p className="mt-3 text-sm leading-relaxed text-slate-300">{scene.description}</p>
 
                 <div className="mt-5 flex items-center gap-4">
                   <div className="flex items-center gap-1.5 text-xs text-slate-300">

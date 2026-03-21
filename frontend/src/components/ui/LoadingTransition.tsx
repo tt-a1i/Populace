@@ -1,3 +1,4 @@
+import React from 'react'
 import { useTranslation } from 'react-i18next'
 
 interface LoadingTransitionProps {
@@ -5,46 +6,91 @@ interface LoadingTransitionProps {
   timedOut: boolean
 }
 
+function SkeletonBlock({ className = '', style }: { className?: string; style?: React.CSSProperties }) {
+  return <div className={['rounded-xl skeleton-shimmer', className].join(' ')} style={style} />
+}
+
 export function LoadingTransition({ onRetry, timedOut }: LoadingTransitionProps) {
   const { t } = useTranslation()
-  return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-6 text-slate-100">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(249,115,22,0.14),_transparent_28%)]" />
-      <div className="relative z-10 w-full max-w-2xl rounded-[32px] border border-white/10 bg-slate-900/82 p-8 shadow-[0_32px_100px_rgba(2,6,23,0.65)] backdrop-blur">
-        <p className="text-xs uppercase tracking-[0.38em] text-cyan-200/70">{t('loading.badge')}</p>
-        <h1 className="mt-4 font-display text-4xl text-white sm:text-5xl">{t('loading.title')}</h1>
-        <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
-          {t('loading.desc')}
-        </p>
 
-        <div className="mt-8 overflow-hidden rounded-[20px] border border-cyan-300/20 bg-slate-950/70 p-4">
-          <div className="grid grid-cols-12 gap-1">
-            {Array.from({ length: 24 }).map((_, index) => (
-              <span
-                key={index}
-                className="h-3 rounded-sm bg-cyan-300/15 shadow-[0_0_18px_rgba(34,211,238,0.18)] animate-[pulse_1.6s_ease-in-out_infinite]"
-                style={{ animationDelay: `${index * 90}ms` }}
-              />
-            ))}
+  return (
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-slate-950 px-3 py-3 text-slate-100 sm:px-6 sm:py-4 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.14),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(249,115,22,0.10),_transparent_24%)]" />
+
+      <div className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-4">
+        {/* Header skeleton */}
+        <div className="flex items-center justify-between rounded-[28px] border border-white/10 bg-white/5 px-5 py-4">
+          <div className="flex flex-col gap-2">
+            <SkeletonBlock className="h-3 w-20 bg-cyan-300/10" />
+            <SkeletonBlock className="h-7 w-40 bg-white/8" />
+          </div>
+          <div className="flex gap-2">
+            <SkeletonBlock className="h-8 w-28 rounded-full bg-white/6" />
+            <SkeletonBlock className="h-8 w-24 rounded-full bg-white/6" />
           </div>
         </div>
 
-        {timedOut ? (
-          <div className="mt-8 rounded-[24px] border border-amber-300/20 bg-amber-400/10 p-5 text-left">
-            <p className="text-xs uppercase tracking-[0.3em] text-amber-100/70">{t('loading.timeout_badge')}</p>
-            <h2 className="mt-2 text-xl font-semibold text-amber-50">{t('loading.timeout_title')}</h2>
-            <p className="mt-3 text-sm leading-6 text-amber-100/80">{t('loading.timeout_desc')}</p>
-            <button
-              type="button"
-              onClick={onRetry}
-              className="mt-5 rounded-full border border-amber-200/30 bg-amber-200/12 px-5 py-2 text-sm text-amber-50 transition hover:bg-amber-200/20"
-            >
-              {t('loading.retry')}
-            </button>
+        {/* Two-panel skeleton */}
+        <div className="flex flex-1 gap-3 rounded-[32px] border border-white/10 bg-slate-900/80 p-3">
+          {/* Left panel */}
+          <div className="flex flex-1 flex-col gap-3 rounded-[24px] border border-cyan-300/15 bg-slate-950/35 p-4">
+            <div className="flex items-center gap-2">
+              <SkeletonBlock className="h-3 w-14 bg-cyan-300/12" />
+              <SkeletonBlock className="h-5 w-24 bg-white/8" />
+            </div>
+            <SkeletonBlock className="flex-1 rounded-2xl bg-white/4" style={{ minHeight: '320px' }} />
+            <div className="flex gap-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <SkeletonBlock key={i} className="h-6 w-6 rounded-full bg-white/6" />
+              ))}
+            </div>
           </div>
-        ) : (
-          <p className="mt-6 text-sm text-cyan-100/72">{t('loading.connecting')}</p>
-        )}
+          {/* Right panel */}
+          <div className="flex flex-1 flex-col gap-3 rounded-[24px] border border-amber-200/15 bg-slate-950/35 p-4">
+            <div className="flex items-center gap-2">
+              <SkeletonBlock className="h-3 w-14 bg-amber-300/12" />
+              <SkeletonBlock className="h-5 w-28 bg-white/8" />
+            </div>
+            <SkeletonBlock className="flex-1 rounded-2xl bg-white/4" style={{ minHeight: '320px' }} />
+          </div>
+        </div>
+
+        {/* Toolbar skeleton */}
+        <div className="flex flex-wrap items-center gap-2 rounded-[20px] border border-white/10 bg-white/5 p-3">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <SkeletonBlock key={i} className="h-8 w-20 rounded-full bg-white/6" />
+          ))}
+        </div>
+      </div>
+
+      {/* Connecting overlay badge */}
+      <div className="pointer-events-none absolute bottom-6 left-1/2 z-20 -translate-x-1/2">
+        <div className="flex items-center gap-3 rounded-[20px] border border-white/10 bg-slate-900/90 px-6 py-3 shadow-[0_8px_32px_rgba(2,6,23,0.5)] backdrop-blur">
+          {timedOut ? (
+            <>
+              <span className="text-lg">⚠️</span>
+              <div className="flex flex-col gap-1">
+                <p className="text-xs uppercase tracking-[0.3em] text-amber-200/70">{t('loading.timeout_badge')}</p>
+                <p className="text-sm font-medium text-amber-50">{t('loading.timeout_title')}</p>
+              </div>
+              <button
+                type="button"
+                onClick={onRetry}
+                className="ml-2 rounded-full border border-amber-200/30 bg-amber-200/12 px-4 py-1.5 text-xs text-amber-50 transition hover:bg-amber-200/20"
+              >
+                {t('loading.retry')}
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-cyan-300/90 border-t-transparent" />
+              <div className="flex flex-col gap-0.5">
+                <p className="text-[10px] uppercase tracking-[0.36em] text-cyan-200/70">{t('loading.badge')}</p>
+                <p className="text-sm font-medium text-cyan-50">{t('loading.connecting')}</p>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -57,3 +57,59 @@
 .message-marquee {
   animation: message-marquee 22s linear infinite;
 }
+
+/* ── Welcome page animations ─────────────────────────────────────── */
+@keyframes fade-slide-up {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes particle-float {
+  0%   { transform: translateY(0)     scale(1);   opacity: var(--p-op, 0.2); }
+  50%  { transform: translateY(-22px) scale(1.15); opacity: calc(var(--p-op, 0.2) * 1.6); }
+  100% { transform: translateY(0)     scale(1);   opacity: var(--p-op, 0.2); }
+}
+
+.animate-fade-up {
+  animation: fade-slide-up 0.65s ease-out both;
+}
+
+/* ── Skeleton shimmer ─────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite linear;
+}
+
+/* ── Light theme overrides ────────────────────────────────────────── */
+html.theme-light,
+html.theme-light body {
+  background: linear-gradient(160deg, #f0f9ff 0%, #e8f0fe 50%, #f1f5f9 100%) !important;
+  color: #1e293b !important;
+}
+
+html.theme-light .bg-slate-950 {
+  background-color: #f1f5f9 !important;
+}
+
+html.theme-light .text-slate-100 { color: #1e293b !important; }
+html.theme-light .text-white     { color: #0f172a !important; }
+html.theme-light .text-slate-300 { color: #334155 !important; }
+html.theme-light .text-slate-400 { color: #475569 !important; }
+html.theme-light .text-slate-500,
+html.theme-light .text-slate-600 { color: #64748b !important; }
+
+html.theme-light .border-white\/10  { border-color: rgba(15, 23, 42, 0.12) !important; }
+html.theme-light .border-white\/6   { border-color: rgba(15, 23, 42, 0.07) !important; }
+html.theme-light .bg-white\/5       { background-color: rgba(15, 23, 42, 0.05) !important; }
+html.theme-light .bg-white\/\[0\.03\] { background-color: rgba(15, 23, 42, 0.03) !important; }

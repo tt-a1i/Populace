@@ -6,10 +6,13 @@ import {
   LoadingTransition,
   ScenePicker,
   SplitPane,
+  ThemeToggle,
   WelcomePage,
 } from './components/ui'
 import { TutorialOverlay } from './components/ui/TutorialOverlay'
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useWebSocket } from './hooks/useWebSocket'
+import { useThemeStore } from './stores/theme'
 
 const TownCanvas = lazy(() =>
   import('./components/town/TownCanvas').then((module) => ({ default: module.TownCanvas })),
@@ -156,6 +159,7 @@ function SimulationView() {
     maxRetriesExceeded,
     retry,
   } = useWebSocket()
+  useKeyboardShortcuts(true)
   const isMobile = useIsMobileViewport()
   const [splitRatio, setSplitRatio] = useState(60)
   const [activeMobilePane, setActiveMobilePane] = useState<MobilePane>('town')
@@ -273,8 +277,11 @@ function SimulationView() {
                 </span>
               </div>
             </div>
-            <div className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-sm text-cyan-50">
-              图谱、地图与上帝模式联动面板
+            <div className="flex items-center gap-3">
+              <div className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-sm text-cyan-50">
+                图谱、地图与上帝模式联动面板
+              </div>
+              <ThemeToggle />
             </div>
           </div>
         </header>
@@ -333,6 +340,16 @@ function SimulationView() {
 
 function App() {
   const [page, setPage] = useState<AppPage>('welcome')
+  const theme = useThemeStore((s) => s.theme)
+
+  // Apply / remove theme-light class on <html> for CSS overrides
+  useEffect(() => {
+    if (theme === 'light') {
+      document.documentElement.classList.add('theme-light')
+    } else {
+      document.documentElement.classList.remove('theme-light')
+    }
+  }, [theme])
 
   if (page === 'welcome') {
     return <WelcomePage onStart={() => setPage('picking')} />
