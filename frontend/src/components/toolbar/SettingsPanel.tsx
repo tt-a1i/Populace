@@ -78,6 +78,9 @@ export function SettingsPanel() {
 
   const handleResetTutorial = () => {
     resetTutorial()
+    // Also reset the onboarding drama so it replays on next page load
+    localStorage.removeItem('populace:onboarding_done')
+    localStorage.removeItem('populace:first-run-guide-seen')
     setTutorialReset(true)
     setTimeout(() => setTutorialReset(false), 2000)
   }
