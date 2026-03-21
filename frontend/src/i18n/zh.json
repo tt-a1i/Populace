@@ -321,22 +321,12 @@
     "social_butterfly_desc": "让一个居民拥有 5 段友谊"
   },
   "app": {
-    "panel_loading": "模块加载中…",
-    "mobile_tool_drawer": "移动端工具面板",
     "close": "关闭",
-    "town_map": "小镇地图",
     "relationship_graph": "关系图谱",
-    "header_title": "现代小区",
-    "header_subtitle": "图谱、地图与上帝模式联动面板",
-    "connected": "● 已连接",
-    "connecting": "○ 连接中…",
     "conn_failed": "连接失败，请手动刷新页面",
     "reconnect": "重新连接",
     "reconnecting": "重连中 {{seconds}}s...",
     "conn_interrupted": "连接中断，正在重连...",
-    "open_tools": "打开工具",
-    "close_tools": "关闭工具",
-    "tab_map": "地图",
-    "tab_graph": "图谱"
+    "open_tools": "工具面板"
   }
 }

@@ -6,7 +6,7 @@ export { LanguageSwitcher } from './LanguageSwitcher'
 export { LoadingTransition } from './LoadingTransition'
 export { MessageBar } from './MessageBar'
 export { ScenePicker } from './ScenePicker'
-export { SplitPane } from './SplitPane'
+
 export { TimelineSlider } from './TimelineSlider'
 export { ToastProvider, useToast } from './ToastProvider'
 export { WelcomePage } from './WelcomePage'
