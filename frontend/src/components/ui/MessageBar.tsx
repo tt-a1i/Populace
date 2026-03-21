@@ -28,12 +28,9 @@ export function MessageBar() {
   const isEmpty = messages.length === 0
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/8 bg-slate-950/50 px-4 py-2.5">
+    <div className="overflow-hidden rounded-2xl border border-white/8 bg-slate-950/70 px-4 py-2.5 backdrop-blur-sm">
       <div className="mb-1.5 flex items-center gap-2 text-[10px] uppercase tracking-[0.26em] text-slate-500">
         <span>{t('message_bar.label')}</span>
-        {!isEmpty && (
-          <span className="ml-auto tabular-nums text-slate-600">{messages.length}</span>
-        )}
       </div>
       <div className="flex flex-col gap-1" style={{ minHeight: '3.5rem' }}>
         {isEmpty ? (

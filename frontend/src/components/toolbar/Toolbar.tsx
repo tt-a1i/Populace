@@ -58,12 +58,23 @@ export function Toolbar() {
   const [indicator, setIndicator] = useState({ left: 0, width: 0, visible: false })
 
   useEffect(() => {
-    const handler = () => {
-      setActiveTool('settings')
-      setShowSecondary(true)
+    const openSettings = () => { setActiveTool('settings'); setShowSecondary(true) }
+    const openPersona = () => setActiveTool('persona')
+    const openQuest = () => setActiveTool('quest')
+    const openReport = () => setActiveTool('report')
+    const openDirector = () => setActiveTool('director')
+    window.addEventListener(OPEN_SETTINGS_EVENT, openSettings)
+    window.addEventListener('populace:open-persona', openPersona)
+    window.addEventListener('populace:open-quest', openQuest)
+    window.addEventListener('populace:open-report', openReport)
+    window.addEventListener('populace:open-director', openDirector)
+    return () => {
+      window.removeEventListener(OPEN_SETTINGS_EVENT, openSettings)
+      window.removeEventListener('populace:open-persona', openPersona)
+      window.removeEventListener('populace:open-quest', openQuest)
+      window.removeEventListener('populace:open-report', openReport)
+      window.removeEventListener('populace:open-director', openDirector)
     }
-    window.addEventListener(OPEN_SETTINGS_EVENT, handler)
-    return () => window.removeEventListener(OPEN_SETTINGS_EVENT, handler)
   }, [])
 
   // Measure active button position for sliding indicator

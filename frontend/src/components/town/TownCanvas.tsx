@@ -380,9 +380,9 @@ export function TownCanvas() {
       ref={shellRef}
       data-testid="town-canvas-shell"
       onContextMenu={handleContextMenu}
-      className="relative mt-5 flex min-h-[30rem] flex-1 overflow-hidden rounded-[24px] border border-cyan-300/30 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.22),_rgba(15,23,42,0.42)_38%,_rgba(2,6,23,0.96)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+      className="relative flex h-full w-full overflow-hidden bg-slate-950"
     >
-      <div id="town-canvas" ref={hostRef} className="h-full min-h-[30rem] w-full" />
+      <div id="town-canvas" ref={hostRef} className="h-full w-full" />
       <TownChrome
         residents={residents}
         buildings={buildings}
