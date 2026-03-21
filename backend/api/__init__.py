@@ -1,5 +1,7 @@
 from backend.api import schemas
 from backend.api.achievements import router as achievements_router
+from backend.api.director import router as director_router
+from backend.api.quests import router as quests_router
 from backend.api.report import router as report_router
 from backend.api.residents import router as residents_router
 from backend.api.saves import router as saves_router
@@ -10,6 +12,8 @@ from backend.api.ws import router as ws_router
 
 __all__ = [
     "achievements_router",
+    "director_router",
+    "quests_router",
     "report_router",
     "saves_router",
     "schemas",
