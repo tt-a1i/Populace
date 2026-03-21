@@ -6,6 +6,7 @@
  * Hovering a cell shows relationship details in a tooltip below the matrix.
  */
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { useRelationshipsStore } from '../../stores/relationships'
 
@@ -31,12 +32,12 @@ function cellColor(type: string, intensity: number): string {
   }
 }
 
-const LEGEND = [
-  { label: '爱情', color: 'hsl(340, 75%, 42%)' },
-  { label: '友谊/信任', color: 'hsl(200, 65%, 38%)' },
-  { label: '竞争/厌恶', color: 'hsl(0, 60%, 36%)' },
-  { label: '认识', color: 'hsl(210, 18%, 28%)' },
-  { label: '无关系', color: '#0f172a' },
+const LEGEND_KEYS = [
+  { key: 'love', color: 'hsl(340, 75%, 42%)' },
+  { key: 'friendship', color: 'hsl(200, 65%, 38%)' },
+  { key: 'rivalry', color: 'hsl(0, 60%, 36%)' },
+  { key: 'knows', color: 'hsl(210, 18%, 28%)' },
+  { key: 'none', color: '#0f172a' },
 ]
 
 // ── Component ─────────────────────────────────────────────────────────────
@@ -47,6 +48,7 @@ interface HoveredCell {
 }
 
 export function HeatmapPanel() {
+  const { t } = useTranslation()
   const rawResidents = useRelationshipsStore((s) => s.residents)
   const relationships = useRelationshipsStore((s) => s.relationships)
   const [hovered, setHovered] = useState<HoveredCell | null>(null)
@@ -82,8 +84,8 @@ export function HeatmapPanel() {
     return (
       <div className="rounded-xl border border-fuchsia-300/20 bg-slate-950/70 p-5 text-slate-100 ">
         <p className="text-[11px] uppercase tracking-[0.3em] text-fuchsia-200/70">Heatmap</p>
-        <h3 className="mt-1 font-display text-2xl text-white">关系热力图</h3>
-        <p className="mt-4 text-sm text-slate-500">等待居民数据加载…</p>
+        <h3 className="mt-1 font-display text-2xl text-white">{t('heatmap_panel.title')}</h3>
+        <p className="mt-4 text-sm text-slate-500">{t('heatmap_panel.loading')}</p>
       </div>
     )
   }
@@ -93,16 +95,16 @@ export function HeatmapPanel() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] uppercase tracking-[0.3em] text-fuchsia-200/70">Heatmap</p>
-          <h3 className="mt-1 font-display text-2xl text-white">关系热力图</h3>
+          <h3 className="mt-1 font-display text-2xl text-white">{t('heatmap_panel.title')}</h3>
         </div>
         <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400">
           {n} × {n}
-          {rawResidents.length > MAX_N && ` (前 ${MAX_N})`}
+          {rawResidents.length > MAX_N && ` (${t('heatmap_panel.first_n', { n: MAX_N })})`}
         </span>
       </div>
 
       <p className="mt-1 text-sm text-slate-500">
-        行 → 列方向的有向关系强度；对角线为自身（灰色）。
+        {t('heatmap_panel.desc')}
       </p>
 
       {/* ── Matrix SVG ── */}
@@ -178,13 +180,13 @@ export function HeatmapPanel() {
 
       {/* ── Legend ── */}
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
-        {LEGEND.map((item) => (
-          <span key={item.label} className="flex items-center gap-1.5 text-[11px] text-slate-400">
+        {LEGEND_KEYS.map((item) => (
+          <span key={item.key} className="flex items-center gap-1.5 text-[11px] text-slate-400">
             <span
               className="inline-block h-3 w-3 rounded-sm"
               style={{ background: item.color }}
             />
-            {item.label}
+            {t(`heatmap_panel.${item.key}`)}
           </span>
         ))}
       </div>
@@ -213,7 +215,7 @@ export function HeatmapPanel() {
             {hoveredRel ? (
               <>
                 <div className="mt-2 flex items-center gap-3 text-sm">
-                  <span className="text-slate-400">强度</span>
+                  <span className="text-slate-400">{t('heatmap_panel.intensity')}</span>
                   <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-800">
                     <div
                       className="h-full rounded-full bg-fuchsia-400 transition-all"
@@ -227,7 +229,7 @@ export function HeatmapPanel() {
                 )}
               </>
             ) : (
-              <p className="mt-1 text-sm text-slate-500">无关系记录</p>
+              <p className="mt-1 text-sm text-slate-500">{t('heatmap_panel.no_relationship')}</p>
             )}
           </div>
         )}

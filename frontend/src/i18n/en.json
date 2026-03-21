@@ -239,6 +239,19 @@
     "message": "No LLM API key configured — AI dialogue will be unavailable.",
     "action": "Go to Settings"
   },
+  "heatmap_panel": {
+    "title": "Relationship Heatmap",
+    "loading": "Waiting for resident data…",
+    "desc": "Row → Column directed relationship intensity; diagonal is self (gray).",
+    "first_n": "first {{n}}",
+    "intensity": "Intensity",
+    "no_relationship": "No relationship",
+    "love": "Love",
+    "friendship": "Friendship/Trust",
+    "rivalry": "Rivalry/Dislike",
+    "knows": "Acquaintance",
+    "none": "No relation"
+  },
   "resident_panel": {
     "now": "Now",
     "recent": "Recent Events",

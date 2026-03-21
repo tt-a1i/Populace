@@ -239,6 +239,19 @@
     "message": "未配置 LLM API Key，AI 对话功能将不可用。",
     "action": "前往设置"
   },
+  "heatmap_panel": {
+    "title": "关系热力图",
+    "loading": "等待居民数据加载…",
+    "desc": "行 → 列方向的有向关系强度；对角线为自身（灰色）。",
+    "first_n": "前 {{n}}",
+    "intensity": "强度",
+    "no_relationship": "无关系记录",
+    "love": "爱情",
+    "friendship": "友谊/信任",
+    "rivalry": "竞争/厌恶",
+    "knows": "认识",
+    "none": "无关系"
+  },
   "resident_panel": {
     "now": "现在",
     "recent": "最近发生的事",
