@@ -491,6 +491,7 @@
     "rel_trust": "Trust",
     "rel_fear": "Fear",
     "rel_dislike": "Dislike",
+    "rel_knows": "Acquaintance",
     "rel_default": "Acquaintance"
   },
   "canvas": {

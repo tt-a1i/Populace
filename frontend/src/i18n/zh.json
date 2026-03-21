@@ -491,6 +491,7 @@
     "rel_trust": "信任",
     "rel_fear": "畏惧",
     "rel_dislike": "反感",
+    "rel_knows": "认识",
     "rel_default": "认识"
   },
   "canvas": {

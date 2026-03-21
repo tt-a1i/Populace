@@ -29,6 +29,15 @@
     @apply font-medium;
   }
 
+  /* Keyboard focus ring — only visible when navigating with keyboard */
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  input[type="range"]:focus-visible {
+    outline: 2px solid rgba(6, 182, 212, 0.5);
+    outline-offset: 2px;
+    border-radius: inherit;
+  }
+
   #root {
     @apply min-h-screen;
   }
@@ -52,6 +61,13 @@
     font-family: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', serif;
     letter-spacing: -0.02em;
   }
+
+  /* Hide scrollbar but keep scroll functional */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
 }
 
 /* ── Welcome page animations ─────────────────────────────────────── */
@@ -69,8 +85,6 @@
 .animate-fade-up {
   animation: fade-slide-up 0.65s ease-out both;
 }
-
-
 
 /* ── Toast enter ─────────────────────────────────────────────────── */
 @keyframes toast-enter {

@@ -182,7 +182,7 @@ export function GraphPanel() {
                       : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
                   }`}
                 >
-                  {type === 'all' ? t('graph.all') : type}
+                  {type === 'all' ? t('graph.all') : t(`graph.rel_${type}`, type)}
                 </button>
               ))}
             </div>

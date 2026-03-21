@@ -193,7 +193,7 @@ function SimulationView() {
 
       {/* -- BOTTOM-CENTER: Quick Action Bar -- */}
       <div className="fixed inset-x-0 bottom-3 z-30 flex justify-center pointer-events-none px-3">
-        <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-950/80 px-1.5 py-1.5 shadow-xl backdrop-blur-sm">
+        <div className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/80 px-1.5 py-1.5 shadow-xl backdrop-blur-sm scrollbar-none">
           {[
             { key: 'director', icon: '\u26A1', event: 'populace:open-director' },
             { key: 'persona', icon: '\uD83D\uDC64', event: 'populace:open-persona' },
