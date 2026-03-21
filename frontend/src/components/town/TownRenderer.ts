@@ -266,9 +266,13 @@ export class TownRenderer {
       const width = TILE_SIZE * 2
       const height = TILE_SIZE * 3
 
-      this.buildingGraphics.roundRect(x, y, width, height, 8)
-      this.buildingGraphics.fill({ color, alpha: 0.82 })
-      this.buildingGraphics.stroke({ color: 0xf8fafc, alpha: 0.18, width: 2 })
+      // Building shadow
+      this.buildingGraphics.roundRect(x + 2, y + 2, width, height, 6)
+      this.buildingGraphics.fill({ color: 0x000000, alpha: 0.25 })
+      // Building body
+      this.buildingGraphics.roundRect(x, y, width, height, 6)
+      this.buildingGraphics.fill({ color, alpha: 0.88 })
+      this.buildingGraphics.stroke({ color: 0xffffff, alpha: 0.12, width: 1.5 })
 
       const icon = typeIcon[b.type] ?? ''
       const label = new Text({
@@ -749,7 +753,7 @@ export class TownRenderer {
 
         this.tileGraphics.rect(tileX, tileY, TILE_SIZE, TILE_SIZE)
         this.tileGraphics.fill({ color: fillColor })
-        this.tileGraphics.stroke({ color: strokeColor, width: 1, alpha: 0.6 })
+        this.tileGraphics.stroke({ color: strokeColor, width: 0.5, alpha: 0.15 })
       }
     }
   }
@@ -865,23 +869,32 @@ export class TownRenderer {
     fillColor: number
     strokeColor: number
   } {
+    // Simple hash for natural-looking variation
+    const h = ((x * 7 + y * 13) & 0xff) / 255
+
     if (kind === 'water') {
+      // Deep blue with subtle wave-like variation
+      const blues = [0x1e40af, 0x1d4ed8, 0x2563eb, 0x1e3a8a]
       return {
-        fillColor: (x + y) % 2 === 0 ? 0x2563eb : 0x1d4ed8,
-        strokeColor: 0x93c5fd,
+        fillColor: blues[Math.floor(h * blues.length)],
+        strokeColor: 0x3b82f6,
       }
     }
 
     if (kind === 'road') {
+      // Warm gray stone road
+      const grays = [0x57534e, 0x4a4542, 0x52504c, 0x5c5955]
       return {
-        fillColor: (x + y) % 2 === 0 ? 0x64748b : 0x475569,
-        strokeColor: 0xcbd5e1,
+        fillColor: grays[Math.floor(h * grays.length)],
+        strokeColor: 0x78716c,
       }
     }
 
+    // Grass — multiple greens for a lush, natural look
+    const greens = [0x2d7a3a, 0x348a42, 0x3b9348, 0x2e8040, 0x38863e, 0x2a7236]
     return {
-      fillColor: (x + y) % 2 === 0 ? 0x3f9b4b : 0x2f855a,
-      strokeColor: 0x14532d,
+      fillColor: greens[Math.floor(h * greens.length)],
+      strokeColor: 0x1a5c28,
     }
   }
 
