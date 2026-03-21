@@ -276,7 +276,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         const existingResident = residentMap.get(movement.id)
         const dialogueEntry = dialogueByResident.get(movement.id)
         const dialogueText = dialogueEntry?.text ?? movement.dialogueText ?? null
-        const dialogueKind = dialogueEntry?.kind ?? 'dialogue'
+        const dialogueKind = (dialogueEntry?.kind ?? 'dialogue') as ResidentPosition['dialogueKind']
         const nextX = clampTilePosition(movement.x, 39)
         const nextY = clampTilePosition(movement.y, 29)
         const previousTargetX = existingResident?.targetX ?? existingResident?.x ?? nextX
