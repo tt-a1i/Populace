@@ -169,9 +169,5 @@ describe('Toolbar', () => {
     expect(screen.getByTestId('secondary-row')).toBeInTheDocument()
   })
 
-  // --- Sound toggle ---
-  it('renders the sound toggle button in the top controls', () => {
-    render(<Toolbar />)
-    expect(screen.getByTestId('sound-toggle')).toBeInTheDocument()
-  })
+  // Sound toggle is now in App.tsx HUD, not in Toolbar
 })

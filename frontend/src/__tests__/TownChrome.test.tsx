@@ -419,9 +419,8 @@ describe('TownChrome', () => {
 
     expect(screen.getByTestId('resident-story-panel')).toBeInTheDocument()
 
-    // God action buttons are present
+    // God action buttons are present (teleport was removed)
     expect(screen.getByRole('button', { name: /\u6539\u60c5\u7eea/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /\u4f20\u9001/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /\u6ce8\u5165\u8bb0\u5fc6/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /\u56de\u5fc6\u5f55/ })).toBeInTheDocument()
   })

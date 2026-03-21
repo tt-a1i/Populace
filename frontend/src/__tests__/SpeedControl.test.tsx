@@ -20,7 +20,7 @@ import { SpeedControl } from '../components/toolbar/SpeedControl'
 describe('SpeedControl', () => {
   it('renders the pause button', () => {
     render(<SpeedControl />)
-    expect(screen.getByRole('button', { name: /暂停/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /⏸/ })).toBeInTheDocument()
   })
 
   it('renders the 1x speed button', () => {

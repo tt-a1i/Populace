@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { SoundToggleButton } from './SoundToggleButton'
 import { BuildPanel } from './BuildPanel'
 import { ComparePanel } from './ComparePanel'
 import { DirectorConsole } from './DirectorConsole'
@@ -12,11 +11,9 @@ import { QuestPanel } from './QuestPanel'
 import { ResidentCreationWizard } from './ResidentCreationWizard'
 import { SavesPanel } from './SavesPanel'
 import { SettingsPanel } from './SettingsPanel'
-import { SpeedControl } from './SpeedControl'
 import { StatsPanel } from './StatsPanel'
 import { TimelinePanel } from './TimelinePanel'
 import { ReportsPanel } from '../report'
-import { LanguageSwitcher, MessageBar } from '../ui'
 
 const OPEN_SETTINGS_EVENT = 'populace:open-settings'
 
@@ -146,65 +143,53 @@ export function Toolbar() {
   }, [activeTool, t])
 
   return (
-    <div className="grid gap-4">
-      <div className="flex flex-col gap-4 rounded-[28px] border border-white/10 bg-white/5 px-5 py-4 shadow-[0_18px_48px_rgba(15,23,42,0.25)] backdrop-blur xl:px-8">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative" ref={containerRef}>
-            {/* Primary tools row */}
-            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-100">
-              {primaryTools.map((tool) => (
-                <button
-                  key={tool.key}
-                  type="button"
-                  data-active={activeTool === tool.key}
-                  onClick={() => handleToolClick(tool.key)}
-                  className={`rounded-full border px-5 py-3 text-sm font-semibold transition ${toneClass(tool.tone, activeTool === tool.key)}`}
-                >
-                  <span className="mr-2">{tool.icon}</span>
-                  {tool.label}
-                </button>
-              ))}
-              <button
-                type="button"
-                data-testid="more-toggle"
-                onClick={() => setShowSecondary((v) => !v)}
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300 transition hover:bg-white/10"
-              >
-                {showSecondary ? t('toolbar.less') : t('toolbar.more')} {showSecondary ? '\u25B4' : '\u25BE'}
-              </button>
-            </div>
-            {/* Secondary tools row */}
-            {showSecondary && (
-              <div className="mt-2 flex flex-wrap gap-2 text-sm text-slate-100" data-testid="secondary-row">
-                {secondaryTools.map((tool) => (
-                  <button
-                    key={tool.key}
-                    type="button"
-                    data-active={activeTool === tool.key}
-                    onClick={() => handleToolClick(tool.key)}
-                    className={`rounded-full border px-3 py-2 text-xs transition ${toneClass(tool.tone, activeTool === tool.key)}`}
-                  >
-                    <span className="mr-1">{tool.icon}</span>
-                    {tool.label}
-                  </button>
-                ))}
-              </div>
-            )}
-            {indicator.visible && (
-              <div
-                className={`absolute -bottom-1 h-0.5 rounded-full transition-all duration-300 ease-out ${TONE_GLOW[activeTone] ?? TONE_GLOW.cyan}`}
-                style={{ left: indicator.left, width: indicator.width }}
-              />
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <SpeedControl />
-            <SoundToggleButton />
-            <LanguageSwitcher />
-          </div>
+    <div className="grid gap-3">
+      {/* Tool selector tabs */}
+      <div className="relative" ref={containerRef}>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {primaryTools.map((tool) => (
+            <button
+              key={tool.key}
+              type="button"
+              data-active={activeTool === tool.key}
+              onClick={() => handleToolClick(tool.key)}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${toneClass(tool.tone, activeTool === tool.key)}`}
+            >
+              <span className="mr-1.5">{tool.icon}</span>
+              {tool.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            data-testid="more-toggle"
+            onClick={() => setShowSecondary((v) => !v)}
+            className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] text-slate-400 transition hover:bg-white/10"
+          >
+            {showSecondary ? t('toolbar.less') : t('toolbar.more')} {showSecondary ? '\u25B4' : '\u25BE'}
+          </button>
         </div>
-
-        <MessageBar />
+        {showSecondary && (
+          <div className="mt-1.5 flex flex-wrap gap-1.5" data-testid="secondary-row">
+            {secondaryTools.map((tool) => (
+              <button
+                key={tool.key}
+                type="button"
+                data-active={activeTool === tool.key}
+                onClick={() => handleToolClick(tool.key)}
+                className={`rounded-lg border px-2.5 py-1 text-[11px] transition ${toneClass(tool.tone, activeTool === tool.key)}`}
+              >
+                <span className="mr-1">{tool.icon}</span>
+                {tool.label}
+              </button>
+            ))}
+          </div>
+        )}
+        {indicator.visible && (
+          <div
+            className={`absolute -bottom-0.5 h-0.5 rounded-full transition-all duration-300 ease-out ${TONE_GLOW[activeTone] ?? TONE_GLOW.cyan}`}
+            style={{ left: indicator.left, width: indicator.width }}
+          />
+        )}
       </div>
 
       {panel}
