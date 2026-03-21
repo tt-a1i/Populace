@@ -80,3 +80,23 @@ export interface ResidentMovement extends MovementUpdate {
   dialogueText?: string | null
   mood?: string
 }
+
+export interface QuestInfo {
+  id: string
+  name: string
+  description: string
+  icon: string
+  status: 'available' | 'active' | 'completed'
+  requires_params: boolean
+}
+
+export interface ActiveQuest {
+  quest_id: string
+  name: string
+  icon: string
+  description: string
+  progress: number
+  progress_text: string
+  remaining_ticks: number
+  status: string
+}
