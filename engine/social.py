@@ -7,10 +7,14 @@ Implements the dialogue protocol from spec §11:
 """
 from __future__ import annotations
 
+import logging
 import random
+import re
 import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+
+_log = logging.getLogger(__name__)
 
 from engine._optional_backend import load_backend_attr
 from engine.types import Memory, RelationType, Relationship, RelationshipDelta, WorldConfig
@@ -385,9 +389,11 @@ async def initiate_dialogue(
     delta = 0
     eval_text = await agent_a.call_llm(_build_dialogue_eval_messages(context_history), max_tokens=10)
     if eval_text is not None:
-        try:
-            delta = max(-10, min(10, int(eval_text.strip().split()[0])))
-        except (ValueError, IndexError):
+        match = re.search(r'-?\d+', eval_text.strip())
+        if match:
+            delta = max(-10, min(10, int(match.group())))
+        else:
+            _log.warning("Could not parse dialogue score from LLM: %r", eval_text)
             delta = 0
 
     is_important = abs(delta) >= 5

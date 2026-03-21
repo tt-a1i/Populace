@@ -249,8 +249,11 @@ async def add_building(payload: AddBuildingRequest, request: Request) -> Buildin
     h = state.world.config.map_height_tiles
     x, y = payload.position
 
+    # Buildings occupy a 2×2 tile footprint; ensure the full footprint fits
     if not (0 <= x < w and 0 <= y < h):
         raise api_error(400, f"Position ({x}, {y}) out of bounds (map is {w}×{h})", "position_out_of_bounds")
+    if x + 1 >= w or y + 1 >= h:
+        raise api_error(400, f"Building footprint at ({x}, {y}) extends beyond map edge (2×2 needs ({x+1}, {y+1}) < ({w}, {h}))", "footprint_out_of_bounds")
 
     for existing in state.world.buildings:
         if existing.position == (x, y):

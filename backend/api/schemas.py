@@ -107,6 +107,7 @@ class BuildingResponse(BaseModel):
     name: str
     capacity: int
     position: tuple[int, int]
+    occupants: int = 0
 
 
 class ResidentResponse(BaseModel):

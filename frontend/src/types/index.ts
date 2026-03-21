@@ -61,6 +61,7 @@ export interface Building {
   name: string
   capacity: number
   position: [number, number]
+  occupants?: number
 }
 
 export interface ResidentMovement extends MovementUpdate {

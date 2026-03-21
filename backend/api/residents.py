@@ -332,34 +332,43 @@ class TransferRequest(BaseModel):
         return v
 
 
+class TransferResponse(BaseModel):
+    from_resident: ResidentResponse
+    to_resident: ResidentResponse
+
+
 @router.post(
     "/{resident_id}/transfer",
-    response_model=ResidentResponse,
+    response_model=TransferResponse,
     responses=error_responses(400, 404, 422, 503),
 )
 async def transfer_coins(
     resident_id: str,
     payload: TransferRequest,
     request: Request,
-) -> ResidentResponse:
+) -> TransferResponse:
     """Transfer coins from one resident to another."""
     state = get_simulation_state(request)
 
     from_agent = _find_agent(state, resident_id)
     if from_agent is None:
-        raise HTTPException(status_code=404, detail="Resident not found")
+        raise api_error(404, "Resident not found", "resident_not_found")
 
     to_agent = _find_agent(state, payload.to_id)
     if to_agent is None:
-        raise HTTPException(status_code=404, detail="Target resident not found")
+        raise api_error(404, "Target resident not found", "resident_not_found")
 
     if from_agent.resident.coins < payload.amount:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Insufficient coins: has {from_agent.resident.coins}, needs {payload.amount}",
+        raise api_error(
+            400,
+            f"Insufficient coins: has {from_agent.resident.coins}, needs {payload.amount}",
+            "insufficient_coins",
         )
 
     from_agent.resident.coins -= payload.amount
     to_agent.resident.coins += payload.amount
 
-    return ResidentResponse(**asdict(from_agent.resident))
+    return TransferResponse(
+        from_resident=ResidentResponse(**asdict(from_agent.resident)),
+        to_resident=ResidentResponse(**asdict(to_agent.resident)),
+    )

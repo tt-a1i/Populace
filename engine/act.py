@@ -200,9 +200,9 @@ def apply_mood_contagion(world: "World") -> None:
                 direction = 1.0 if other_rank > my_rank else -1.0
                 net_push += direction * intensity * 0.05
 
-            if net_push > 0 and random.random() < net_push:
+            if net_push > 0 and random.random() < min(1.0, net_push):
                 new_rank = min(my_rank + 1, len(_MOOD_LADDER) - 1)
                 agent.resident.mood = _MOOD_LADDER[new_rank]
-            elif net_push < 0 and random.random() < -net_push:
+            elif net_push < 0 and random.random() < min(1.0, -net_push):
                 new_rank = max(my_rank - 1, 0)
                 agent.resident.mood = _MOOD_LADDER[new_rank]

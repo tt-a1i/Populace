@@ -161,11 +161,9 @@ def test_transfer_coins_success(client):
         json={"to_id": to_id, "amount": 10},
     )
     assert response.status_code == 200
-    assert response.json()["coins"] == from_before - 10
-
-    # Verify recipient received
-    to_after = client.get(f"/api/residents/{to_id}").json()["coins"]
-    assert to_after == to_before + 10
+    body = response.json()
+    assert body["from_resident"]["coins"] == from_before - 10
+    assert body["to_resident"]["coins"] == to_before + 10
 
 
 def test_transfer_coins_insufficient_funds(client):

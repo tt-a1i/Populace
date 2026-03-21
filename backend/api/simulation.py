@@ -813,7 +813,8 @@ class SimulationState:
 
         for task in self._pending_dialogues:
             if task.done():
-                pair_ids = self._dialogue_pair_ids.pop(task, None)
+                # Look up pair_ids first, clean up in finally
+                pair_ids = self._dialogue_pair_ids.get(task)
                 try:
                     result: DialogueResult = task.result()
                     if pair_ids is not None:
@@ -842,7 +843,8 @@ class SimulationState:
                 except Exception:
                     _log.warning("Dialogue task failed: %s", task.get_name(), exc_info=True)
                 finally:
-                    # Remove from active set regardless of success/failure
+                    # Clean up after processing — pop dict + discard active pair
+                    self._dialogue_pair_ids.pop(task, None)
                     if pair_ids is not None:
                         self._active_dialogue_pairs.discard(frozenset(pair_ids))
             else:

@@ -265,9 +265,15 @@ class World:
         return building
 
     def apply_building_effects(self, agent: Agent) -> None:
-        """Apply passive effects from the building the agent is inside."""
+        """Apply passive effects from the building the agent is inside.
+
+        Income is paid once per building stay (not every tick) using
+        ``_paid_this_stay`` flag on the agent.
+        """
         building_id = agent.resident.location
         if building_id is None:
+            # Agent left all buildings — reset pay flag for next stay
+            agent._paid_this_stay = False  # type: ignore[attr-defined]
             return
 
         building = self.get_building(building_id)
@@ -287,13 +293,16 @@ class World:
         elif building.type in _OCCUPATION_MAP:
             occupation, income = _OCCUPATION_MAP[building.type]
             agent.resident.occupation = occupation
-            # Give income only during work (08–12) and afternoon (13–17) hours
-            tick_per_day = self.config.tick_per_day
-            hour = (self.current_tick % tick_per_day) * 24.0 / tick_per_day
-            if 8.0 <= hour < 12.0 or 13.0 <= hour < 17.0:
-                agent.resident.coins += income
-                # Work drains energy
-                agent.resident.energy = max(0.0, agent.resident.energy - 0.03)
+            # Pay once per stay, not every tick
+            already_paid: bool = getattr(agent, "_paid_this_stay", False)
+            if not already_paid:
+                tick_per_day = self.config.tick_per_day
+                hour = (self.current_tick % tick_per_day) * 24.0 / tick_per_day
+                if 8.0 <= hour < 12.0 or 13.0 <= hour < 17.0:
+                    agent.resident.coins += income
+                    agent._paid_this_stay = True  # type: ignore[attr-defined]
+            # Work drains energy every tick
+            agent.resident.energy = max(0.0, agent.resident.energy - 0.03)
 
     def building_stay_duration(self) -> int:
         """Return the random number of ticks an agent stays indoors."""
