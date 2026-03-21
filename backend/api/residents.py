@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any, Optional
 
-from fastapi import APIRouter, Request
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field, field_validator
 
 from backend.api.schemas import (
     ResidentMemoryResponse,
@@ -299,3 +299,52 @@ async def create_resident(payload: ResidentCreateRequest, request: Request) -> R
         )
 
     return ResidentResponse(**asdict(resident))
+
+
+# ---------------------------------------------------------------------------
+# POST /api/residents/{resident_id}/transfer
+# ---------------------------------------------------------------------------
+
+class TransferRequest(BaseModel):
+    to_id: str
+    amount: int
+
+    @field_validator("amount")
+    @classmethod
+    def amount_positive(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("amount must be positive")
+        return v
+
+
+@router.post(
+    "/{resident_id}/transfer",
+    response_model=ResidentResponse,
+    responses=error_responses(400, 404, 422, 503),
+)
+async def transfer_coins(
+    resident_id: str,
+    payload: TransferRequest,
+    request: Request,
+) -> ResidentResponse:
+    """Transfer coins from one resident to another."""
+    state = get_simulation_state(request)
+
+    from_agent = _find_agent(state, resident_id)
+    if from_agent is None:
+        raise HTTPException(status_code=404, detail="Resident not found")
+
+    to_agent = _find_agent(state, payload.to_id)
+    if to_agent is None:
+        raise HTTPException(status_code=404, detail="Target resident not found")
+
+    if from_agent.resident.coins < payload.amount:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient coins: has {from_agent.resident.coins}, needs {payload.amount}",
+        )
+
+    from_agent.resident.coins -= payload.amount
+    to_agent.resident.coins += payload.amount
+
+    return ResidentResponse(**asdict(from_agent.resident))

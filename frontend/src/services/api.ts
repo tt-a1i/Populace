@@ -13,6 +13,7 @@ export interface ApiResident {
   hair_style?: string | null
   hair_color?: string | null
   outfit_color?: string | null
+  coins?: number
 }
 
 interface SpeedPayload {
@@ -425,5 +426,12 @@ export function createResident(payload: ResidentCreatePayload) {
   return request<ApiResident>('/api/residents/create', {
     method: 'POST',
     body: JSON.stringify(payload),
+  })
+}
+
+export function transferCoins(fromId: string, toId: string, amount: number) {
+  return request<ApiResident>(`/api/residents/${fromId}/transfer`, {
+    method: 'POST',
+    body: JSON.stringify({ to_id: toId, amount }),
   })
 }

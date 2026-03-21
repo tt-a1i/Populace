@@ -74,6 +74,7 @@ else:
         hair_color: Optional[str] = None
         outfit_color: Optional[str] = None
         current_goal: Optional[str] = None   # active short-term goal text
+        coins: int = 100
 
 
     @dataclass

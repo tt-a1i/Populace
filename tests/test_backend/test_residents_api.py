@@ -135,3 +135,71 @@ def test_create_resident_with_initial_relationship(client):
     # Verify relationship was created
     rels = client.get(f"/api/residents/{new_id}/relationships").json()
     assert any(r["to_id"] == target_id for r in rels)
+
+
+# ---------------------------------------------------------------------------
+# Economic system: coins field + transfer
+# ---------------------------------------------------------------------------
+
+def test_resident_has_coins_field(client):
+    residents = client.get("/api/residents").json()
+    resident = residents[0]
+    assert "coins" in resident
+    assert isinstance(resident["coins"], int)
+    assert resident["coins"] >= 0
+
+
+def test_transfer_coins_success(client):
+    residents = client.get("/api/residents").json()
+    from_id = residents[0]["id"]
+    to_id = residents[1]["id"]
+    from_before = residents[0]["coins"]
+    to_before = residents[1]["coins"]
+
+    response = client.post(
+        f"/api/residents/{from_id}/transfer",
+        json={"to_id": to_id, "amount": 10},
+    )
+    assert response.status_code == 200
+    assert response.json()["coins"] == from_before - 10
+
+    # Verify recipient received
+    to_after = client.get(f"/api/residents/{to_id}").json()["coins"]
+    assert to_after == to_before + 10
+
+
+def test_transfer_coins_insufficient_funds(client):
+    residents = client.get("/api/residents").json()
+    from_id = residents[0]["id"]
+    to_id = residents[1]["id"]
+
+    # Try to transfer more than available
+    current = client.get(f"/api/residents/{from_id}").json()["coins"]
+    response = client.post(
+        f"/api/residents/{from_id}/transfer",
+        json={"to_id": to_id, "amount": current + 9999},
+    )
+    assert response.status_code == 400
+
+
+def test_transfer_coins_invalid_amount(client):
+    residents = client.get("/api/residents").json()
+    from_id = residents[0]["id"]
+    to_id = residents[1]["id"]
+
+    response = client.post(
+        f"/api/residents/{from_id}/transfer",
+        json={"to_id": to_id, "amount": 0},
+    )
+    assert response.status_code == 422
+
+
+def test_transfer_coins_resident_not_found(client):
+    residents = client.get("/api/residents").json()
+    to_id = residents[0]["id"]
+
+    response = client.post(
+        "/api/residents/nonexistent_xyz/transfer",
+        json={"to_id": to_id, "amount": 5},
+    )
+    assert response.status_code == 404

@@ -45,6 +45,7 @@ export interface Resident {
   hair_style?: string | null
   hair_color?: string | null
   outfit_color?: string | null
+  coins?: number
 }
 
 export interface Building {

@@ -410,7 +410,7 @@ export function TownChrome({
             </div>
           )}
 
-          <div className="mt-5 grid grid-cols-2 gap-3">
+          <div className="mt-5 grid grid-cols-3 gap-3">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Mood</p>
               <p className="mt-2 text-lg font-semibold text-white">{formatMood(selectedResident.mood)}</p>
@@ -418,6 +418,10 @@ export function TownChrome({
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Position</p>
               <p className="mt-2 text-lg font-semibold text-white">{selectedResident.targetX}, {selectedResident.targetY}</p>
+            </div>
+            <div className="rounded-2xl border border-amber-400/15 bg-amber-400/[0.06] px-4 py-3">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-amber-400/70">Coins</p>
+              <p className="mt-2 text-lg font-semibold text-amber-200">🪙 {selectedResident.coins ?? 100}</p>
             </div>
           </div>
 

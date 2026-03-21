@@ -183,6 +183,10 @@ class World:
         self.mark_grid_index_dirty()
         if building.type == "home":
             agent.resident.mood = "neutral"
+        elif building.type == "cafe":
+            agent.resident.coins = max(0, agent.resident.coins - 5)
+        elif building.type == "shop":
+            agent.resident.coins = max(0, agent.resident.coins - 10)
         return True
 
     def leave_building(self, agent: Agent) -> None:
@@ -271,6 +275,9 @@ class World:
 
         if building.type == "home":
             agent.resident.mood = "neutral"
+        elif building.type in ("school", "shop"):
+            # Work income: +2 coins per tick while in a work building
+            agent.resident.coins += 2
 
     def building_stay_duration(self) -> int:
         """Return the random number of ticks an agent stays indoors."""

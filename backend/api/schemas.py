@@ -122,6 +122,7 @@ class ResidentResponse(BaseModel):
     hair_color: str | None = None
     outfit_color: str | None = None
     current_goal: str | None = None
+    coins: int = 100
 
 
 class ResidentMemoryResponse(BaseModel):
