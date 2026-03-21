@@ -48,10 +48,7 @@ interface TownChromeProps {
 export function TownChrome({
   residents,
   buildings,
-  relationships: _relationships,
   selectedResidentId,
-  currentTime: _currentTime,
-  messageFeed: _messageFeed,
   contextMenu,
   inspection,
   placeholders,

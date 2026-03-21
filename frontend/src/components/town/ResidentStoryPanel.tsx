@@ -77,9 +77,6 @@ export function ResidentStoryPanel({
   useEffect(() => {
     let cancelled = false
 
-    setMemories([])
-    setRelationships([])
-
     void getResidentMemories(residentId)
       .then((data) => {
         if (!cancelled) setMemories(data)

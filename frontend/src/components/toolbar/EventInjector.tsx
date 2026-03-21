@@ -36,7 +36,7 @@ export function EventInjector() {
   const [presets, setPresets] = useState<PresetEvent[]>([])
   const [activeEvents, setActiveEvents] = useState<ActiveEvent[]>([])
 
-  const flashTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const canSubmitCustom = useMemo(() => customEvent.trim().length > 0, [customEvent])
 
   useEffect(() => {

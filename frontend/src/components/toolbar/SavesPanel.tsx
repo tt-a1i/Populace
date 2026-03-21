@@ -16,7 +16,7 @@ export function SavesPanel() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
-  const flashTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const fetchSaves = async () => {
     try {
