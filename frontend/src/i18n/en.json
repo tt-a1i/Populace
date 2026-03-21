@@ -228,6 +228,25 @@
     "message": "No LLM API key configured — AI dialogue will be unavailable.",
     "action": "Go to Settings"
   },
+  "resident_panel": {
+    "now": "Now",
+    "recent": "Recent Events",
+    "relationships": "Relationships",
+    "no_recent": "No recent events",
+    "no_relationships": "No relationships yet",
+    "god_actions": "God Actions",
+    "edit_mood": "Edit Mood",
+    "teleport": "Teleport",
+    "inject_memory": "Inject Memory",
+    "generate_memoir": "Memoir",
+    "coins": "Coins",
+    "energy": "Energy",
+    "goal": "Goal",
+    "close": "Close",
+    "wandering": "Wandering around town",
+    "at_home": "Resting at home",
+    "at_work": "Working"
+  },
   "app": {
     "panel_loading": "Loading module…",
     "mobile_tool_drawer": "Mobile Tool Drawer",
