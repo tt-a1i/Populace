@@ -8,6 +8,7 @@ import {
   SplitPane,
   WelcomePage,
 } from './components/ui'
+import { TutorialOverlay } from './components/ui/TutorialOverlay'
 import { useWebSocket } from './hooks/useWebSocket'
 
 const TownCanvas = lazy(() =>
@@ -302,6 +303,7 @@ function SimulationView() {
         )}
       </div>
       <FirstRunGuide enabled={hasInitialSnapshot} />
+      {hasInitialSnapshot && <TutorialOverlay />}
     </main>
   )
 }
