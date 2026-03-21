@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import {
   getMoodHistory,
@@ -49,6 +50,7 @@ function nowStamp() {
 type ExportKey = 'json' | 'residents_csv' | 'relationships_csv' | 'mood_csv' | 'network_csv'
 
 export function ExportPanel() {
+  const { t } = useTranslation()
   const [busy, setBusy] = useState<ExportKey | null>(null)
   const [lastMsg, setLastMsg] = useState<string | null>(null)
 
@@ -61,9 +63,9 @@ export function ExportPanel() {
     setLastMsg(null)
     try {
       await fn()
-      setLastMsg('✓ 导出成功')
+      setLastMsg(t('export_panel.success'))
     } catch {
-      setLastMsg('✗ 导出失败')
+      setLastMsg(t('export_panel.fail'))
     } finally {
       setBusy(null)
     }
@@ -166,36 +168,36 @@ export function ExportPanel() {
   }> = [
     {
       key: 'json',
-      label: '导出完整 JSON',
-      sub: '含统计 + 居民 + 关系 + 情绪历史',
+      label: t('export_panel.json_label'),
+      sub: t('export_panel.json_sub'),
       tone: 'cyan',
       onClick: exportJSON,
     },
     {
       key: 'residents_csv',
-      label: '导出居民 CSV',
-      sub: '姓名、情绪、位置、状态、目标',
+      label: t('export_panel.residents_csv_label'),
+      sub: t('export_panel.residents_csv_sub'),
       tone: 'amber',
       onClick: exportResidentsCSV,
     },
     {
       key: 'relationships_csv',
-      label: '导出关系 CSV',
-      sub: 'from/to、类型、强度、原因',
+      label: t('export_panel.relationships_csv_label'),
+      sub: t('export_panel.relationships_csv_sub'),
       tone: 'rose',
       onClick: exportRelationshipsCSV,
     },
     {
       key: 'mood_csv',
-      label: '导出情绪历史 CSV',
-      sub: '每 tick 每居民情绪快照',
+      label: t('export_panel.mood_csv_label'),
+      sub: t('export_panel.mood_csv_sub'),
       tone: 'violet',
       onClick: exportMoodCSV,
     },
     {
       key: 'network_csv',
-      label: '导出网络分析 CSV',
-      sub: '影响力排名、关系数、平均强度',
+      label: t('export_panel.network_csv_label'),
+      sub: t('export_panel.network_csv_sub'),
       tone: 'emerald',
       onClick: exportNetworkCSV,
     },
@@ -211,10 +213,10 @@ export function ExportPanel() {
 
   return (
     <div className="rounded-xl border border-sky-300/20 bg-slate-950/70 p-5 text-slate-100 ">
-      <p className="text-[11px] uppercase tracking-[0.3em] text-sky-200/70">Export</p>
-      <h3 className="mt-1 font-display text-2xl text-white">数据导出</h3>
+      <p className="text-[11px] uppercase tracking-[0.3em] text-sky-200/70">{t('export_panel.badge')}</p>
+      <h3 className="mt-1 font-display text-2xl text-white">{t('export_panel.title')}</h3>
       <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
-        将当前模拟数据导出为 JSON 或 CSV 文件，可用于外部分析、可视化或存档。
+        {t('export_panel.desc')}
       </p>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -231,7 +233,7 @@ export function ExportPanel() {
             </span>
             <span>
               <span className="block text-sm font-semibold">
-                {busy === btn.key ? '导出中…' : btn.label}
+                {busy === btn.key ? t('export_panel.exporting') : btn.label}
               </span>
               <span className="mt-0.5 block text-[11px] opacity-70">{btn.sub}</span>
             </span>
@@ -246,18 +248,18 @@ export function ExportPanel() {
       )}
 
       <p className="mt-4 text-[11px] text-slate-600">
-        当前 Tick: {tick} · 居民 {residents.length} 人 · 关系 {relationships.length} 条
+        {t('export_panel.footer', { tick, residentCount: residents.length, relationshipCount: relationships.length })}
       </p>
 
       {/* ── Tutorial reset ── */}
       <div className="mt-5 border-t border-white/8 pt-4">
-        <p className="mb-2 text-[11px] uppercase tracking-[0.28em] text-slate-600">设置</p>
+        <p className="mb-2 text-[11px] uppercase tracking-[0.28em] text-slate-600">{t('export_panel.settings_label')}</p>
         <button
           type="button"
           onClick={resetTutorial}
           className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-slate-400 transition hover:bg-white/10"
         >
-          🎓 重置新手教程
+          {t('export_panel.reset_tutorial')}
         </button>
       </div>
     </div>

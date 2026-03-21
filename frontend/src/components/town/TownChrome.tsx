@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import type { GraphRelationship } from '../../stores/relationships'
 import type { ResidentPosition } from '../../stores/simulation'
 import {
@@ -59,6 +61,8 @@ export function TownChrome({
   onClearResidentSelection,
   onDismissInspection,
 }: TownChromeProps) {
+  const { t } = useTranslation()
+
   const handleTeleport = async (x: number, y: number, rid?: string) => {
     const targetId = rid ?? selectedResidentId
     if (!targetId) return
@@ -75,7 +79,7 @@ export function TownChrome({
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.3em] text-cyan-100/70">查看位置</p>
+              <p className="text-[11px] uppercase tracking-[0.3em] text-cyan-100/70">{t('chrome.inspect_badge')}</p>
               <h3 className="mt-2 font-mono text-lg font-bold text-white">Tile {inspection.tileX}, {inspection.tileY}</h3>
             </div>
             <button
@@ -83,20 +87,20 @@ export function TownChrome({
               onClick={onDismissInspection}
               className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-300 transition hover:bg-white/10"
             >
-              关闭
+              {t('chrome.close')}
             </button>
           </div>
           <dl className="mt-4 grid gap-3 text-sm text-slate-300">
             <div className="flex items-center justify-between gap-3">
-              <dt className="text-slate-500">地形</dt>
+              <dt className="text-slate-500">{t('chrome.terrain')}</dt>
               <dd>{formatTileKind(inspection.tileKind)}</dd>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <dt className="text-slate-500">建筑</dt>
-              <dd>{inspection.buildingName ?? '暂无'}</dd>
+              <dt className="text-slate-500">{t('chrome.building_label')}</dt>
+              <dd>{inspection.buildingName ?? t('chrome.no_building')}</dd>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <dt className="text-slate-500">角色数</dt>
+              <dt className="text-slate-500">{t('chrome.resident_count')}</dt>
               <dd>{inspection.residentCount}</dd>
             </div>
           </dl>
@@ -193,21 +197,21 @@ export function TownChrome({
               onClick={onInjectEvent}
               className="rounded-2xl px-3 py-2 text-left text-sm text-slate-100 transition hover:bg-cyan-300/14"
             >
-              投放事件
+              {t('chrome.ctx_inject_event')}
             </button>
             <button
               type="button"
               onClick={onInspectTile}
               className="rounded-2xl px-3 py-2 text-left text-sm text-slate-100 transition hover:bg-cyan-300/14"
             >
-              查看位置
+              {t('chrome.ctx_inspect_tile')}
             </button>
             <button
               type="button"
               onClick={onPlacePlaceholder}
               className="rounded-2xl px-3 py-2 text-left text-sm text-slate-100 transition hover:bg-amber-300/14"
             >
-              放置建筑占位
+              {t('chrome.ctx_place_placeholder')}
             </button>
             {/* Teleport selected resident or context-menu nearby resident */}
             {(selectedResidentId || contextMenu.nearbyResidentId) && (
@@ -219,7 +223,7 @@ export function TownChrome({
                 }}
                 className="rounded-2xl px-3 py-2 text-left text-sm text-violet-200 transition hover:bg-violet-300/14"
               >
-                ⚡ 传送到此
+                {t('chrome.ctx_teleport')}
               </button>
             )}
           </div>
@@ -228,7 +232,7 @@ export function TownChrome({
             onClick={onCloseContextMenu}
             className="w-full rounded-2xl border border-white/8 px-3 py-2 text-xs text-slate-400 transition hover:bg-white/5"
           >
-            收起菜单
+            {t('chrome.ctx_dismiss')}
           </button>
         </section>
       )}

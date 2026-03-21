@@ -6,6 +6,7 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Application } from 'pixi.js'
 
@@ -19,6 +20,7 @@ import { TownRenderer } from './TownRenderer'
 import { inspectTile } from './townMap'
 
 export function TownCanvas() {
+  const { t } = useTranslation()
   const shellRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
   const rendererRef = useRef<TownRenderer | null>(null)
@@ -158,12 +160,12 @@ export function TownCanvas() {
           id: `placeholder-${contextMenu.tileX}-${contextMenu.tileY}`,
           tileX: contextMenu.tileX,
           tileY: contextMenu.tileY,
-          label: '预留地块',
+          label: t('canvas.placeholder_label'),
         },
       ]
     })
     setContextMenu(null)
-  }, [contextMenu])
+  }, [contextMenu, t])
 
   const handleInjectEvent = useCallback(async () => {
     if (!contextMenu) {
@@ -172,25 +174,25 @@ export function TownCanvas() {
 
     try {
       await injectEvent({
-        description: `地图 Tile ${contextMenu.tileX},${contextMenu.tileY} 出现新的街坊传闻。`,
+        description: t('canvas.event_desc', { x: contextMenu.tileX, y: contextMenu.tileY }),
         source: 'map_context_menu',
       })
       play('event')
       pushToast({
         type: 'success',
-        title: '事件已投放',
-        description: `Tile ${contextMenu.tileX}, ${contextMenu.tileY} 的地图事件已加入队列。`,
+        title: t('canvas.event_success_title'),
+        description: t('canvas.event_success_desc', { x: contextMenu.tileX, y: contextMenu.tileY }),
       })
     } catch {
       pushToast({
         type: 'error',
-        title: '事件投放失败',
-        description: '请确认后端服务可用后重试。',
+        title: t('canvas.event_fail_title'),
+        description: t('canvas.event_fail_desc'),
       })
     } finally {
       setContextMenu(null)
     }
-  }, [contextMenu, play, pushToast])
+  }, [contextMenu, play, pushToast, t])
 
   useEffect(() => {
     const host = hostRef.current
@@ -406,7 +408,7 @@ export function TownCanvas() {
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/45 backdrop-blur-[2px]">
           <div className="rounded-[22px] border border-cyan-300/15 bg-slate-950/80 px-6 py-5 text-center shadow-[0_18px_44px_rgba(8,15,31,0.4)]">
             <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-100/70">Town Waiting Room</p>
-            <p className="mt-3 font-display text-2xl text-white">等待居民加载...</p>
+            <p className="mt-3 font-display text-2xl text-white">{t('canvas.waiting')}</p>
           </div>
         </div>
       )}

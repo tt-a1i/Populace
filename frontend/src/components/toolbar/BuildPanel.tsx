@@ -1,18 +1,19 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { addBuilding, getBuildings, removeBuilding } from '../../services/api'
 import { useSimulationStore } from '../../stores/simulation'
 import type { Building } from '../../types'
 
-const BUILDING_TYPES = [
-  { value: 'home', label: '住宅 Home' },
-  { value: 'cafe', label: '咖啡馆 Cafe' },
-  { value: 'park', label: '公园 Park' },
-  { value: 'shop', label: '商店 Shop' },
-  { value: 'school', label: '学校 School' },
-  { value: 'gym', label: '健身房 Gym' },
-  { value: 'library', label: '图书馆 Library' },
-  { value: 'hospital', label: '医院 Hospital' },
+const BUILDING_TYPE_KEYS = [
+  { value: 'home', i18nKey: 'build_panel.type_home' },
+  { value: 'cafe', i18nKey: 'build_panel.type_cafe' },
+  { value: 'park', i18nKey: 'build_panel.type_park' },
+  { value: 'shop', i18nKey: 'build_panel.type_shop' },
+  { value: 'school', i18nKey: 'build_panel.type_school' },
+  { value: 'gym', i18nKey: 'build_panel.type_gym' },
+  { value: 'library', i18nKey: 'build_panel.type_library' },
+  { value: 'hospital', i18nKey: 'build_panel.type_hospital' },
 ]
 
 const TYPE_COLORS: Record<string, string> = {
@@ -39,6 +40,7 @@ async function refreshBuildings(
 }
 
 export function BuildPanel() {
+  const { t } = useTranslation()
   const buildings = useSimulationStore((s) => s.buildings)
   const setBuildings = useSimulationStore((s) => s.setBuildings)
 
@@ -54,7 +56,7 @@ export function BuildPanel() {
   const [demolishBusy, setDemolishBusy] = useState<string | null>(null)
 
   const handleBuild = async () => {
-    if (!bName.trim()) { setError('请输入建筑名称'); return }
+    if (!bName.trim()) { setError(t('build_panel.name_required')); return }
     setBusy(true)
     setError(null)
     try {
@@ -63,7 +65,7 @@ export function BuildPanel() {
       setBName('')
       setFormOpen(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '建造失败，请检查位置是否被占用')
+      setError(e instanceof Error ? e.message : t('build_panel.build_fail_default'))
     } finally {
       setBusy(false)
     }
@@ -85,46 +87,46 @@ export function BuildPanel() {
     <div className="rounded-xl border border-emerald-300/20 bg-slate-950/70 p-5 text-slate-100 ">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.3em] text-emerald-200/70">Build Mode</p>
-          <h3 className="mt-1 font-display text-2xl text-white">建造 &amp; 拆除</h3>
+          <p className="text-[11px] uppercase tracking-[0.3em] text-emerald-200/70">{t('build_panel.badge')}</p>
+          <h3 className="mt-1 font-display text-2xl text-white">{t('build_panel.title')}</h3>
         </div>
         <button
           type="button"
           onClick={() => { setFormOpen((o) => !o); setError(null) }}
           className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-sm font-medium text-emerald-200 transition hover:bg-emerald-300/20"
         >
-          {formOpen ? '收起' : '+ 新建建筑'}
+          {formOpen ? t('build_panel.collapse') : t('build_panel.new_building')}
         </button>
       </div>
 
       {/* ── Build form ── */}
       {formOpen && (
         <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-4">
-          <p className="mb-3 text-[11px] uppercase tracking-[0.28em] text-emerald-300/70">新建建筑参数</p>
+          <p className="mb-3 text-[11px] uppercase tracking-[0.28em] text-emerald-300/70">{t('build_panel.form_title')}</p>
           <div className="grid grid-cols-2 gap-3">
             <label className="col-span-2 grid gap-1 text-xs text-slate-300">
-              建筑类型
+              {t('build_panel.type_label')}
               <select
                 value={bType}
                 onChange={(e) => setBType(e.target.value)}
                 className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none"
               >
-                {BUILDING_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
+                {BUILDING_TYPE_KEYS.map((bt) => (
+                  <option key={bt.value} value={bt.value}>{t(bt.i18nKey)}</option>
                 ))}
               </select>
             </label>
             <label className="col-span-2 grid gap-1 text-xs text-slate-300">
-              建筑名称
+              {t('build_panel.name_label')}
               <input
                 value={bName}
                 onChange={(e) => setBName(e.target.value)}
-                placeholder="例如：星光书店"
+                placeholder={t('build_panel.name_placeholder')}
                 className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none placeholder-slate-600"
               />
             </label>
             <label className="grid gap-1 text-xs text-slate-300">
-              容量 (1-200)
+              {t('build_panel.capacity_label')}
               <input
                 type="number"
                 min={1}
@@ -135,7 +137,7 @@ export function BuildPanel() {
               />
             </label>
             <div className="grid gap-1 text-xs text-slate-300">
-              入口坐标 (x, y)
+              {t('build_panel.position_label')}
               <div className="flex gap-2">
                 <input
                   type="number"
@@ -166,14 +168,14 @@ export function BuildPanel() {
               onClick={() => void handleBuild()}
               className="flex-1 rounded-xl bg-emerald-600/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
             >
-              {busy ? '建造中…' : '🏗️ 建造'}
+              {busy ? t('build_panel.building_busy') : t('build_panel.building_btn')}
             </button>
             <button
               type="button"
               onClick={() => setFormOpen(false)}
               className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 hover:bg-white/10"
             >
-              取消
+              {t('build_panel.cancel')}
             </button>
           </div>
         </div>
@@ -182,12 +184,12 @@ export function BuildPanel() {
       {/* ── Building list ── */}
       <div className="mt-4">
         <p className="mb-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
-          现有建筑 · {buildings.length} 栋
+          {t('build_panel.existing_title')} · {buildings.length} {t('build_panel.existing_count')}
         </p>
         <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
           {buildings.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-500">
-              暂无建筑数据
+              {t('build_panel.no_buildings')}
             </p>
           ) : (
             buildings.map((b) => (
@@ -206,8 +208,8 @@ export function BuildPanel() {
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    位置 ({b.position[0]}, {b.position[1]}) · 容量 {b.capacity}
-                    {b.occupants ? ` · 占用 ${b.occupants}` : ''}
+                    {t('build_panel.position_info')} ({b.position[0]}, {b.position[1]}) · {t('build_panel.capacity_info')} {b.capacity}
+                    {b.occupants ? ` · ${t('build_panel.occupants_info')} ${b.occupants}` : ''}
                   </p>
                 </div>
                 <button
@@ -216,7 +218,7 @@ export function BuildPanel() {
                   onClick={() => void handleDemolish(b.id)}
                   className="shrink-0 rounded-xl border border-rose-400/25 bg-rose-400/8 px-2.5 py-1.5 text-xs font-medium text-rose-300 transition hover:bg-rose-400/18 disabled:opacity-40"
                 >
-                  {demolishBusy === b.id ? '…' : '🗑 拆除'}
+                  {demolishBusy === b.id ? '…' : t('build_panel.demolish')}
                 </button>
               </div>
             ))

@@ -38,13 +38,13 @@ describe('ThemeToggle', () => {
 
   it('has correct aria-label in dark mode', () => {
     render(<ThemeToggle />)
-    expect(screen.getByRole('button')).toHaveAttribute('aria-label', '切换亮色主题')
+    expect(screen.getByRole('button')).toHaveAttribute('aria-label', '亮色')
   })
 
   it('has correct aria-label in light mode', () => {
     useThemeStore.setState({ theme: 'light' })
     render(<ThemeToggle />)
-    expect(screen.getByRole('button')).toHaveAttribute('aria-label', '切换暗色主题')
+    expect(screen.getByRole('button')).toHaveAttribute('aria-label', '暗色')
   })
 })
 

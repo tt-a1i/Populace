@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import i18n from '../../i18n/config'
 
 interface Props {
   children: ReactNode
@@ -40,14 +41,15 @@ export class ErrorBoundary extends Component<Props, State> {
     }
 
     const { error, errorInfo, detailsOpen } = this.state
+    const t = (key: string) => i18n.t(key)
 
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
         <div className="w-full max-w-lg rounded-[28px] border border-red-400/25 bg-slate-900/90 px-8 py-9 shadow-[0_24px_80px_rgba(2,6,23,0.65)]">
-          <p className="text-[11px] uppercase tracking-[0.35em] text-red-300/70">应用错误</p>
-          <h1 className="mt-3 font-mono text-2xl font-bold text-white">页面出现了问题</h1>
+          <p className="text-[11px] uppercase tracking-[0.35em] text-red-300/70">{t('error.badge')}</p>
+          <h1 className="mt-3 font-mono text-2xl font-bold text-white">{t('error.title')}</h1>
           <p className="mt-3 text-sm leading-6 text-slate-300">
-            渲染时遇到了意外错误。请点击下方按钮重试，或刷新页面。
+            {t('error.desc')}
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
@@ -56,14 +58,14 @@ export class ErrorBoundary extends Component<Props, State> {
               onClick={this.handleRetry}
               className="rounded-full border border-cyan-300/35 bg-cyan-300/14 px-5 py-2 text-sm font-medium text-cyan-50 transition hover:bg-cyan-300/22"
             >
-              重试
+              {t('error.retry')}
             </button>
             <button
               type="button"
               onClick={() => window.location.reload()}
               className="rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
             >
-              刷新页面
+              {t('error.reload')}
             </button>
           </div>
 
@@ -79,7 +81,7 @@ export class ErrorBoundary extends Component<Props, State> {
               >
                 ▶
               </span>
-              {detailsOpen ? '收起错误详情' : '展开错误详情'}
+              {detailsOpen ? t('error.hide_details') : t('error.show_details')}
             </button>
             {detailsOpen && (
               <pre className="mt-3 max-h-60 overflow-auto rounded-[14px] border border-white/8 bg-slate-950/80 p-4 text-[11px] leading-5 text-red-200/80 whitespace-pre-wrap">

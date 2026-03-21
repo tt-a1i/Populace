@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { RelationCard } from './RelationCard'
 import { GraphRenderer } from './GraphRenderer'
@@ -46,6 +47,7 @@ export function filterGraphData(
 }
 
 export function GraphPanel() {
+  const { t } = useTranslation()
   const hostRef = useRef<HTMLDivElement | null>(null)
   const rendererRef = useRef<GraphRenderer | null>(null)
   const residents = useRelationshipsStore((state) => state.residents)
@@ -166,7 +168,7 @@ export function GraphPanel() {
       <div className="absolute left-4 right-4 top-4 z-10 flex flex-col gap-3">
         <div className="pointer-events-auto flex flex-col gap-3 rounded-xl border border-white/8 bg-slate-950/80 px-3 py-3 backdrop-blur-sm md:flex-row md:items-end md:justify-between">
           <div className="flex flex-col gap-2">
-            <p className="text-[11px] uppercase tracking-[0.28em] text-amber-100/70">关系过滤</p>
+            <p className="text-[11px] uppercase tracking-[0.28em] text-amber-100/70">{t('graph.filter_label')}</p>
             <div className="flex flex-wrap gap-2">
               {graphTypeOptions.map((type) => (
                 <button
@@ -179,7 +181,7 @@ export function GraphPanel() {
                       : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
                   }`}
                 >
-                  {type === 'all' ? '全部' : type}
+                  {type === 'all' ? t('graph.all') : type}
                 </button>
               ))}
             </div>
@@ -187,11 +189,11 @@ export function GraphPanel() {
 
           <div className="min-w-[14rem] flex-1 md:max-w-xs">
             <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.2em] text-slate-300/75">
-              <span>{`强度 > ${minIntensity.toFixed(1)}`}</span>
-              <span>仅显示相关节点</span>
+              <span>{t('graph.intensity_above', { value: minIntensity.toFixed(1) })}</span>
+              <span>{t('graph.related_nodes_only')}</span>
             </div>
             <input
-              aria-label="关系强度阈值"
+              aria-label={t('graph.intensity_threshold_aria')}
               type="range"
               min={0}
               max={graphIntensityThresholds[graphIntensityThresholds.length - 1]}
@@ -228,8 +230,8 @@ export function GraphPanel() {
       {filteredRelationships.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/45 backdrop-blur-[2px]">
           <div className="max-w-xs rounded-xl border border-white/10 bg-slate-950/80 px-5 py-4 text-center backdrop-blur-sm">
-            <p className="text-sm text-slate-400">当前筛选下暂无关系</p>
-            <p className="mt-1 text-xs text-slate-500">调整类型或强度阈值试试</p>
+            <p className="text-sm text-slate-400">{t('graph.no_relationships')}</p>
+            <p className="mt-1 text-xs text-slate-500">{t('graph.adjust_hint')}</p>
           </div>
         </div>
       )}
