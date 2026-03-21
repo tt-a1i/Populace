@@ -1,56 +1,45 @@
-import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Toolbar } from './components/toolbar/Toolbar'
 import {
   FirstRunGuide,
+  LanguageSwitcher,
   LoadingTransition,
+  MessageBar,
   ScenePicker,
-  SplitPane,
   ThemeToggle,
   WelcomePage,
 } from './components/ui'
 import { OnboardingDrama } from './components/ui/OnboardingDrama'
 import { TutorialOverlay } from './components/ui/TutorialOverlay'
+import { SoundToggleButton } from './components/toolbar/SoundToggleButton'
+import { SpeedControl } from './components/toolbar/SpeedControl'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useWebSocket } from './hooks/useWebSocket'
-import { getLlmKeyStatus } from './services/api'
+import { useSimulationStore } from './stores/simulation'
 import { useThemeStore } from './stores/theme'
 
-function ApiKeyBanner() {
-  const { t } = useTranslation()
-  const [show, setShow] = useState(false)
+const WEATHER_EMOJI: Record<string, string> = {
+  sunny: '\u2600\uFE0F',
+  cloudy: '\u26C5',
+  rainy: '\uD83C\uDF27\uFE0F',
+  stormy: '\u26C8\uFE0F',
+  snowy: '\u2744\uFE0F',
+}
 
-  useEffect(() => {
-    getLlmKeyStatus()
-      .then((s) => { if (!s.configured) setShow(true) })
-      .catch(() => {})
-  }, [])
+const SEASON_EMOJI: Record<string, string> = {
+  spring: '\uD83C\uDF38',
+  summer: '\u2600\uFE0F',
+  autumn: '\uD83C\uDF42',
+  winter: '\u2744\uFE0F',
+}
 
-  if (!show) return null
-
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-200">
-      <span>{t('api_key_banner.message')}</span>
-      <div className="flex shrink-0 items-center gap-2">
-        <button
-          type="button"
-          onClick={() => window.dispatchEvent(new CustomEvent('populace:open-settings'))}
-          className="rounded-full border border-amber-300/30 bg-amber-300/15 px-3 py-1 text-xs font-medium text-amber-100 transition hover:bg-amber-300/25"
-        >
-          {t('api_key_banner.action')}
-        </button>
-        <button
-          type="button"
-          onClick={() => setShow(false)}
-          aria-label="Dismiss"
-          className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-400 transition hover:bg-white/10"
-        >
-          ✕
-        </button>
-      </div>
-    </div>
-  )
+const SEASON_LABEL_ZH: Record<string, string> = {
+  spring: '\u6625\u5929',
+  summer: '\u590F\u5929',
+  autumn: '\u79CB\u5929',
+  winter: '\u51AC\u5929',
 }
 
 const TownCanvas = lazy(() =>
@@ -61,137 +50,9 @@ const GraphPanel = lazy(() =>
 )
 
 type AppPage = 'welcome' | 'picking' | 'simulation'
-type MobilePane = 'town' | 'graph'
-
-function useIsMobileViewport(breakpoint = 768): boolean {
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === 'undefined') {
-      return false
-    }
-
-    return window.innerWidth < breakpoint
-  })
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
-    const update = () => {
-      setIsMobile(mediaQuery.matches)
-    }
-
-    update()
-    mediaQuery.addEventListener('change', update)
-    return () => {
-      mediaQuery.removeEventListener('change', update)
-    }
-  }, [breakpoint])
-
-  return isMobile
-}
-
-function PanelFallback({ tone, title }: { tone: 'amber' | 'cyan'; title: string }) {
-  const { t } = useTranslation()
-  const borderTone = tone === 'cyan' ? 'border-cyan-300/25' : 'border-amber-200/25'
-  const textTone = tone === 'cyan' ? 'text-cyan-100/70' : 'text-amber-100/70'
-
-  return (
-    <div
-      className={[
-        'flex min-h-[30rem] flex-1 items-center justify-center rounded-[24px] border bg-slate-950/35',
-        borderTone,
-      ].join(' ')}
-    >
-      <div className="text-center">
-        <p className={['text-xs uppercase tracking-[0.32em]', textTone].join(' ')}>{title}</p>
-        <p className="mt-3 text-sm text-slate-300">{t('app.panel_loading')}</p>
-      </div>
-    </div>
-  )
-}
-
-function SimulationPanelShell({
-  tone,
-  eyebrow,
-  title,
-  badge,
-  children,
-}: {
-  tone: 'cyan' | 'amber'
-  eyebrow: string
-  title: string
-  badge: string
-  children: ReactNode
-}) {
-  const borderTone = tone === 'cyan' ? 'border-cyan-400/20' : 'border-amber-300/20'
-  const backgroundTone =
-    tone === 'cyan'
-      ? 'bg-gradient-to-br from-cyan-400/10 via-slate-900 to-slate-950'
-      : 'bg-gradient-to-b from-amber-200/10 via-slate-900 to-slate-950'
-  const eyebrowTone = tone === 'cyan' ? 'text-cyan-200/75' : 'text-amber-100/75'
-
-  return (
-    <article className={`flex min-h-[28rem] flex-col rounded-[28px] border p-4 sm:p-5 ${borderTone} ${backgroundTone}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className={`text-xs uppercase tracking-[0.35em] ${eyebrowTone}`}>{eyebrow}</p>
-          <h2 className="mt-2 font-mono text-2xl font-bold text-white">{title}</h2>
-        </div>
-        <span className="rounded-full border border-white/10 bg-slate-900/70 px-3 py-1 text-xs text-slate-300">
-          {badge}
-        </span>
-      </div>
-      <div className="mt-4 flex min-h-0 flex-1">{children}</div>
-    </article>
-  )
-}
-
-function MobileToolbarSheet({
-  open,
-  onClose,
-}: {
-  open: boolean
-  onClose: () => void
-}) {
-  const { t } = useTranslation()
-  return (
-    <>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-hidden={!open}
-        className={[
-          'fixed inset-0 z-40 bg-slate-950/68 backdrop-blur-sm transition-opacity md:hidden',
-          open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
-        ].join(' ')}
-      />
-      <div
-        className={[
-          'fixed inset-x-3 bottom-3 z-50 max-h-[78vh] overflow-hidden rounded-[28px] border border-white/10 bg-slate-900/96 shadow-[0_24px_80px_rgba(2,6,23,0.62)] transition-transform duration-300 md:hidden',
-          open ? 'translate-y-0' : 'translate-y-[115%]',
-        ].join(' ')}
-      >
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-100/70">Tool Drawer</p>
-            <p className="mt-1 text-sm text-slate-300">{t('app.mobile_tool_drawer')}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-100"
-          >
-            {t('app.close')}
-          </button>
-        </div>
-        <div className="max-h-[calc(78vh-5rem)] overflow-y-auto p-4">
-          <Toolbar />
-        </div>
-      </div>
-    </>
-  )
-}
 
 function SimulationView() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const {
     connected,
     disconnected,
@@ -202,59 +63,44 @@ function SimulationView() {
     retry,
   } = useWebSocket()
   useKeyboardShortcuts(true)
-  const isMobile = useIsMobileViewport()
-  const [splitRatio, setSplitRatio] = useState(60)
-  const [activeMobilePane, setActiveMobilePane] = useState<MobilePane>('town')
-  const [mobileToolbarOpen, setMobileToolbarOpen] = useState(false)
-  const mobileToolbarVisible = isMobile && mobileToolbarOpen
+
   const [showOnboarding, setShowOnboarding] = useState(
     () => !localStorage.getItem('populace:onboarding_done'),
   )
+  const [showGraph, setShowGraph] = useState(false)
+  const [showToolbar, setShowToolbar] = useState(false)
 
-  const townPanel = useMemo(
-    () => (
-      <SimulationPanelShell
-        tone="cyan"
-        eyebrow="PixiJS Town View"
-        title={t('app.town_map')}
-        badge={isMobile ? 'Map' : `${Math.round(splitRatio)}%`}
-      >
-        <Suspense fallback={<PanelFallback tone="cyan" title="PixiJS Town View" />}>
-          <TownCanvas />
-        </Suspense>
-      </SimulationPanelShell>
-    ),
-    [isMobile, splitRatio, t],
-  )
+  const time = useSimulationStore((s) => s.time)
+  const weather = useSimulationStore((s) => s.weather)
+  const season = useSimulationStore((s) => s.season)
+  const residents = useSimulationStore((s) => s.residents)
+  const buildings = useSimulationStore((s) => s.buildings)
 
-  const graphPanel = useMemo(
-    () => (
-      <SimulationPanelShell
-        tone="amber"
-        eyebrow="D3 Relationship Graph"
-        title={t('app.relationship_graph')}
-        badge={isMobile ? 'Graph' : `${Math.round(100 - splitRatio)}%`}
-      >
-        <Suspense fallback={<PanelFallback tone="amber" title="D3 Relationship Graph" />}>
-          <GraphPanel />
-        </Suspense>
-      </SimulationPanelShell>
-    ),
-    [isMobile, splitRatio, t],
-  )
+  const isZh = i18n.language === 'zh'
+  const weatherEmoji = WEATHER_EMOJI[weather] ?? WEATHER_EMOJI.sunny
+  const seasonEmoji = SEASON_EMOJI[season] ?? SEASON_EMOJI.spring
+  const seasonLabel = isZh ? (SEASON_LABEL_ZH[season] ?? season) : season
 
   if (!hasInitialSnapshot) {
     return <LoadingTransition onRetry={retry} timedOut={startupTimedOut} />
   }
 
   return (
-    <main className="relative min-h-screen bg-slate-950 text-slate-100">
+    <div className="fixed inset-0 bg-slate-950">
+      {/* -- FULLSCREEN MAP -- */}
+      <div className="absolute inset-0">
+        <Suspense fallback={null}>
+          <TownCanvas />
+        </Suspense>
+      </div>
+
+      {/* -- Disconnected overlay -- */}
       {disconnected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/72 backdrop-blur-md">
-          <div className="flex flex-col items-center gap-4 rounded-[28px] border border-white/10 bg-slate-900/90 px-10 py-9 shadow-[0_24px_80px_rgba(2,6,23,0.62)]">
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-slate-900/90 px-10 py-9 shadow-2xl">
             {maxRetriesExceeded ? (
               <>
-                <span className="text-2xl">⚠️</span>
+                <span className="text-2xl">{'\u26A0\uFE0F'}</span>
                 <div className="text-center">
                   <p className="text-[11px] uppercase tracking-[0.34em] text-amber-100/70">Connection Failed</p>
                   <p className="mt-3 text-base font-medium text-amber-50">{t('app.conn_failed')}</p>
@@ -282,9 +128,137 @@ function SimulationView() {
         </div>
       )}
 
+      {/* -- TOP-LEFT HUD: Status -- */}
+      <div className="fixed left-4 top-4 z-20 pointer-events-auto">
+        <div className="rounded-2xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm text-slate-200 shadow-lg backdrop-blur-sm">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs font-bold uppercase tracking-widest text-cyan-300">POPULACE</span>
+            <span className="text-slate-500">{'\u00B7'}</span>
+            <span className="text-xs text-slate-400">{time}</span>
+          </div>
+          <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
+            <span>{weatherEmoji} {weather}</span>
+            <span>{seasonEmoji} {seasonLabel}</span>
+            <span>{residents.length} {isZh ? '\u5C45\u6C11' : 'residents'}</span>
+            <span>{buildings.length} {isZh ? '\u5EFA\u7B51' : 'buildings'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* -- TOP-RIGHT: Settings icons -- */}
+      <div className="fixed right-4 top-4 z-20 flex items-center gap-2 pointer-events-auto">
+        <SoundToggleButton />
+        <LanguageSwitcher />
+        <ThemeToggle />
+      </div>
+
+      {/* -- BOTTOM-LEFT: Message Feed -- */}
+      <div className="fixed bottom-20 left-4 z-20 w-80 pointer-events-auto">
+        <MessageBar />
+      </div>
+
+      {/* -- BOTTOM-CENTER: Quick Action Bar -- */}
+      <div className="fixed inset-x-0 bottom-4 z-30 flex justify-center pointer-events-none">
+        <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-950/80 px-2 py-2 shadow-xl backdrop-blur-sm">
+          <button
+            type="button"
+            onClick={() => setShowToolbar((v) => !v)}
+            className="rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm font-medium text-cyan-50 transition hover:bg-cyan-300/20"
+          >
+            {'\u26A1'} {t('toolbar.director')}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowToolbar(true); window.dispatchEvent(new CustomEvent('populace:open-persona')) }}
+            className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:bg-white/10"
+          >
+            {'\uD83D\uDC64'} {t('toolbar.persona')}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowToolbar(true); window.dispatchEvent(new CustomEvent('populace:open-quest')) }}
+            className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:bg-white/10"
+          >
+            {'\uD83C\uDFAF'} {t('toolbar.quest')}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowToolbar(true); window.dispatchEvent(new CustomEvent('populace:open-report')) }}
+            className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:bg-white/10"
+          >
+            {'\uD83D\uDCF0'} {t('toolbar.report')}
+          </button>
+
+          <div className="mx-1 h-6 w-px bg-white/10" />
+
+          <button
+            type="button"
+            onClick={() => setShowGraph((v) => !v)}
+            className={`rounded-xl border px-3 py-2 text-sm transition ${showGraph ? 'border-amber-300/40 bg-amber-300/15 text-amber-50' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+          >
+            {'\uD83D\uDD78\uFE0F'} {t('app.relationship_graph')}
+          </button>
+
+          <div className="mx-1 h-6 w-px bg-white/10" />
+
+          <SpeedControl />
+        </div>
+      </div>
+
+      {/* -- RIGHT DRAWER: Graph Panel -- */}
+      <div
+        className={`fixed right-0 top-0 bottom-0 z-30 w-96 transform transition-transform duration-300 ${showGraph ? 'translate-x-0' : 'translate-x-full'} pointer-events-auto`}
+      >
+        <div className="h-full border-l border-white/10 bg-slate-950/90 p-4 backdrop-blur-md">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white">{t('app.relationship_graph')}</h3>
+            <button
+              type="button"
+              onClick={() => setShowGraph(false)}
+              className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-400 transition hover:bg-white/10 hover:text-white"
+            >
+              {'\u2715'}
+            </button>
+          </div>
+          <Suspense fallback={null}>
+            <GraphPanel />
+          </Suspense>
+        </div>
+      </div>
+
+      {/* -- TOOL PANEL DRAWER -- */}
+      {showToolbar && (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowToolbar(false)}
+            className="fixed inset-0 z-30 bg-slate-950/40 backdrop-blur-[2px]"
+            aria-label={t('app.close')}
+          />
+          <div className="fixed inset-x-0 bottom-16 z-40 flex justify-center pointer-events-none">
+            <div className="pointer-events-auto w-full max-w-3xl rounded-2xl border border-white/10 bg-slate-950/95 p-4 shadow-2xl backdrop-blur-md mx-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-sm font-semibold text-white">{t('app.open_tools')}</span>
+                <button
+                  type="button"
+                  onClick={() => setShowToolbar(false)}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400 transition hover:bg-white/10 hover:text-white"
+                >
+                  {'\u2715'} {t('app.close')}
+                </button>
+              </div>
+              <div className="max-h-[60vh] overflow-y-auto">
+                <Toolbar />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* -- Connection indicator -- */}
       <div
         className={[
-          'fixed bottom-4 right-4 z-40 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+          'fixed bottom-4 right-4 z-20 rounded-full px-3 py-1 text-xs font-medium transition-colors pointer-events-auto',
           connected
             ? 'border border-emerald-400/30 bg-emerald-400/10 text-emerald-300 connection-pulse'
             : 'border border-amber-400/30 bg-amber-400/10 text-amber-300',
@@ -293,93 +267,7 @@ function SimulationView() {
         {connected ? t('app.connected') : t('app.connecting')}
       </div>
 
-      {isMobile && (
-        <>
-          <button
-            type="button"
-            onClick={() => setMobileToolbarOpen((open) => !open)}
-            className="fixed bottom-4 left-4 z-40 rounded-full border border-cyan-300/35 bg-cyan-300/14 px-4 py-3 text-sm font-medium text-cyan-50 shadow-[0_18px_44px_rgba(8,15,31,0.42)] md:hidden"
-          >
-            {mobileToolbarVisible ? t('app.close_tools') : t('app.open_tools')}
-          </button>
-          <MobileToolbarSheet open={mobileToolbarVisible} onClose={() => setMobileToolbarOpen(false)} />
-        </>
-      )}
-
-      <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col px-3 py-3 sm:px-6 sm:py-4 lg:px-8">
-        <div className="mb-3">
-          <ApiKeyBanner />
-        </div>
-        <header className="rounded-[28px] border border-white/10 bg-white/5 px-4 py-4 shadow-[0_24px_80px_rgba(15,23,42,0.35)] backdrop-blur sm:px-5 xl:px-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="font-mono text-xs uppercase tracking-[0.4em] text-cyan-300/70">
-                POPULACE
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <h1 className="font-mono text-2xl font-black tracking-tight text-white sm:text-3xl">
-                  {t('app.header_title')}
-                </h1>
-                <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">
-                  10 residents · 8 buildings
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-sm text-cyan-50">
-                {t('app.header_subtitle')}
-              </div>
-              <ThemeToggle />
-            </div>
-          </div>
-        </header>
-
-        <section className="mt-4 flex-1 rounded-[32px] border border-white/10 bg-slate-900/80 p-3 shadow-[0_24px_80px_rgba(8,15,31,0.45)] backdrop-blur sm:p-4">
-          {isMobile ? (
-            <div className="flex h-full min-h-[calc(100vh-13rem)] flex-col gap-4">
-              <div className="inline-flex rounded-full border border-white/10 bg-white/5 p-1">
-                {([
-                  { key: 'town', label: t('app.tab_map') },
-                  { key: 'graph', label: t('app.tab_graph') },
-                ] as Array<{ key: MobilePane; label: string }>).map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setActiveMobilePane(item.key)}
-                    className={[
-                      'rounded-full px-4 py-2 text-sm font-medium transition',
-                      activeMobilePane === item.key
-                        ? 'bg-cyan-300/16 text-cyan-50'
-                        : 'text-slate-300',
-                    ].join(' ')}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex min-h-0 flex-1 flex-col">
-                {activeMobilePane === 'town' ? townPanel : graphPanel}
-              </div>
-            </div>
-          ) : (
-            <SplitPane
-              defaultRatio={60}
-              minLeftRatio={30}
-              minRightRatio={20}
-              onRatioChange={setSplitRatio}
-              left={townPanel}
-              right={graphPanel}
-            />
-          )}
-        </section>
-
-        {!isMobile && (
-          <footer className="mt-4">
-            <Toolbar />
-          </footer>
-        )}
-      </div>
+      {/* -- Onboarding + tutorial -- */}
       {hasInitialSnapshot && showOnboarding && (
         <OnboardingDrama
           onComplete={() => {
@@ -388,10 +276,9 @@ function SimulationView() {
           }}
         />
       )}
-      {/* Only show tutorial/guide AFTER onboarding is done */}
       {!showOnboarding && <FirstRunGuide enabled={hasInitialSnapshot} />}
       {!showOnboarding && hasInitialSnapshot && <TutorialOverlay />}
-    </main>
+    </div>
   )
 }
 
