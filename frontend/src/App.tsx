@@ -152,6 +152,8 @@ function SimulationView() {
     disconnected,
     hasInitialSnapshot,
     startupTimedOut,
+    reconnectCountdown,
+    maxRetriesExceeded,
     retry,
   } = useWebSocket()
   const isMobile = useIsMobileViewport()
@@ -201,11 +203,32 @@ function SimulationView() {
       {disconnected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/72 backdrop-blur-md">
           <div className="flex flex-col items-center gap-4 rounded-[28px] border border-white/10 bg-slate-900/90 px-10 py-9 shadow-[0_24px_80px_rgba(2,6,23,0.62)]">
-            <span className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-300/90 border-t-transparent" />
-            <div className="text-center">
-              <p className="text-[11px] uppercase tracking-[0.34em] text-cyan-100/70">Connection Interrupted</p>
-              <p className="mt-3 text-base font-medium text-cyan-50">连接中断，正在重连...</p>
-            </div>
+            {maxRetriesExceeded ? (
+              <>
+                <span className="text-2xl">⚠️</span>
+                <div className="text-center">
+                  <p className="text-[11px] uppercase tracking-[0.34em] text-amber-100/70">Connection Failed</p>
+                  <p className="mt-3 text-base font-medium text-amber-50">连接失败，请手动刷新页面</p>
+                  <button
+                    type="button"
+                    onClick={retry}
+                    className="mt-4 rounded-full border border-amber-400/30 bg-amber-400/10 px-5 py-2 text-sm font-medium text-amber-200 transition hover:bg-amber-400/20"
+                  >
+                    重新连接
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-300/90 border-t-transparent" />
+                <div className="text-center">
+                  <p className="text-[11px] uppercase tracking-[0.34em] text-cyan-100/70">Connection Interrupted</p>
+                  <p className="mt-3 text-base font-medium text-cyan-50">
+                    {reconnectCountdown > 0 ? `重连中 ${reconnectCountdown}s...` : '连接中断，正在重连...'}
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

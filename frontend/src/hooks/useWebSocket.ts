@@ -19,7 +19,8 @@ import { useSimulationStore } from '../stores/simulation'
 export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected'
 
 const MIN_BACKOFF_MS = 1_000
-const MAX_BACKOFF_MS = 10_000
+const MAX_BACKOFF_MS = 30_000
+const MAX_RETRIES = 10
 
 function buildWsUrl(): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -33,6 +34,8 @@ export interface UseWebSocketReturn {
   disconnected: boolean
   hasInitialSnapshot: boolean
   startupTimedOut: boolean
+  reconnectCountdown: number
+  maxRetriesExceeded: boolean
   retry: () => void
 }
 
@@ -40,13 +43,17 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
   const [hasInitialSnapshot, setHasInitialSnapshot] = useState(false)
   const [startupTimedOut, setStartupTimedOut] = useState(false)
+  const [reconnectCountdown, setReconnectCountdown] = useState(0)
+  const [maxRetriesExceeded, setMaxRetriesExceeded] = useState(false)
   const { pushToast } = useToast()
   const { play } = useSound()
 
   const wsRef = useRef<WebSocket | null>(null)
   const backoffRef = useRef<number>(MIN_BACKOFF_MS)
+  const retryCountRef = useRef<number>(0)
   const connectRef = useRef<() => void>(() => {})
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const mountedRef = useRef<boolean>(true)
   const frameRef = useRef<number | null>(null)
   const pendingTicksRef = useRef<Array<Record<string, unknown>>>([])
@@ -157,8 +164,15 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
         ws.close()
         return
       }
-      // Reset backoff on successful connection
+      // Reset backoff and retry state on successful connection
       backoffRef.current = MIN_BACKOFF_MS
+      retryCountRef.current = 0
+      setMaxRetriesExceeded(false)
+      setReconnectCountdown(0)
+      if (countdownIntervalRef.current !== null) {
+        clearInterval(countdownIntervalRef.current)
+        countdownIntervalRef.current = null
+      }
       setStatus('connected')
       if (shouldAnnounceReconnectRef.current) {
         pushToast({
@@ -178,6 +192,13 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
     ws.onclose = () => {
       if (!mountedRef.current) return
       setStatus('disconnected')
+
+      // Clear any running countdown
+      if (countdownIntervalRef.current !== null) {
+        clearInterval(countdownIntervalRef.current)
+        countdownIntervalRef.current = null
+      }
+
       if (hasConnectedOnceRef.current) {
         shouldAnnounceReconnectRef.current = true
         pushToast({
@@ -186,9 +207,34 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
           description: '正在尝试重新连接 WebSocket。',
         })
       }
-      // Exponential backoff: 1 s → 2 s → 4 s → … → 10 s max
+
+      retryCountRef.current += 1
+
+      // Give up after MAX_RETRIES attempts
+      if (retryCountRef.current > MAX_RETRIES) {
+        setMaxRetriesExceeded(true)
+        return
+      }
+
+      // Exponential backoff: 1 s → 2 s → 4 s → 8 s → 16 s → 30 s max
       const delay = backoffRef.current
       backoffRef.current = Math.min(delay * 2, MAX_BACKOFF_MS)
+
+      // Countdown display
+      const delaySeconds = Math.ceil(delay / 1_000)
+      setReconnectCountdown(delaySeconds)
+      let remaining = delaySeconds
+      countdownIntervalRef.current = setInterval(() => {
+        remaining -= 1
+        if (remaining <= 0) {
+          clearInterval(countdownIntervalRef.current!)
+          countdownIntervalRef.current = null
+          setReconnectCountdown(0)
+        } else {
+          setReconnectCountdown(remaining)
+        }
+      }, 1_000)
+
       timerRef.current = setTimeout(() => {
         connectRef.current()
       }, delay)
@@ -203,6 +249,14 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
   const retry = useCallback(() => {
     setStartupTimedOut(false)
     backoffRef.current = MIN_BACKOFF_MS
+    retryCountRef.current = 0
+    setMaxRetriesExceeded(false)
+    setReconnectCountdown(0)
+
+    if (countdownIntervalRef.current !== null) {
+      clearInterval(countdownIntervalRef.current)
+      countdownIntervalRef.current = null
+    }
 
     if (timerRef.current !== null) {
       clearTimeout(timerRef.current)
@@ -240,6 +294,7 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
     return () => {
       mountedRef.current = false
       if (timerRef.current !== null) clearTimeout(timerRef.current)
+      if (countdownIntervalRef.current !== null) clearInterval(countdownIntervalRef.current)
       if (frameRef.current !== null) {
         if (typeof window.cancelAnimationFrame === 'function') {
           window.cancelAnimationFrame(frameRef.current)
@@ -271,6 +326,8 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
     disconnected: status === 'disconnected',
     hasInitialSnapshot,
     startupTimedOut,
+    reconnectCountdown,
+    maxRetriesExceeded,
     retry,
   }
 }
