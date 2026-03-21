@@ -11,7 +11,7 @@ import {
 } from '../../stores/relationships'
 
 const graphTypeOptions = ['all', 'friendship', 'rivalry', 'love', 'knows'] as const
-const graphIntensityThresholds = [0.3, 0.5, 0.7] as const
+const graphIntensityThresholds = [0.0, 0.3, 0.5, 0.7] as const
 
 type GraphFilterType = (typeof graphTypeOptions)[number]
 
@@ -22,7 +22,7 @@ export function filterGraphData(
   filter: { type: GraphFilterType; minIntensity: number },
 ): { residents: GraphResident[]; relationships: GraphRelationship[] } {
   const visibleRelationships = relationships.filter((relationship) => {
-    if (relationship.intensity <= filter.minIntensity) {
+    if (relationship.intensity < filter.minIntensity) {
       return false
     }
 
@@ -63,7 +63,7 @@ export function GraphPanel() {
   const [hoveredRelationship, setHoveredRelationship] = useState<(typeof relationships)[number] | null>(null)
   const [cardPosition, setCardPosition] = useState<{ x: number; y: number } | null>(null)
   const [activeType, setActiveType] = useState<GraphFilterType>('all')
-  const [minIntensity, setMinIntensity] = useState<number>(0.3)
+  const [minIntensity, setMinIntensity] = useState<number>(0.0)
   const replaySnapshot = useMemo(
     () => history.find((snapshot) => snapshot.tick === replayTick) ?? null,
     [history, replayTick],
@@ -193,9 +193,9 @@ export function GraphPanel() {
             <input
               aria-label="关系强度阈值"
               type="range"
-              min={graphIntensityThresholds[0]}
+              min={0}
               max={graphIntensityThresholds[graphIntensityThresholds.length - 1]}
-              step={0.2}
+              step={0.1}
               value={minIntensity}
               onChange={(event) => setMinIntensity(Number(event.target.value))}
               className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-amber-300"

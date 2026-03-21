@@ -156,11 +156,10 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
         // Rebuild graph store from backend residents, clearing mock data
         relInitFromSnapshot(snapshot.residents ?? [])
         // Seed initial relationships absolutely (not as deltas) from snapshot
-        if (Array.isArray(snapshot.relationships) && snapshot.relationships.length > 0) {
-          relSetAbsolute(snapshot.relationships as Array<{
-            from_id: string; to_id: string; type: string; intensity: number; reason?: string
-          }>)
-        }
+        // Always call even with empty array to clear seed data on fresh simulations
+        relSetAbsolute((snapshot.relationships ?? []) as Array<{
+          from_id: string; to_id: string; type: string; intensity: number; reason?: string
+        }>)
         if (snapshot.last_tick) {
           // Apply last_tick for positions/dialogues but SKIP relationship deltas to prevent
           // double-stacking with the absolute snapshot.relationships already applied above.

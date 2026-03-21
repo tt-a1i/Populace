@@ -299,8 +299,18 @@ class SimulationState:
             "agents": agents_data,
             "relationships": relationships,
             "weather": self.world.weather.value if hasattr(self.world.weather, "value") else str(self.world.weather),
+            "season": self.world.season,
             "clock_speed": self.loop.clock.speed,
             "running": self.loop.running,
+            "total_dialogue_count": getattr(self, "_total_dialogue_count", 0),
+            "total_relationship_change_count": getattr(self, "_total_relationship_change_count", 0),
+            "achievements": {k: list(v) for k, v in getattr(self, "_achievements_store", {}).items()},
+            "mood_history": list(getattr(self, "_mood_history", [])),
+            "active_events": list(getattr(self, "_active_events", [])),
+            "world_timeline": list(getattr(self, "_world_timeline", [])),
+            "timeline_id_counter": getattr(self, "_timeline_id_counter", 0),
+            "rel_events_fired": [list(x) for x in getattr(self, "_rel_events_fired", set())],
+            "buildings_visited": {k: list(v) for k, v in getattr(self, "_buildings_visited", {}).items()},
         }
 
     async def load_state(self, data: dict[str, Any]) -> None:
@@ -309,7 +319,7 @@ class SimulationState:
         from engine.generative_agent import GenerativeAgent
         from engine.memory import MemoryStream
         from engine.types import (
-            Building, Memory, Reflection, Relationship, RelationType, Resident, WorldConfig,
+            Building, DiaryEntry, Memory, Reflection, Relationship, RelationType, Resident, WorldConfig,
         )
         from engine.world import World
 
@@ -364,7 +374,15 @@ class SimulationState:
                 hair_style=res_data.get("hair_style"),
                 hair_color=res_data.get("hair_color"),
                 outfit_color=res_data.get("outfit_color"),
+                current_goal=res_data.get("current_goal"),
+                coins=res_data.get("coins", 100),
+                occupation=res_data.get("occupation", "unemployed"),
+                energy=float(res_data.get("energy", 1.0)),
             )
+            for d in res_data.get("diary", []):
+                resident.diary.append(DiaryEntry(
+                    id=d["id"], date=d["date"], tick=d["tick"], summary=d["summary"],
+                ))
             agent = GenerativeAgent(resident)
 
             ms = MemoryStream(config)
@@ -395,13 +413,25 @@ class SimulationState:
 
         self.world = world
 
-        # Restore weather
+        # Restore weather and season
         from engine.types import WeatherType
         weather_val = data.get("weather", "sunny")
         try:
             world.weather = WeatherType(weather_val)
         except ValueError:
             world.weather = WeatherType.sunny
+        world.season = data.get("season", "spring")
+
+        # Restore simulation counters and per-session state
+        self._total_dialogue_count = data.get("total_dialogue_count", 0)
+        self._total_relationship_change_count = data.get("total_relationship_change_count", 0)
+        self._achievements_store = {k: set(v) for k, v in data.get("achievements", {}).items()}
+        self._mood_history = list(data.get("mood_history", []))
+        self._active_events = list(data.get("active_events", []))
+        self._world_timeline = list(data.get("world_timeline", []))
+        self._timeline_id_counter = data.get("timeline_id_counter", 0)
+        self._rel_events_fired = {tuple(x) for x in data.get("rel_events_fired", [])}
+        self._buildings_visited = {k: set(v) for k, v in data.get("buildings_visited", {}).items()}
 
         # Restore loop with saved speed/running state
         saved_speed = float(data.get("clock_speed", 1.0))
