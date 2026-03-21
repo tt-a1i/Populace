@@ -1,0 +1,29 @@
+# Frontend build artifacts and dependencies (only needed for frontend Dockerfile)
+frontend/node_modules
+frontend/dist
+frontend/.vite
+
+# Backend Python caches
+**/__pycache__
+**/*.pyc
+*.egg-info
+
+# Build artifacts
+engine/build
+engine/*.egg-info
+
+# Git, IDE, docs
+.git
+.github
+.claude
+docs
+*.md
+!README.md
+
+# Environment and saves
+.env
+backend/saves/*.json
+
+# OS files
+.DS_Store
+Thumbs.db
