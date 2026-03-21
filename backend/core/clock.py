@@ -8,10 +8,10 @@ from .config import settings
 class SimulationClock:
     """Controls tick cadence and pause/resume state.
 
-    Supported speeds follow spec §8: paused (0x), 1x, 2x, and 5x.
+    Supported speeds follow spec §8: paused (0x), 1x, 2x, 5x, 10x, and 50x.
     """
 
-    _ALLOWED_SPEEDS = {0.0, 1.0, 2.0, 5.0}
+    _ALLOWED_SPEEDS = {0.0, 1.0, 2.0, 5.0, 10.0, 50.0}
 
     def __init__(self, speed: float = 1.0) -> None:
         self._base_interval = settings.tick_interval_seconds

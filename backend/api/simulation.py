@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/simulation", tags=["simulation"])
 
 
 class SpeedRequest(BaseModel):
-    speed: Literal[1, 2, 5]
+    speed: Literal[1, 2, 5, 10, 50]
 
 
 class StartRequest(BaseModel):
@@ -183,8 +183,8 @@ class SimulationState:
             self._task = None
 
     def set_speed(self, speed: int) -> None:
-        if speed not in {1, 2, 5}:
-            raise ValueError("Input should be 1, 2 or 5")
+        if speed not in {1, 2, 5, 10, 50}:
+            raise ValueError("Input should be 1, 2, 5, 10 or 50")
         self.loop.clock.set_speed(float(speed))
 
     async def reset_with_scene(self, scene_slug: str) -> None:
@@ -378,7 +378,7 @@ class SimulationState:
         # Restore loop with saved speed/running state
         saved_speed = float(data.get("clock_speed", 1.0))
         from backend.core.clock import SimulationClock
-        clock = SimulationClock(speed=saved_speed if saved_speed in {0.0, 1.0, 2.0, 5.0} else 1.0)
+        clock = SimulationClock(speed=saved_speed if saved_speed in {0.0, 1.0, 2.0, 5.0, 10.0, 50.0} else 1.0)
         self.loop = SimulationLoop(self.world, clock=clock, tick_handler=self._tick)
         self._task = None
         self._experiment_history = []
@@ -1008,7 +1008,7 @@ async def stop_simulation(request: Request) -> SimulationStatusResponse:
     responses=error_responses(400, 422, 503),
 )
 async def set_simulation_speed(payload: SpeedRequest, request: Request) -> SimulationStatusResponse:
-    """Update the simulation clock speed; accepted values are 1x, 2x, and 5x."""
+    """Update the simulation clock speed; accepted values are 1x, 2x, 5x, 10x, and 50x."""
     state = get_simulation_state(request)
 
     try:

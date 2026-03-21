@@ -147,9 +147,11 @@ def test_stop_simulation(client):
     assert response.status_code == 200
 
 
-def test_set_speed_valid(client):
-    response = client.post("/api/simulation/speed", json={"speed": 2})
+@pytest.mark.parametrize("speed", [2, 10, 50])
+def test_set_speed_valid(client, speed):
+    response = client.post("/api/simulation/speed", json={"speed": speed})
     assert response.status_code == 200
+    assert response.json()["speed"] == speed
 
 
 def test_set_speed_invalid(client):

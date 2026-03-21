@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { setSpeed, startSimulation, stopSimulation } from '../../services/api'
 import { useSimulationStore, type SimulationSpeed } from '../../stores'
 
-const speedValues: Array<Exclude<SimulationSpeed, 0>> = [1, 2, 5]
+const speedValues: Array<Exclude<SimulationSpeed, 0>> = [1, 2, 5, 10, 50]
 
 export function SpeedControl() {
   const { t } = useTranslation()
@@ -63,7 +63,7 @@ export function SpeedControl() {
               : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
           }`}
         >
-          {t(`speed.${val}x` as 'speed.1x' | 'speed.2x' | 'speed.5x')}
+          {t(`speed.${val}x` as 'speed.1x' | 'speed.2x' | 'speed.5x' | 'speed.10x' | 'speed.50x')}
         </button>
       ))}
     </div>

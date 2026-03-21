@@ -126,3 +126,98 @@ async def get_resident_reflections(resident_id: str, request: Request) -> list[R
     if agent is None:
         raise _NOT_FOUND
     return [ResidentReflectionResponse(**asdict(rf)) for rf in agent.reflections]
+
+
+class AttributeUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    personality: Optional[str] = None
+    mood: Optional[str] = None
+    goals: Optional[list[str]] = None
+
+
+@router.patch(
+    "/{resident_id}/attributes",
+    response_model=ResidentResponse,
+    responses=error_responses(404, 422, 503),
+)
+async def update_resident_attributes(
+    resident_id: str,
+    payload: AttributeUpdateRequest,
+    request: Request,
+) -> ResidentResponse:
+    """God-mode: directly overwrite resident attributes (name/personality/mood/goals)."""
+    state = get_simulation_state(request)
+    agent = _find_agent(state, resident_id)
+    if agent is None:
+        raise _NOT_FOUND
+    for field_name, value in payload.model_dump(exclude_unset=True).items():
+        setattr(agent.resident, field_name, value)
+    return ResidentResponse(**asdict(agent.resident))
+
+
+class InjectMemoryRequest(BaseModel):
+    content: str
+    importance: float = 0.7
+    emotion: str = "neutral"
+
+
+@router.post(
+    "/{resident_id}/inject-memory",
+    response_model=ResidentMemoryResponse,
+    responses=error_responses(404, 422, 503),
+)
+async def inject_resident_memory(
+    resident_id: str,
+    payload: InjectMemoryRequest,
+    request: Request,
+) -> ResidentMemoryResponse:
+    """God-mode: inject a custom memory into a resident's short-term stream."""
+    import uuid
+    from engine.types import Memory
+    state = get_simulation_state(request)
+    agent = _find_agent(state, resident_id)
+    if agent is None:
+        raise _NOT_FOUND
+    mem = Memory(
+        id=str(uuid.uuid4()),
+        content=payload.content,
+        timestamp=state.world.simulation_time(),
+        importance=max(0.0, min(1.0, payload.importance)),
+        emotion=payload.emotion,
+    )
+    agent.memory_stream.add(mem)
+    return ResidentMemoryResponse(**asdict(mem))
+
+
+class TeleportRequest(BaseModel):
+    x: int
+    y: int
+
+
+@router.post(
+    "/{resident_id}/teleport",
+    response_model=ResidentResponse,
+    responses=error_responses(404, 422, 503),
+)
+async def teleport_resident(
+    resident_id: str,
+    payload: TeleportRequest,
+    request: Request,
+) -> ResidentResponse:
+    """God-mode: instantly move a resident to the given tile coordinates."""
+    from backend.api.schemas import api_error as _api_error
+    state = get_simulation_state(request)
+    agent = _find_agent(state, resident_id)
+    if agent is None:
+        raise _NOT_FOUND
+    cfg = state.world.config
+    if not (0 <= payload.x < cfg.map_width_tiles and 0 <= payload.y < cfg.map_height_tiles):
+        raise _api_error(422, f"Coordinates ({payload.x}, {payload.y}) are out of map bounds.", "out_of_bounds")
+    # Leave current building if inside one
+    if agent.resident.location is not None:
+        state.world.leave_building(agent)
+    agent.resident.x = payload.x
+    agent.resident.y = payload.y
+    agent.current_path = []
+    state.world.mark_grid_index_dirty()
+    return ResidentResponse(**asdict(agent.resident))

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 import type { Building, DialogueUpdate, MovementUpdate, Resident, TickState } from '../types'
 
-export type SimulationSpeed = 0 | 1 | 2 | 5
+export type SimulationSpeed = 0 | 1 | 2 | 5 | 10 | 50
 export type ResidentStatus =
   | 'idle'
   | 'walking'

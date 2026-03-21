@@ -47,7 +47,9 @@
     "pause": "⏸ Pause",
     "1x": "1x",
     "2x": "2x",
-    "5x": "5x"
+    "5x": "5x",
+    "10x": "10x",
+    "50x": "50x"
   },
   "message_bar": {
     "label": "Feed",

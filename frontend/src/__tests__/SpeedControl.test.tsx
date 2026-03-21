@@ -38,6 +38,16 @@ describe('SpeedControl', () => {
     expect(screen.getByRole('button', { name: '5x' })).toBeInTheDocument()
   })
 
+  it('renders the 10x speed button', () => {
+    render(<SpeedControl />)
+    expect(screen.getByRole('button', { name: '10x' })).toBeInTheDocument()
+  })
+
+  it('renders the 50x speed button', () => {
+    render(<SpeedControl />)
+    expect(screen.getByRole('button', { name: '50x' })).toBeInTheDocument()
+  })
+
   it('renders all 4 speed control buttons', () => {
     render(<SpeedControl />)
     expect(screen.getAllByRole('button').length).toBeGreaterThanOrEqual(4)
@@ -54,5 +64,12 @@ describe('SpeedControl', () => {
     await userEvent.click(screen.getByRole('button', { name: '2x' }))
     expect(api.startSimulation).toHaveBeenCalled()
     expect(api.setSpeed).toHaveBeenCalledWith({ speed: 2 })
+  })
+
+  it('clicking 50x calls startSimulation then setSpeed with 50', async () => {
+    render(<SpeedControl />)
+    await userEvent.click(screen.getByRole('button', { name: '50x' }))
+    expect(api.startSimulation).toHaveBeenCalled()
+    expect(api.setSpeed).toHaveBeenCalledWith({ speed: 50 })
   })
 })

@@ -2,11 +2,15 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockGetSimulationStats } = vi.hoisted(() => ({
+const { mockGetMoodHistory, mockGetNetworkAnalysis, mockGetSimulationStats } = vi.hoisted(() => ({
+  mockGetMoodHistory: vi.fn(),
+  mockGetNetworkAnalysis: vi.fn(),
   mockGetSimulationStats: vi.fn(),
 }))
 
 vi.mock('../services/api', () => ({
+  getMoodHistory: mockGetMoodHistory,
+  getNetworkAnalysis: mockGetNetworkAnalysis,
   getSimulationStats: mockGetSimulationStats,
 }))
 
@@ -14,6 +18,10 @@ import { StatsPanel } from '../components/toolbar/StatsPanel'
 
 describe('StatsPanel', () => {
   beforeEach(() => {
+    mockGetMoodHistory.mockReset()
+    mockGetMoodHistory.mockResolvedValue([])
+    mockGetNetworkAnalysis.mockReset()
+    mockGetNetworkAnalysis.mockResolvedValue([])
     mockGetSimulationStats.mockReset()
   })
 

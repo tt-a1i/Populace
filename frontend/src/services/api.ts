@@ -16,7 +16,7 @@ export interface ApiResident {
 }
 
 interface SpeedPayload {
-  speed: 1 | 2 | 5
+  speed: 1 | 2 | 5 | 10 | 50
 }
 
 interface EventPayload {
@@ -213,6 +213,33 @@ export interface SimulationStats {
 
 export function getResidentMemories(id: string) {
   return request<ResidentMemory[]>(`/api/residents/${id}/memories`)
+}
+
+export function patchResidentAttributes(
+  id: string,
+  attrs: { name?: string; personality?: string; mood?: string; goals?: string[] },
+) {
+  return request<ApiResident>(`/api/residents/${id}/attributes`, {
+    method: 'PATCH',
+    body: JSON.stringify(attrs),
+  })
+}
+
+export function injectResidentMemory(
+  id: string,
+  payload: { content: string; importance?: number; emotion?: string },
+) {
+  return request<ResidentMemory>(`/api/residents/${id}/inject-memory`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function teleportResident(id: string, x: number, y: number) {
+  return request<ApiResident>(`/api/residents/${id}/teleport`, {
+    method: 'POST',
+    body: JSON.stringify({ x, y }),
+  })
 }
 
 export function getResidentRelationships(id: string) {

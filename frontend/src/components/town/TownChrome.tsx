@@ -9,6 +9,9 @@ import {
   getResidentMemories,
   getResidentReflections,
   getResidentRelationships,
+  injectResidentMemory,
+  patchResidentAttributes,
+  teleportResident,
 } from '../../services/api'
 import type { Building } from '../../types'
 import {
@@ -27,6 +30,7 @@ export interface TownContextMenuState {
   tileX: number
   tileY: number
   tileKind: TileKind
+  nearbyResidentId?: string   // set when right-clicking on/near a resident
 }
 
 export type TownPlaceholder = PlaceholderBuilding
@@ -134,14 +138,68 @@ export function TownChrome({
   const [liveReflections, setLiveReflections] = useState<ResidentReflection[] | null>(null)
   const requestSequenceRef = useRef(0)
 
+  // God-mode: edit panel state
+  const [editMode, setEditMode] = useState(false)
+  const [editMood, setEditMood] = useState('')
+  const [editPersonality, setEditPersonality] = useState('')
+  const [editBusy, setEditBusy] = useState(false)
+
+  // God-mode: inject memory panel state
+  const [injectOpen, setInjectOpen] = useState(false)
+  const [injectContent, setInjectContent] = useState('')
+  const [injectImportance, setInjectImportance] = useState(0.7)
+  const [injectEmotion, setInjectEmotion] = useState('neutral')
+  const [injectBusy, setInjectBusy] = useState(false)
+  const [injectResult, setInjectResult] = useState<string | null>(null)
+
+  const handleOpenEdit = () => {
+    if (!selectedResident) return
+    setEditMood(selectedResident.mood ?? 'neutral')
+    setEditPersonality(selectedResident.personality ?? '')
+    setEditMode(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!selectedResidentId) return
+    setEditBusy(true)
+    try {
+      await patchResidentAttributes(selectedResidentId, {
+        mood: editMood || undefined,
+        personality: editPersonality || undefined,
+      })
+      setEditMode(false)
+    } catch { /* silently ignore */ }
+    finally { setEditBusy(false) }
+  }
+
+  const handleInjectMemory = async () => {
+    if (!selectedResidentId || !injectContent.trim()) return
+    setInjectBusy(true)
+    setInjectResult(null)
+    try {
+      await injectResidentMemory(selectedResidentId, {
+        content: injectContent.trim(),
+        importance: injectImportance,
+        emotion: injectEmotion,
+      })
+      setInjectResult('✓ 记忆已注入')
+      setInjectContent('')
+    } catch { setInjectResult('✗ 注入失败') }
+    finally { setInjectBusy(false) }
+  }
+
+  const handleTeleport = async (x: number, y: number, rid?: string) => {
+    const targetId = rid ?? selectedResidentId
+    if (!targetId) return
+    try { await teleportResident(targetId, x, y) }
+    catch { /* silently ignore */ }
+  }
+
   useLayoutEffect(() => {
     requestSequenceRef.current += 1
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    window.queueMicrotask(() => {
-      setLiveMemories(null)
-      setLiveRelationships(null)
-      setLiveReflections(null)
-    })
+    setLiveMemories(null)
+    setLiveRelationships(null)
+    setLiveReflections(null)
   }, [selectedResidentId])
 
   useEffect(() => {
@@ -237,14 +295,120 @@ export function TownChrome({
               <h3 className="mt-2 font-display text-3xl text-white">{selectedResident.name}</h3>
               <p className="mt-1 text-sm text-slate-400">{selectedResident.personality ?? '暂无性格描述'}</p>
             </div>
-            <button
-              type="button"
-              onClick={onClearResidentSelection}
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 transition hover:bg-white/10"
-            >
-              收起
-            </button>
+            <div className="flex flex-col items-end gap-1.5">
+              <button
+                type="button"
+                onClick={onClearResidentSelection}
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 transition hover:bg-white/10"
+              >
+                收起
+              </button>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={handleOpenEdit}
+                  className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2.5 py-1 text-[11px] font-medium text-amber-200 transition hover:bg-amber-300/20"
+                >
+                  ✏️ 编辑
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setInjectOpen(true); setInjectResult(null) }}
+                  className="rounded-full border border-violet-300/30 bg-violet-300/10 px-2.5 py-1 text-[11px] font-medium text-violet-200 transition hover:bg-violet-300/20"
+                >
+                  💉 记忆
+                </button>
+              </div>
+            </div>
           </div>
+
+          {/* ── God-mode: Edit attributes panel ── */}
+          {editMode && (
+            <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/8 p-4">
+              <p className="mb-3 text-[11px] uppercase tracking-[0.28em] text-amber-300/70">上帝模式 · 编辑属性</p>
+              <label className="grid gap-1 text-xs text-slate-300">
+                心情 Mood
+                <select
+                  value={editMood}
+                  onChange={e => setEditMood(e.target.value)}
+                  className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none"
+                >
+                  {['happy','neutral','sad','angry','excited','calm','tired','fearful'].map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="mt-2 grid gap-1 text-xs text-slate-300">
+                性格 Personality
+                <input
+                  value={editPersonality}
+                  onChange={e => setEditPersonality(e.target.value)}
+                  className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none"
+                />
+              </label>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  disabled={editBusy}
+                  onClick={() => void handleSaveEdit()}
+                  className="flex-1 rounded-xl bg-amber-500/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-amber-400 disabled:opacity-50"
+                >
+                  {editBusy ? '保存中…' : '保存'}
+                </button>
+                <button type="button" onClick={() => setEditMode(false)}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 hover:bg-white/10">
+                  取消
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── God-mode: Inject memory panel ── */}
+          {injectOpen && (
+            <div className="mt-3 rounded-2xl border border-violet-400/20 bg-violet-400/8 p-4">
+              <p className="mb-3 text-[11px] uppercase tracking-[0.28em] text-violet-300/70">上帝模式 · 注入记忆</p>
+              <label className="grid gap-1 text-xs text-slate-300">
+                记忆内容
+                <input
+                  value={injectContent}
+                  onChange={e => setInjectContent(e.target.value)}
+                  placeholder="描述一段记忆…"
+                  className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none placeholder-slate-600"
+                />
+              </label>
+              <label className="mt-2 grid gap-1 text-xs text-slate-300">
+                重要度 {(injectImportance * 100).toFixed(0)}%
+                <input type="range" min={0} max={1} step={0.05}
+                  value={injectImportance}
+                  onChange={e => setInjectImportance(Number(e.target.value))}
+                  className="w-full accent-violet-400" />
+              </label>
+              <label className="mt-2 grid gap-1 text-xs text-slate-300">
+                情绪
+                <select value={injectEmotion} onChange={e => setInjectEmotion(e.target.value)}
+                  className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none">
+                  {['neutral','happy','sad','angry','surprised','fearful'].map(em => (
+                    <option key={em} value={em}>{em}</option>
+                  ))}
+                </select>
+              </label>
+              {injectResult && <p className="mt-2 text-xs text-violet-300">{injectResult}</p>}
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  disabled={injectBusy || !injectContent.trim()}
+                  onClick={() => void handleInjectMemory()}
+                  className="flex-1 rounded-xl bg-violet-500/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-violet-400 disabled:opacity-50"
+                >
+                  {injectBusy ? '注入中…' : '注入记忆'}
+                </button>
+                <button type="button" onClick={() => setInjectOpen(false)}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 hover:bg-white/10">
+                  关闭
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="mt-5 grid grid-cols-2 gap-3">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
@@ -462,6 +626,19 @@ export function TownChrome({
             >
               放置建筑占位
             </button>
+            {/* Teleport selected resident or context-menu nearby resident */}
+            {(selectedResidentId || contextMenu.nearbyResidentId) && (
+              <button
+                type="button"
+                onClick={() => {
+                  void handleTeleport(contextMenu.tileX, contextMenu.tileY, contextMenu.nearbyResidentId)
+                  onCloseContextMenu()
+                }}
+                className="rounded-2xl px-3 py-2 text-left text-sm text-violet-200 transition hover:bg-violet-300/14"
+              >
+                ⚡ 传送到此
+              </button>
+            )}
           </div>
           <button
             type="button"

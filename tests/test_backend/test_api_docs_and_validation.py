@@ -35,7 +35,7 @@ def test_invalid_simulation_speed_returns_validation_error(client: TestClient) -
 
     assert response.status_code == 422
     assert response.json() == {
-        "detail": "Input should be 1, 2 or 5",
+        "detail": "Input should be 1, 2, 5, 10 or 50",
         "code": "validation_error",
     }
 
