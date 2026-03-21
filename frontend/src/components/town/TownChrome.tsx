@@ -109,6 +109,7 @@ export function TownChrome({
           className="absolute bottom-4 right-4 top-4 z-30 flex w-[min(22rem,calc(100%-2rem))] flex-col rounded-[26px] border border-cyan-300/18 bg-slate-950/92 p-5 text-slate-100 shadow-[0_28px_80px_rgba(8,15,31,0.44)] backdrop-blur"
         >
           <ResidentStoryPanel
+            key={selectedResidentId}
             residentId={selectedResidentId}
             residents={residents}
             buildings={buildings}
