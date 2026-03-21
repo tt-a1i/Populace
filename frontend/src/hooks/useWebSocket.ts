@@ -135,11 +135,20 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
             })
             if (playSounds) {
               for (const unlock of achievementUnlocks) {
-                pushToast(`${unlock.icon} ${unlock.achievement_name}`)
+                pushToast({
+                  type: 'success',
+                  category: 'achievement',
+                  title: `${unlock.icon} ${unlock.achievement_name}`,
+                })
                 play('achievement')
               }
               for (const ev of relationshipEvents) {
-                pushToast(`${relEventLabel(ev.event_type)}: ${ev.from_name} & ${ev.to_name}`)
+                pushToast({
+                  type: 'info',
+                  category: 'relationship',
+                  title: relEventLabel(ev.event_type),
+                  description: `${ev.from_name} & ${ev.to_name}`,
+                })
                 play('event')
               }
             }

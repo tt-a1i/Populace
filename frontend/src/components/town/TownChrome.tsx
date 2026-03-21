@@ -47,7 +47,7 @@ interface TownChromeProps {
   relationships: GraphRelationship[]
   selectedResidentId: string | null
   currentTime: string
-  messageFeed: string[]
+  messageFeed: Array<{ text: string }>
   contextMenu: TownContextMenuState | null
   inspection: TownInspectionState | null
   placeholders: TownPlaceholder[]
@@ -73,10 +73,10 @@ function formatMood(mood: string | undefined): string {
 
 function buildMemorySummary(
   resident: ResidentPosition,
-  messageFeed: string[],
+  messageFeed: Array<{ text: string }>,
   currentTime: string,
 ): string[] {
-  const relatedFeed = messageFeed.filter((message) => message.includes(resident.name)).slice(-2).reverse()
+  const relatedFeed = messageFeed.filter((message) => message.text.includes(resident.name)).map((m) => m.text).slice(-2).reverse()
   const summary = [
     resident.dialogueText ? `刚刚说过：${resident.dialogueText}` : null,
     ...relatedFeed,

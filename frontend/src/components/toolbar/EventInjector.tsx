@@ -32,6 +32,7 @@ export function EventInjector() {
   const [customEvent, setCustomEvent] = useState('')
   const [lastEvent, setLastEvent] = useState('')
   const [busy, setBusy] = useState(false)
+  const [flashBorder, setFlashBorder] = useState(false)
   const [presets, setPresets] = useState<PresetEvent[]>([])
   const [activeEvents, setActiveEvents] = useState<ActiveEvent[]>([])
 
@@ -61,6 +62,8 @@ export function EventInjector() {
     try {
       await injectPresetEvent(presetId)
       setLastEvent(presetName)
+      setFlashBorder(true)
+      setTimeout(() => setFlashBorder(false), 600)
       play('event')
       pushToast({
         type: 'success',
@@ -80,6 +83,8 @@ export function EventInjector() {
       await injectEvent({ description: desc })
       setLastEvent(desc)
       setCustomEvent('')
+      setFlashBorder(true)
+      setTimeout(() => setFlashBorder(false), 600)
       play('event')
       pushToast({
         type: 'success',
@@ -92,7 +97,12 @@ export function EventInjector() {
   }
 
   return (
-    <div className="grid gap-4 rounded-[24px] border border-white/10 bg-slate-950/70 p-4 text-slate-100 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
+    <div className={[
+      'grid gap-4 rounded-[24px] border p-4 text-slate-100 transition-all duration-300',
+      flashBorder
+        ? 'border-cyan-400/50 bg-slate-950/70 shadow-[0_0_24px_rgba(34,211,238,0.12),0_18px_44px_rgba(15,23,42,0.35)]'
+        : 'border-white/10 bg-slate-950/70 shadow-[0_18px_44px_rgba(15,23,42,0.35)]',
+    ].join(' ')}>
       <div>
         <p className="text-[11px] uppercase tracking-[0.3em] text-cyan-200/70">{t('event_injector.badge')}</p>
         <h3 className="mt-2 font-display text-2xl text-white">{t('event_injector.title')}</h3>

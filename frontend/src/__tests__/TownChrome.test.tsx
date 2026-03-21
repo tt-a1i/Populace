@@ -118,7 +118,10 @@ function buildProps(selectedResidentId: string | null) {
     relationships,
     selectedResidentId,
     currentTime: 'Day 2, 09:30',
-    messageFeed: ['小明 对 小红 说：今天真热闹。', '事件：咖啡馆门口传来笑声'],
+    messageFeed: [
+      { text: '小明 对 小红 说：今天真热闹。' },
+      { text: '事件：咖啡馆门口传来笑声' },
+    ],
     contextMenu: null,
     inspection: null,
     placeholders,
@@ -193,7 +196,7 @@ describe('TownChrome', () => {
         relationships={relationships}
         selectedResidentId="r1"
         currentTime="Day 2, 09:30"
-        messageFeed={['小明 对 小红 说：今天真热闹。', '事件：咖啡馆门口传来笑声']}
+        messageFeed={[{ text: '小明 对 小红 说：今天真热闹。' }, { text: '事件：咖啡馆门口传来笑声' }]}
         contextMenu={null}
         inspection={inspection}
         placeholders={placeholders}

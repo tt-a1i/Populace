@@ -3,15 +3,18 @@ import React from 'react'
 
 export interface ToastOptions {
   type?: 'success' | 'info' | 'warning' | 'error'
+  category?: 'achievement' | 'relationship' | 'default'
   title?: string
   description?: string
 }
 
 type ToastType = NonNullable<ToastOptions['type']>
+type ToastCategory = NonNullable<ToastOptions['category']>
 
 interface Toast {
   id: string
   type: ToastType
+  category: ToastCategory
   title: string
   description: string
 }
@@ -48,6 +51,13 @@ const TOAST_VARIANTS: Record<
   },
 }
 
+function relationshipBorderClass(title: string): string {
+  if (title.includes('💚')) return 'border-l-4 border-l-emerald-400'
+  if (title.includes('💖')) return 'border-l-4 border-l-pink-400'
+  if (title.includes('⚡')) return 'border-l-4 border-l-amber-400'
+  return 'border-l-4 border-l-blue-400'
+}
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = React.useState<Toast[]>([])
 
@@ -55,6 +65,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     (messageOrOpts: string | ToastOptions, opts?: ToastOptions) => {
       const id = String(Date.now() + Math.random())
       let type: ToastType = 'info'
+      let category: ToastCategory = 'default'
       let title = ''
       let description = ''
 
@@ -62,13 +73,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         title = messageOrOpts
         description = opts?.description ?? ''
         type = opts?.type ?? 'info'
+        category = opts?.category ?? 'default'
       } else {
         title = messageOrOpts.title ?? ''
         description = messageOrOpts.description ?? ''
         type = messageOrOpts.type ?? 'info'
+        category = messageOrOpts.category ?? 'default'
       }
 
-      setToasts((current) => [...current, { id, type, title, description }])
+      setToasts((current) => [...current, { id, type, category, title, description }])
       window.setTimeout(() => {
         setToasts((current) => current.filter((toast) => toast.id !== id))
       }, 3000)
@@ -85,6 +98,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       >
         {toasts.map((toast) => {
           const variant = TOAST_VARIANTS[toast.type]
+          const isAchievement = toast.category === 'achievement'
+          const isRelationship = toast.category === 'relationship'
 
           return (
             <div
@@ -93,7 +108,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               data-variant={toast.type}
               role="status"
               aria-live="polite"
-              className={`rounded-xl border px-4 py-3 text-sm shadow-lg backdrop-blur ${variant.className}`}
+              className={[
+                'rounded-xl border px-4 py-3 text-sm shadow-lg backdrop-blur',
+                isAchievement ? 'toast-achievement' : 'toast-enter',
+                variant.className,
+                isRelationship ? relationshipBorderClass(toast.title) : '',
+              ].join(' ')}
             >
               <div className="flex items-start gap-3">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-current/20 bg-black/10 text-xs font-bold">

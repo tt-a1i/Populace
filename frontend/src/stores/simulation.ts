@@ -3,6 +3,14 @@ import { create } from 'zustand'
 import type { Building, DialogueUpdate, EnergyUpdate, MovementUpdate, Resident, TickState } from '../types'
 
 export type SimulationSpeed = 0 | 1 | 2 | 5 | 10 | 50
+
+export type FeedMessageKind = 'dialogue' | 'event' | 'system'
+
+export interface FeedMessage {
+  id: string
+  text: string
+  kind: FeedMessageKind
+}
 export type ResidentStatus =
   | 'idle'
   | 'walking'
@@ -102,7 +110,7 @@ interface SimulationState {
   history: SimulationHistoryFrame[]
   buildings: Array<Building & { occupants: number }>
   replayFrozenFrame: FrozenSimulationFrame | null
-  messageFeed: string[]
+  messageFeed: FeedMessage[]
   selectedResidentId: string | null
   hoveredPairIds: [string, string] | null
   setRunning: (running: boolean) => void
@@ -152,7 +160,10 @@ function statusFromAction(action?: string, fallback?: ResidentStatus): ResidentS
   }
 }
 
-function appendRecentMessages(existing: string[], incoming: string[]): string[] {
+let _feedCounter = 0
+function _feedId(): string { return `f${++_feedCounter}` }
+
+function appendRecentMessages(existing: FeedMessage[], incoming: FeedMessage[]): FeedMessage[] {
   if (incoming.length === 0) {
     return existing
   }
@@ -207,8 +218,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   buildings: [],
   replayFrozenFrame: null,
   messageFeed: [
-    '等待居民进入场景...',
-    '连接建立后，这里会滚动显示最新事件与对话。',
+    { id: 'init-1', kind: 'system' as FeedMessageKind, text: '等待居民进入场景...' },
+    { id: 'init-2', kind: 'system' as FeedMessageKind, text: '连接建立后，这里会滚动显示最新事件与对话。' },
   ],
   selectedResidentId: null,
   hoveredPairIds: null,
@@ -236,7 +247,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     set((state) => {
       const residentMap = new Map(state.residents.map((resident) => [resident.id, resident]))
       const dialogueByResident = new Map<string, string>()
-      const freshMessages: string[] = []
+      const freshMessages: FeedMessage[] = []
       const seenResidents = new Set<string>()
 
       for (const dialogue of tickState.dialogues ?? []) {
@@ -246,11 +257,11 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         dialogueByResident.set(dialogue.from_id, dialogue.text)
         const fromName = residentMap.get(dialogue.from_id)?.name ?? dialogue.from_id
         const toName = residentMap.get(dialogue.to_id)?.name ?? dialogue.to_id
-        freshMessages.push(`${fromName} 对 ${toName} 说：${dialogue.text}`)
+        freshMessages.push({ id: _feedId(), kind: 'dialogue', text: `${fromName} 对 ${toName} 说：${dialogue.text}` })
       }
 
       for (const event of tickState.events ?? []) {
-        freshMessages.push(`事件：${event.description}`)
+        freshMessages.push({ id: _feedId(), kind: 'event', text: `事件：${event.description}` })
       }
 
       for (const movement of tickState.movements) {
@@ -411,8 +422,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         replayFrozenFrame: state.replayFrozenFrame,
         messageFeed:
           residents.length > 0
-            ? appendRecentMessages(state.messageFeed, ['首帧快照已到达，居民开始进入小镇。'])
-            : appendRecentMessages(state.messageFeed, ['首帧快照为空，等待居民加载...']),
+            ? appendRecentMessages(state.messageFeed, [{ id: _feedId(), kind: 'system', text: '首帧快照已到达，居民开始进入小镇。' }])
+            : appendRecentMessages(state.messageFeed, [{ id: _feedId(), kind: 'system', text: '首帧快照为空，等待居民加载...' }]),
         residents,
       }
     })

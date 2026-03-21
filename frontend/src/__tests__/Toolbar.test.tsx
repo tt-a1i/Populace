@@ -98,11 +98,9 @@ describe('Toolbar', () => {
     expect(screen.getByTestId('stats-panel')).toBeInTheDocument()
   })
 
-  it('displays the active tool name in the status bar', () => {
+  it('marks the default tool button as active', () => {
     render(<Toolbar />)
-    // Status bar contains "当前工具：事件投放"
-    expect(screen.getByText(/当前工具/)).toBeInTheDocument()
-    const statusBar = screen.getByText(/当前工具/)
-    expect(statusBar.textContent).toContain('事件投放')
+    const eventButton = screen.getByRole('button', { name: /事件投放/ })
+    expect(eventButton.dataset.active).toBe('true')
   })
 })

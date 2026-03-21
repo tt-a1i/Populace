@@ -149,7 +149,15 @@
     "timeout_title": "Backend not running — please run docker compose up",
     "timeout_desc": "Frontend is ready but no snapshot has arrived. Confirm the container is up, then retry.",
     "retry": "Retry Connection",
-    "connecting": "You'll be switched automatically once the first snapshot arrives."
+    "connecting": "You'll be switched automatically once the first snapshot arrives.",
+    "fun_messages": [
+      "Residents are moving furniture…",
+      "The bakery is preheating its oven…",
+      "Building the gossip network…",
+      "Assigning unique personalities…",
+      "Residents are recalling past lives…",
+      "AI is learning how to gossip…"
+    ]
   },
   "report": {
     "badge": "Town Gazette",

@@ -279,7 +279,7 @@ function SimulationView() {
         className={[
           'fixed bottom-4 right-4 z-40 rounded-full px-3 py-1 text-xs font-medium transition-colors',
           connected
-            ? 'border border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
+            ? 'border border-emerald-400/30 bg-emerald-400/10 text-emerald-300 connection-pulse'
             : 'border border-amber-400/30 bg-amber-400/10 text-amber-300',
         ].join(' ')}
       >

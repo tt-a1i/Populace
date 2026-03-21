@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 interface LoadingTransitionProps {
@@ -12,6 +12,14 @@ function SkeletonBlock({ className = '', style }: { className?: string; style?: 
 
 export function LoadingTransition({ onRetry, timedOut }: LoadingTransitionProps) {
   const { t } = useTranslation()
+  const funMessages = t('loading.fun_messages', { returnObjects: true }) as string[]
+  const [msgIdx, setMsgIdx] = useState(0)
+
+  useEffect(() => {
+    if (timedOut || !Array.isArray(funMessages) || funMessages.length === 0) return
+    const id = setInterval(() => setMsgIdx((i) => (i + 1) % funMessages.length), 3000)
+    return () => clearInterval(id)
+  }, [timedOut, funMessages])
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-slate-950 px-3 py-3 text-slate-100 sm:px-6 sm:py-4 lg:px-8">
@@ -86,7 +94,11 @@ export function LoadingTransition({ onRetry, timedOut }: LoadingTransitionProps)
               <span className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-cyan-300/90 border-t-transparent" />
               <div className="flex flex-col gap-0.5">
                 <p className="text-[10px] uppercase tracking-[0.36em] text-cyan-200/70">{t('loading.badge')}</p>
-                <p className="text-sm font-medium text-cyan-50">{t('loading.connecting')}</p>
+                <p key={msgIdx} className="animate-fade-up text-sm font-medium text-cyan-50">
+                  {Array.isArray(funMessages) && funMessages.length > 0
+                    ? funMessages[msgIdx]
+                    : t('loading.connecting')}
+                </p>
               </div>
             </>
           )}
