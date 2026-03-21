@@ -568,6 +568,16 @@
     "fallback_s5_heading": "Ethical Considerations",
     "fallback_s5_content": "The experiment panel notes limitations of observations and potential ethical concerns."
   },
+  "ws": {
+    "reconnected": "Reconnected",
+    "reconnected_desc": "Live sync restored.",
+    "connection_lost": "Connection lost",
+    "reconnecting_desc": "Attempting to reconnect…",
+    "event_confession": "fell in love",
+    "event_best_friends": "became best friends",
+    "event_public_argument": "had a public argument",
+    "event_milestone": "{{a}} and {{b}} {{event}}!"
+  },
   "error": {
     "badge": "Application Error",
     "title": "Something went wrong",

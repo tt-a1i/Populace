@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import i18n from '../i18n/config'
 import { useSound } from '../audio'
 import { useToast } from '../components/ui/ToastProvider'
 import { useRelationshipsStore } from '../stores/relationships'
@@ -136,16 +137,17 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
                 play('achievement')
               }
               for (const ev of relationshipEvents) {
-                const EVENT_TOAST: Record<string, { icon: string; label: string }> = {
-                  confession: { icon: '\u{1F495}', label: '\u574E\u5165\u7231\u6CB3' },
-                  best_friends: { icon: '\u{1F91D}', label: '\u6210\u4E3A\u631A\u53CB' },
-                  public_argument: { icon: '\u26A1', label: '\u516C\u5F00\u4E89\u5435' },
+                const EVENT_TOAST: Record<string, { icon: string; labelKey: string }> = {
+                  confession: { icon: '\u{1F495}', labelKey: 'ws.event_confession' },
+                  best_friends: { icon: '\u{1F91D}', labelKey: 'ws.event_best_friends' },
+                  public_argument: { icon: '\u26A1', labelKey: 'ws.event_public_argument' },
                 }
-                const meta = EVENT_TOAST[ev.event_type] ?? { icon: '\u2728', label: ev.event_type }
+                const meta = EVENT_TOAST[ev.event_type] ?? { icon: '\u2728', labelKey: '' }
+                const label = meta.labelKey ? i18n.t(meta.labelKey) : ev.event_type
                 pushToast({
                   type: ev.event_type === 'public_argument' ? 'warning' : 'success',
                   category: 'relationship',
-                  title: `${meta.icon} ${ev.from_name} \u548C ${ev.to_name} ${meta.label}\uFF01`,
+                  title: `${meta.icon} ${i18n.t('ws.event_milestone', { a: ev.from_name, b: ev.to_name, event: label })}`,
                   description: ev.dialogue,
                 })
                 play('event')
@@ -227,8 +229,8 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
       if (shouldAnnounceReconnectRef.current) {
         pushToast({
           type: 'success',
-          title: 'Reconnected',
-          description: 'Live sync restored.',
+          title: i18n.t('ws.reconnected'),
+          description: i18n.t('ws.reconnected_desc'),
         })
         shouldAnnounceReconnectRef.current = false
       }
@@ -253,8 +255,8 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
         shouldAnnounceReconnectRef.current = true
         pushToast({
           type: 'warning',
-          title: 'Connection lost',
-          description: 'Attempting to reconnect…',
+          title: i18n.t('ws.connection_lost'),
+          description: i18n.t('ws.reconnecting_desc'),
         })
       }
 

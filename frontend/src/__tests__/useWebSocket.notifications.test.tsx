@@ -118,10 +118,10 @@ describe('useWebSocket notifications', () => {
     })
 
     expect(mockPushToast).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'warning', title: 'Connection lost' }),
+      expect.objectContaining({ type: 'warning', title: '连接丢失' }),
     )
     expect(mockPushToast).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'success', title: 'Reconnected' }),
+      expect.objectContaining({ type: 'success', title: '已重新连接' }),
     )
     expect(mockPlay).toHaveBeenCalledWith('dialogue')
     expect(mockPlay).toHaveBeenCalledWith('relationship')

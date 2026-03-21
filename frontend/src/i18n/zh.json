@@ -568,6 +568,16 @@
     "fallback_s5_heading": "伦理思考",
     "fallback_s5_content": "实验面板会提示观察结论的局限，以及潜在的伦理问题。"
   },
+  "ws": {
+    "reconnected": "已重新连接",
+    "reconnected_desc": "实时同步已恢复。",
+    "connection_lost": "连接丢失",
+    "reconnecting_desc": "正在尝试重新连接…",
+    "event_confession": "陷入爱河",
+    "event_best_friends": "成为挚友",
+    "event_public_argument": "公开争吵",
+    "event_milestone": "{{a}} 和 {{b}} {{event}}！"
+  },
   "error": {
     "badge": "应用错误",
     "title": "页面出现了问题",
