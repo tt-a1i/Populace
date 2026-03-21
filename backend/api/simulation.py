@@ -213,6 +213,7 @@ class SimulationState:
         self._active_dialogue_pairs.clear()
         self._events.clear()
         self._active_events.clear()
+        self._mood_history = []
         self._total_dialogue_count = 0
         self._total_relationship_change_count = 0
 
@@ -231,6 +232,7 @@ class SimulationState:
         self._active_dialogue_pairs.clear()
         self._events.clear()
         self._active_events.clear()
+        self._mood_history = []
         self._total_dialogue_count = 0
         self._total_relationship_change_count = 0
 
@@ -298,6 +300,7 @@ class SimulationState:
         self._active_dialogue_pairs.clear()
         self._events.clear()
         self._active_events.clear()
+        self._mood_history = []
         self._total_dialogue_count = 0
         self._total_relationship_change_count = 0
 

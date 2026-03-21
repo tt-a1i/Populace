@@ -44,6 +44,9 @@ interface RelationshipsState {
   replayTick: number | null
   updateFromTick: (tickState: RelationshipTickState) => void
   initFromSnapshot: (residents: Array<{ id: string; name: string; mood?: string }>) => void
+  setRelationshipsAbsolute: (
+    rels: Array<{ from_id: string; to_id: string; type: string; intensity: number; reason?: string }>,
+  ) => void
   setReplayTick: (tick: number | null) => void
 }
 
@@ -171,6 +174,18 @@ export const useRelationshipsStore = create<RelationshipsState>((set) => ({
       history: [],
       lastAppliedTick: 0,
       replayTick: null,
+    })
+  },
+
+  setRelationshipsAbsolute: (rels) => {
+    set({
+      relationships: rels.map((r) => ({
+        from_id: r.from_id,
+        to_id: r.to_id,
+        type: normalizeType(r.type),
+        intensity: clampIntensity(r.intensity),
+        reason: r.reason ?? '',
+      })),
     })
   },
 }))

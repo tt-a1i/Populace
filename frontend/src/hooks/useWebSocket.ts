@@ -57,6 +57,7 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
   const simInitFromSnapshot = useSimulationStore((s) => s.initFromSnapshot)
   const relUpdateFromTick = useRelationshipsStore((s) => s.updateFromTick)
   const relInitFromSnapshot = useRelationshipsStore((s) => s.initFromSnapshot)
+  const relSetAbsolute = useRelationshipsStore((s) => s.setRelationshipsAbsolute)
 
   // -------------------------------------------------------------------------
   // Message handler
@@ -120,30 +121,24 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
         simInitFromSnapshot(snapshot)
         // Rebuild graph store from backend residents, clearing mock data
         relInitFromSnapshot(snapshot.residents ?? [])
-        // Seed initial relationships from snapshot (populated from template)
+        // Seed initial relationships absolutely (not as deltas) from snapshot
         if (Array.isArray(snapshot.relationships) && snapshot.relationships.length > 0) {
-          // Inject as a synthetic tick with full relationship list as absolute deltas
-          relUpdateFromTick({
-            tick: snapshot.tick,
-            relationships: snapshot.relationships.map((r: Record<string, unknown>) => ({
-              from_id: r.from_id as string,
-              to_id: r.to_id as string,
-              type: r.type as string,
-              // Initial snapshot uses absolute intensity, not delta — send as positive delta
-              delta: r.intensity as number,
-              reason: r.reason as string | undefined,
-            })),
-          })
+          relSetAbsolute(snapshot.relationships as Array<{
+            from_id: string; to_id: string; type: string; intensity: number; reason?: string
+          }>)
         }
         if (snapshot.last_tick) {
-          commitTick(snapshot.last_tick as Record<string, unknown>, false)
+          // Apply last_tick for positions/dialogues but SKIP relationship deltas to prevent
+          // double-stacking with the absolute snapshot.relationships already applied above.
+          const lastTickNoRels = { ...(snapshot.last_tick as Record<string, unknown>), relationships: [] }
+          commitTick(lastTickNoRels, false)
         }
       } else if (type === 'tick') {
         // Incremental diff
         commitTick(data as Record<string, unknown>)
       }
     },
-    [play, relInitFromSnapshot, relUpdateFromTick, simInitFromSnapshot, simUpdateFromTick],
+    [play, relInitFromSnapshot, relSetAbsolute, relUpdateFromTick, simInitFromSnapshot, simUpdateFromTick],
   )
 
   // -------------------------------------------------------------------------
