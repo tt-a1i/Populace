@@ -35,11 +35,16 @@
     "starting": "Starting…"
   },
   "toolbar": {
-    "event": "Events",
+    "director": "Director",
     "persona": "Persona",
+    "quest": "Quests",
+    "report": "Gazette",
+    "more": "More",
+    "less": "Less",
+    "quest_coming_soon": "Quests coming soon",
+    "event": "Events",
     "build": "Build",
     "create": "Add Resident",
-    "report": "Gazette",
     "stats": "Stats",
     "saves": "Saves",
     "export": "Export",
@@ -246,6 +251,21 @@
     "wandering": "Wandering around town",
     "at_home": "Resting at home",
     "at_work": "Working"
+  },
+  "onboarding": {
+    "line1": "This is a town powered by AI...",
+    "line2": "Every resident has their own personality, memories, and goals",
+    "meet_resident": "Meet {{name}}",
+    "personality_hint": "{{personality}}",
+    "watch_meeting": "Let's see what happens...",
+    "ai_explains": "Residents chat, form relationships, and spread gossip on their own",
+    "your_turn": "Now it's your turn to decide what happens next",
+    "romance": "Spark Romance",
+    "romance_desc": "Drop an anonymous love letter and see who falls",
+    "conflict": "Stir Conflict",
+    "conflict_desc": "Bring a mysterious stranger to shake things up",
+    "watch": "Just Watch",
+    "watch_desc": "Let the AI residents roam free"
   },
   "app": {
     "panel_loading": "Loading module…",

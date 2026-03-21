@@ -35,11 +35,16 @@
     "starting": "启动中…"
   },
   "toolbar": {
-    "event": "事件投放",
+    "director": "导演台",
     "persona": "人设编辑",
+    "quest": "剧情任务",
+    "report": "今日日报",
+    "more": "更多",
+    "less": "收起",
+    "quest_coming_soon": "剧情任务即将上线",
+    "event": "事件投放",
     "build": "建造模式",
     "create": "创建居民",
-    "report": "小镇日报",
     "stats": "数据统计",
     "saves": "存档管理",
     "export": "数据导出",
@@ -246,6 +251,21 @@
     "wandering": "在小镇闲逛",
     "at_home": "在家休息",
     "at_work": "在工作中"
+  },
+  "onboarding": {
+    "line1": "这是一个由 AI 驱动的小镇...",
+    "line2": "每个居民都有自己的性格、记忆和目标",
+    "meet_resident": "这是 {{name}}",
+    "personality_hint": "{{personality}}",
+    "watch_meeting": "让我们看看会发生什么...",
+    "ai_explains": "居民们会自主对话、建立关系、传播八卦",
+    "your_turn": "现在，由你来决定接下来发生什么",
+    "romance": "制造浪漫",
+    "romance_desc": "投放一封匿名情书，看看谁会心动",
+    "conflict": "挑起矛盾",
+    "conflict_desc": "引入一个神秘陌生人，搅动小镇平静",
+    "watch": "随便看看",
+    "watch_desc": "放手让 AI 居民自由发展"
   },
   "app": {
     "panel_loading": "模块加载中…",
