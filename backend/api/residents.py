@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 from backend.api.schemas import (
+    DiaryEntryResponse,
     ResidentMemoryResponse,
     ResidentReflectionResponse,
     ResidentRelationshipResponse,
@@ -126,6 +127,20 @@ async def get_resident_reflections(resident_id: str, request: Request) -> list[R
     if agent is None:
         raise _NOT_FOUND
     return [ResidentReflectionResponse(**asdict(rf)) for rf in agent.reflections]
+
+
+@router.get(
+    "/{resident_id}/diary",
+    response_model=list[DiaryEntryResponse],
+    responses=error_responses(404, 503),
+)
+async def get_resident_diary(resident_id: str, request: Request) -> list[DiaryEntryResponse]:
+    """Return all diary entries accumulated by a resident."""
+    state = get_simulation_state(request)
+    agent = _find_agent(state, resident_id)
+    if agent is None:
+        raise _NOT_FOUND
+    return [DiaryEntryResponse(**asdict(entry)) for entry in agent.resident.diary]
 
 
 class AttributeUpdateRequest(BaseModel):

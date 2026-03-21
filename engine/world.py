@@ -314,6 +314,17 @@ class World:
         self.current_tick += 1
         sim_time = self.simulation_time()
 
+        # ── Mood contagion: co-occupants influence each other's mood ──────
+        from engine.act import apply_mood_contagion
+        apply_mood_contagion(self)
+
+        # ── End-of-day diary generation at 22:00 (tick index 44 / 48) ────
+        _EOD_TICK_IN_DAY = 44  # 22 * (tick_per_day / 24) = 22 * 2
+        if (self.current_tick % self.config.tick_per_day) == _EOD_TICK_IN_DAY:
+            from engine.diary import generate_diary_entry
+            for agent in self.agents:
+                generate_diary_entry(agent, self)
+
         # Collect current position of every agent as movement updates.
         # The backend simulation loop (backend/core/simulation.py) calls
         # perceive/plan/act before tick(); by the time tick() runs the

@@ -184,6 +184,13 @@ export interface ResidentReflection {
   derived_from: string[]
 }
 
+export interface ResidentDiaryEntry {
+  id: string
+  date: string
+  tick: number
+  summary: string
+}
+
 export interface SimulationResidentStat {
   id: string
   name: string
@@ -249,6 +256,10 @@ export function getResidentRelationships(id: string) {
 
 export function getResidentReflections(id: string) {
   return request<ResidentReflection[]>(`/api/residents/${id}/reflections`)
+}
+
+export function getResidentDiary(id: string) {
+  return request<ResidentDiaryEntry[]>(`/api/residents/${id}/diary`)
 }
 
 export function getSimulationStats() {

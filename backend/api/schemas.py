@@ -125,6 +125,13 @@ class ResidentResponse(BaseModel):
     coins: int = 100
 
 
+class DiaryEntryResponse(BaseModel):
+    id: str
+    date: str
+    tick: int
+    summary: str
+
+
 class ResidentMemoryResponse(BaseModel):
     id: str
     content: str

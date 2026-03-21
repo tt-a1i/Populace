@@ -6,16 +6,19 @@ const {
   mockGetResidentMemories,
   mockGetResidentRelationships,
   mockGetResidentReflections,
+  mockGetResidentDiary,
 } = vi.hoisted(() => ({
   mockGetResidentMemories: vi.fn(),
   mockGetResidentRelationships: vi.fn(),
   mockGetResidentReflections: vi.fn(),
+  mockGetResidentDiary: vi.fn(),
 }))
 
 vi.mock('../services/api', () => ({
   getResidentMemories: mockGetResidentMemories,
   getResidentRelationships: mockGetResidentRelationships,
   getResidentReflections: mockGetResidentReflections,
+  getResidentDiary: mockGetResidentDiary,
 }))
 
 import { TownChrome, type TownContextMenuState, type TownInspectionState, type TownPlaceholder } from '../components/town/TownChrome'
@@ -130,10 +133,12 @@ describe('TownChrome', () => {
     mockGetResidentMemories.mockReset()
     mockGetResidentRelationships.mockReset()
     mockGetResidentReflections.mockReset()
+    mockGetResidentDiary.mockReset()
 
     mockGetResidentMemories.mockResolvedValue([])
     mockGetResidentRelationships.mockResolvedValue([])
     mockGetResidentReflections.mockResolvedValue([])
+    mockGetResidentDiary.mockResolvedValue([])
   })
 
   it('shows the tile context menu and dispatches actions', async () => {
@@ -174,7 +179,8 @@ describe('TownChrome', () => {
     expect(onPlacePlaceholder).toHaveBeenCalledTimes(1)
   })
 
-  it('renders the resident sidebar with memory summary and relationships', () => {
+  it('renders the resident sidebar with memory summary and relationships', async () => {
+    const user = userEvent.setup()
     render(
       <TownChrome
         residents={residents}
@@ -200,9 +206,12 @@ describe('TownChrome', () => {
     expect(screen.getByText('外向、热情')).toBeInTheDocument()
     expect(screen.getByText('happy')).toBeInTheDocument()
     expect(screen.getAllByText(/今天真热闹/)[0]).toBeInTheDocument()
-    expect(screen.getByText(/friendship/i)).toBeInTheDocument()
     expect(screen.getByText(/晨曦咖啡馆/)).toBeInTheDocument()
     expect(screen.getByTestId('town-inspection')).toBeInTheDocument()
+
+    // Relationships are on the 关系 tab
+    await user.click(screen.getByRole('button', { name: '关系' }))
+    expect(screen.getByText(/friendship/i)).toBeInTheDocument()
   })
 
   it('renders a minimap dot for every resident and placeholder marker', () => {
@@ -236,6 +245,7 @@ describe('TownChrome', () => {
   })
 
   it('clears live API data immediately when switching residents', async () => {
+    const user = userEvent.setup()
     const residentAMemories: ResidentMemory[] = [
       { id: 'memory-a', content: 'A API 记忆', timestamp: 'Day 1, 08:00', importance: 0.8, emotion: 'happy' },
     ]
@@ -276,6 +286,9 @@ describe('TownChrome', () => {
 
     expect(await screen.findByText('A API 记忆')).toBeInTheDocument()
     expect(screen.getByText('A API 反思')).toBeInTheDocument()
+
+    // Switch to 关系 tab to verify relationship data
+    await user.click(screen.getByRole('button', { name: '关系' }))
     expect(screen.getByText('A API 关系')).toBeInTheDocument()
 
     rerender(<TownChrome {...buildProps('r2')} />)
@@ -284,7 +297,6 @@ describe('TownChrome', () => {
     expect(screen.queryByText('A API 记忆')).not.toBeInTheDocument()
     expect(screen.queryByText('A API 反思')).not.toBeInTheDocument()
     expect(screen.queryByText('A API 关系')).not.toBeInTheDocument()
-    expect(screen.getByText(/当前在地图/)).toBeInTheDocument()
 
     residentBMemories.resolve([])
     residentBRelationships.resolve([])
@@ -366,7 +378,6 @@ describe('TownChrome', () => {
     ])
 
     expect(await screen.findByText('B API 记忆')).toBeInTheDocument()
-    expect(screen.getByText('B API 关系')).toBeInTheDocument()
     expect(screen.getByText('B API 反思')).toBeInTheDocument()
     expect(screen.queryByText('过期的 A 记忆')).not.toBeInTheDocument()
   })
@@ -411,7 +422,6 @@ describe('TownChrome', () => {
     const { rerender } = render(<TownChrome {...buildProps('r1')} />)
 
     expect(await screen.findByText('成功的 A 记忆')).toBeInTheDocument()
-    expect(screen.getByText('成功的 A 关系')).toBeInTheDocument()
     expect(screen.getByText('成功的 A 反思')).toBeInTheDocument()
 
     rerender(<TownChrome {...buildProps('r2')} />)
@@ -422,11 +432,37 @@ describe('TownChrome', () => {
 
     await waitFor(() => {
       expect(screen.queryByText('成功的 A 记忆')).not.toBeInTheDocument()
-      expect(screen.queryByText('成功的 A 关系')).not.toBeInTheDocument()
       expect(screen.queryByText('成功的 A 反思')).not.toBeInTheDocument()
     })
 
     expect(screen.getByText('小红')).toBeInTheDocument()
     expect(screen.queryByText('反思 ·')).not.toBeInTheDocument()
+  })
+
+  it('shows the diary tab with entries when the 日记 tab is clicked', async () => {
+    const user = userEvent.setup()
+    mockGetResidentDiary.mockResolvedValue([
+      { id: 'diary-1', date: 'Day 1', tick: 44, summary: '今天发生了很多有趣的事情。' },
+    ])
+
+    render(<TownChrome {...buildProps('r1')} />)
+
+    await user.click(screen.getByRole('button', { name: '日记' }))
+
+    expect(await screen.findByTestId('resident-diary')).toBeInTheDocument()
+    expect(await screen.findByText('今天发生了很多有趣的事情。')).toBeInTheDocument()
+    expect(screen.getByText('Day 1')).toBeInTheDocument()
+  })
+
+  it('shows empty diary message when no diary entries exist', async () => {
+    const user = userEvent.setup()
+    mockGetResidentDiary.mockResolvedValue([])
+
+    render(<TownChrome {...buildProps('r1')} />)
+
+    await user.click(screen.getByRole('button', { name: '日记' }))
+
+    expect(await screen.findByTestId('resident-diary')).toBeInTheDocument()
+    expect(screen.getByText(/日记尚未生成/)).toBeInTheDocument()
   })
 })

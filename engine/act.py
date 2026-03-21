@@ -13,11 +13,19 @@ multiple ticks until the agent arrives or the path is blocked.
 from __future__ import annotations
 
 import random
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from engine.agent import Agent
     from engine.world import World
+
+# Ordered mood ladder: index 0 = most negative, 9 = most positive
+_MOOD_LADDER: List[str] = [
+    "sad", "fearful", "angry", "tired",
+    "neutral", "calm", "content",
+    "happy", "excited", "ecstatic",
+]
+_MOOD_RANK = {mood: i for i, mood in enumerate(_MOOD_LADDER)}
 
 
 def act(agent: "Agent", plan: dict, world: "World") -> None:
@@ -157,3 +165,41 @@ def _stay_or_leave_building(agent: "Agent", world: "World") -> None:
         return
 
     setattr(agent, "_building_ticks_remaining", remaining)
+
+
+def apply_mood_contagion(world: "World") -> None:
+    """Nudge moods of co-occupants toward each other based on relationship strength.
+
+    For each building with ≥2 occupants:
+    - Each agent accumulates a net push from co-occupants (positive = nudge up,
+      negative = nudge down) weighted by relationship intensity.
+    - If the net push exceeds a random threshold, mood moves one step on the
+      ladder, keeping emotion dynamics gradual and stochastic.
+    """
+    for building in world.buildings:
+        occupants = world.get_occupants(building.id)
+        if len(occupants) < 2:
+            continue
+
+        for agent in occupants:
+            my_rank = _MOOD_RANK.get(agent.resident.mood, 4)
+            net_push = 0.0
+
+            for other in occupants:
+                if other is agent:
+                    continue
+                other_rank = _MOOD_RANK.get(other.resident.mood, 4)
+                if other_rank == my_rank:
+                    continue
+                rel = world.get_relationship(other.resident.id, agent.resident.id)
+                # Use a small base intensity even with no established relationship
+                intensity = rel.intensity if rel is not None else 0.1
+                direction = 1.0 if other_rank > my_rank else -1.0
+                net_push += direction * intensity * 0.05
+
+            if net_push > 0 and random.random() < net_push:
+                new_rank = min(my_rank + 1, len(_MOOD_LADDER) - 1)
+                agent.resident.mood = _MOOD_LADDER[new_rank]
+            elif net_push < 0 and random.random() < -net_push:
+                new_rank = max(my_rank - 1, 0)
+                agent.resident.mood = _MOOD_LADDER[new_rank]

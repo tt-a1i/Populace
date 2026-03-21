@@ -3,9 +3,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { GraphRelationship } from '../../stores/relationships'
 import type { ResidentPosition } from '../../stores/simulation'
 import {
+  type ResidentDiaryEntry,
   type ResidentMemory,
   type ResidentReflection,
   type ResidentRelationship,
+  getResidentDiary,
   getResidentMemories,
   getResidentReflections,
   getResidentRelationships,
@@ -132,10 +134,14 @@ export function TownChrome({
     [residents, selectedResidentId],
   )
 
+  // Sidebar tabs: memories | diary | relationships
+  const [sidebarTab, setSidebarTab] = useState<'memories' | 'diary' | 'relationships'>('memories')
+
   // Real data from API (fetched when a resident is selected)
   const [liveMemories, setLiveMemories] = useState<ResidentMemory[] | null>(null)
   const [liveRelationships, setLiveRelationships] = useState<ResidentRelationship[] | null>(null)
   const [liveReflections, setLiveReflections] = useState<ResidentReflection[] | null>(null)
+  const [liveDiary, setLiveDiary] = useState<ResidentDiaryEntry[] | null>(null)
   const requestSequenceRef = useRef(0)
 
   // God-mode: edit panel state
@@ -200,6 +206,7 @@ export function TownChrome({
     setLiveMemories(null)
     setLiveRelationships(null)
     setLiveReflections(null)
+    setLiveDiary(null)
   }, [selectedResidentId])
 
   useEffect(() => {
@@ -221,6 +228,7 @@ export function TownChrome({
     const setMemories = applyIfCurrent(setLiveMemories)
     const setRelationships = applyIfCurrent(setLiveRelationships)
     const setReflections = applyIfCurrent(setLiveReflections)
+    const setDiary = applyIfCurrent(setLiveDiary)
 
     void getResidentMemories(selectedResidentId).then(setMemories).catch(() => setMemories(null))
     void getResidentRelationships(selectedResidentId)
@@ -229,6 +237,7 @@ export function TownChrome({
     void getResidentReflections(selectedResidentId)
       .then(setReflections)
       .catch(() => setReflections(null))
+    void getResidentDiary(selectedResidentId).then(setDiary).catch(() => setDiary(null))
 
     return () => {
       disposed = true
@@ -425,58 +434,112 @@ export function TownChrome({
             </div>
           </div>
 
-          {/* ── Memories (live from API, fallback to synthesised) ── */}
-          <section className="mt-5 rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">
-                记忆
-                {liveMemories && liveMemories.length > 0 && (
-                  <span className="ml-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5 text-[9px] text-cyan-300/70">
-                    {liveMemories.length}
+          {/* ── Tab switcher: memories / diary / relationships ── */}
+          <div className="mt-5 inline-flex rounded-full border border-white/10 bg-white/5 p-1">
+            {(['memories', 'diary', 'relationships'] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setSidebarTab(tab)}
+                className={[
+                  'rounded-full px-3 py-1 text-xs font-medium transition',
+                  sidebarTab === tab ? 'bg-cyan-300/16 text-cyan-50' : 'text-slate-400',
+                ].join(' ')}
+              >
+                {tab === 'memories' ? '记忆' : tab === 'diary' ? '日记' : '关系'}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Memories ── */}
+          {sidebarTab === 'memories' && (
+            <section className="mt-3 rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">
+                  记忆
+                  {liveMemories && liveMemories.length > 0 && (
+                    <span className="ml-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5 text-[9px] text-cyan-300/70">
+                      {liveMemories.length}
+                    </span>
+                  )}
+                </p>
+                <span className="text-xs text-slate-500">{currentTime}</span>
+              </div>
+              <div className="mt-3 max-h-40 space-y-2 overflow-y-auto text-sm leading-6 text-slate-300 pr-1">
+                {liveMemories && liveMemories.length > 0 ? (
+                  [...liveMemories].reverse().slice(0, 8).map((mem) => (
+                    <div key={mem.id} className="rounded-2xl border border-white/6 bg-slate-900/60 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-slate-500">{mem.timestamp}</span>
+                        <span className="text-[10px] text-slate-500">重要度 {(mem.importance * 100).toFixed(0)}%</span>
+                      </div>
+                      <p className="mt-1">{mem.content}</p>
+                    </div>
+                  ))
+                ) : (
+                  memorySummary.map((entry) => (
+                    <p key={entry} className="rounded-2xl border border-white/6 bg-slate-900/60 px-3 py-2">
+                      {entry}
+                    </p>
+                  ))
+                )}
+              </div>
+              {liveReflections && liveReflections.length > 0 && (
+                <div className="mt-3 border-t border-white/8 pt-3">
+                  <p className="text-[11px] uppercase tracking-[0.28em] text-violet-300/70">
+                    反思 · {liveReflections.length}
+                  </p>
+                  <div className="mt-2 max-h-24 space-y-2 overflow-y-auto pr-1">
+                    {[...liveReflections].reverse().slice(0, 3).map((rf) => (
+                      <div key={rf.id} className="rounded-2xl border border-violet-400/15 bg-slate-900/60 px-3 py-2 text-sm text-slate-300">
+                        <p className="text-[10px] text-slate-500 mb-1">{rf.timestamp}</p>
+                        <p>{rf.summary}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ── Diary ── */}
+          {sidebarTab === 'diary' && (
+            <section
+              data-testid="resident-diary"
+              className="mt-3 flex-1 rounded-[22px] border border-emerald-400/15 bg-emerald-400/[0.04] p-4"
+            >
+              <p className="text-[11px] uppercase tracking-[0.28em] text-emerald-300/70">
+                日记
+                {liveDiary && liveDiary.length > 0 && (
+                  <span className="ml-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] text-emerald-300/70">
+                    {liveDiary.length}
                   </span>
                 )}
               </p>
-              <span className="text-xs text-slate-500">{currentTime}</span>
-            </div>
-            <div className="mt-3 max-h-40 space-y-2 overflow-y-auto text-sm leading-6 text-slate-300 pr-1">
-              {liveMemories && liveMemories.length > 0 ? (
-                [...liveMemories].reverse().slice(0, 8).map((mem) => (
-                  <div key={mem.id} className="rounded-2xl border border-white/6 bg-slate-900/60 px-3 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] text-slate-500">{mem.timestamp}</span>
-                      <span className="text-[10px] text-slate-500">重要度 {(mem.importance * 100).toFixed(0)}%</span>
-                    </div>
-                    <p className="mt-1">{mem.content}</p>
-                  </div>
-                ))
-              ) : (
-                memorySummary.map((entry) => (
-                  <p key={entry} className="rounded-2xl border border-white/6 bg-slate-900/60 px-3 py-2">
-                    {entry}
+              <div className="mt-3 max-h-72 space-y-3 overflow-y-auto pr-1">
+                {liveDiary && liveDiary.length > 0 ? (
+                  [...liveDiary].reverse().map((entry) => (
+                    <article key={entry.id} className="rounded-2xl border border-emerald-400/15 bg-slate-900/60 px-3 py-3">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[10px] text-emerald-300">
+                          {entry.date}
+                        </span>
+                        <span className="text-[10px] text-slate-500">Tick {entry.tick}</span>
+                      </div>
+                      <p className="text-sm leading-[1.7] text-slate-300">{entry.summary}</p>
+                    </article>
+                  ))
+                ) : (
+                  <p className="rounded-2xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-400">
+                    日记尚未生成，每天 22:00 自动写入。
                   </p>
-                ))
-              )}
-            </div>
-          </section>
-
-          {/* ── Reflections ── */}
-          {liveReflections && liveReflections.length > 0 && (
-            <section className="mt-3 rounded-[22px] border border-violet-400/15 bg-violet-400/5 p-4">
-              <p className="text-[11px] uppercase tracking-[0.28em] text-violet-300/70">
-                反思 · {liveReflections.length}
-              </p>
-              <div className="mt-3 max-h-32 space-y-2 overflow-y-auto pr-1">
-                {[...liveReflections].reverse().slice(0, 4).map((rf) => (
-                  <div key={rf.id} className="rounded-2xl border border-violet-400/15 bg-slate-900/60 px-3 py-2 text-sm text-slate-300">
-                    <p className="text-[10px] text-slate-500 mb-1">{rf.timestamp}</p>
-                    <p>{rf.summary}</p>
-                  </div>
-                ))}
+                )}
               </div>
             </section>
           )}
 
-          {/* ── Relationships (live from API or fallback from graph store) ── */}
+          {/* ── Relationships ── */}
+          {sidebarTab === 'relationships' && (
           <section className="mt-3 flex-1 rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
             <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">
               关系
@@ -526,6 +589,7 @@ export function TownChrome({
               )}
             </div>
           </section>
+          )}
         </aside>
       )}
 

@@ -57,6 +57,14 @@ else:
     # ---------------------------------------------------------------------------
 
     @dataclass
+    class DiaryEntry:
+        """A daily journal entry written by a resident at end of day."""
+        id: str
+        date: str      # e.g. "Day 3"
+        tick: int      # tick at which the entry was generated
+        summary: str   # narrative diary text
+
+    @dataclass
     class Resident:
         """An AI resident of the town. Maps to a Neo4j ``Resident`` node."""
 
@@ -75,6 +83,7 @@ else:
         outfit_color: Optional[str] = None
         current_goal: Optional[str] = None   # active short-term goal text
         coins: int = 100
+        diary: List["DiaryEntry"] = field(default_factory=list)
 
 
     @dataclass
@@ -170,6 +179,15 @@ else:
 
 
     @dataclass
+    class AchievementUnlock:
+        """Fired when a resident unlocks an achievement this tick."""
+        resident_id: str
+        achievement_id: str
+        achievement_name: str
+        icon: str
+
+
+    @dataclass
     class TickState:
         """Complete diff pushed to the frontend each tick."""
 
@@ -181,6 +199,7 @@ else:
         events: List[EventUpdate] = field(default_factory=list)
         weather: str = WeatherType.sunny.value
         goals: List["GoalUpdate"] = field(default_factory=list)
+        achievement_unlocks: List["AchievementUnlock"] = field(default_factory=list)
 
 
     # ---------------------------------------------------------------------------
