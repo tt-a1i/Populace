@@ -120,18 +120,8 @@ export function TownChrome({
 
       <section
         data-testid="town-minimap"
-        className="absolute bottom-4 z-10 overflow-hidden rounded-[22px] border border-white/10 bg-slate-950/88 p-3 text-slate-100 shadow-[0_20px_50px_rgba(8,15,31,0.4)] backdrop-blur"
-        style={{ right: '1rem' }}
+        className="absolute bottom-14 right-3 z-10 overflow-hidden rounded-xl border border-white/8 bg-slate-950/70 p-2 text-slate-100 shadow-lg backdrop-blur-sm"
       >
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-100/70">Minimap</p>
-            <p className="mt-1 text-xs text-slate-400">角色分布总览</p>
-          </div>
-          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-slate-300">
-            {residents.length} residents
-          </span>
-        </div>
 
         <div className="relative mt-3 h-32 w-40 rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.94))]">
           {buildings.map((building) => {

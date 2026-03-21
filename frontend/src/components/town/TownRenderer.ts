@@ -172,9 +172,10 @@ export class TownRenderer {
       },
     })
     this.hudLabel.position.set(16, 16)
+    this.hudLabel.visible = false  // Hidden — HTML HUD overlay replaces this
 
     this.hintLabel = new Text({
-      text: 'Wheel to zoom  •  Drag to pan  •  Double-tap resident to follow',
+      text: '',
       style: {
         fill: 0xcbd5e1,
         fontFamily: 'Avenir Next, Helvetica Neue, sans-serif',
@@ -184,6 +185,7 @@ export class TownRenderer {
       },
       anchor: { x: 1, y: 0 },
     })
+    this.hintLabel.visible = false  // Hidden — HTML HUD overlay replaces this
     this.uiLayer.addChild(this.hudLabel, this.hintLabel)
 
     this.drawTiles()
@@ -240,7 +242,20 @@ export class TownRenderer {
       school: 0x7c3aed,
       shop: 0xdc2626,
       home: 0x1e40af,
+      gym: 0xea580c,
+      library: 0x0369a1,
+      hospital: 0xbe123c,
       default: 0x475569,
+    }
+    const typeIcon: Record<string, string> = {
+      cafe: '\u2615',
+      park: '\uD83C\uDF33',
+      school: '\uD83C\uDFEB',
+      shop: '\uD83D\uDED2',
+      home: '\uD83C\uDFE0',
+      gym: '\uD83C\uDFCB',
+      library: '\uD83D\uDCDA',
+      hospital: '\uD83C\uDFE5',
     }
 
     for (const b of buildings) {
@@ -255,12 +270,13 @@ export class TownRenderer {
       this.buildingGraphics.fill({ color, alpha: 0.82 })
       this.buildingGraphics.stroke({ color: 0xf8fafc, alpha: 0.18, width: 2 })
 
+      const icon = typeIcon[b.type] ?? ''
       const label = new Text({
-        text: b.name,
+        text: icon ? `${icon}\n${b.name}` : b.name,
         style: {
           fill: 0xf8fafc,
-          fontFamily: 'Iowan Old Style, Palatino Linotype, serif',
-          fontSize: 11,
+          fontFamily: 'Avenir Next, Helvetica Neue, sans-serif',
+          fontSize: 10,
           fontWeight: '700',
           stroke: { color: 0x020617, width: 3 },
           wordWrap: true,
@@ -269,7 +285,7 @@ export class TownRenderer {
         },
         anchor: { x: 0.5, y: 0.5 },
       })
-      label.position.set(x + width / 2, y + height / 2 - 6)
+      label.position.set(x + width / 2, y + height / 2 - 4)
       this.buildingLabelLayer.addChild(label)
 
       const occupantLabel = new Text({
