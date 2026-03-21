@@ -5,10 +5,7 @@
 :root {
   font-family: 'Avenir Next', 'Helvetica Neue', Helvetica, sans-serif;
   color: #e2e8f0;
-  background:
-    radial-gradient(circle at top, rgba(56, 189, 248, 0.16), transparent 32%),
-    radial-gradient(circle at bottom right, rgba(245, 158, 11, 0.12), transparent 24%),
-    #020617;
+  background: #020617;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
