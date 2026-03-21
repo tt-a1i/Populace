@@ -22,6 +22,11 @@ export interface EventUpdate {
   description: string
 }
 
+export interface EnergyUpdate {
+  id: string
+  energy: number
+}
+
 export interface TickState {
   tick: number
   time: string
@@ -30,6 +35,8 @@ export interface TickState {
   relationships: RelationshipDelta[]
   events: EventUpdate[]
   weather: string
+  season?: string
+  energy_updates?: EnergyUpdate[]
 }
 
 export interface Resident {

@@ -84,6 +84,7 @@ else:
         current_goal: Optional[str] = None   # active short-term goal text
         coins: int = 100
         occupation: str = "unemployed"
+        energy: float = 1.0
         diary: List["DiaryEntry"] = field(default_factory=list)
 
 
@@ -180,6 +181,13 @@ else:
 
 
     @dataclass
+    class EnergyUpdate:
+        """Current energy level for a resident, pushed with each tick."""
+        id: str      # resident id
+        energy: float  # [0.0, 1.0]
+
+
+    @dataclass
     class AchievementUnlock:
         """Fired when a resident unlocks an achievement this tick."""
         resident_id: str
@@ -213,6 +221,8 @@ else:
         goals: List["GoalUpdate"] = field(default_factory=list)
         achievement_unlocks: List["AchievementUnlock"] = field(default_factory=list)
         relationship_events: List["RelationshipEvent"] = field(default_factory=list)
+        season: str = "spring"
+        energy_updates: List["EnergyUpdate"] = field(default_factory=list)
 
 
     # ---------------------------------------------------------------------------

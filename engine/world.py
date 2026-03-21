@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple
 
 from engine.agent import Agent
 from engine.pathfinding import PathCache
-from engine.types import Building, Event, MovementUpdate, Relationship, TickState, WeatherType, WorldConfig
+from engine.types import Building, EnergyUpdate, Event, MovementUpdate, Relationship, TickState, WeatherType, WorldConfig
 
 _EXTROVERT_KEYWORDS = ("外向", "开朗", "活泼", "健谈", "社牛", "extrovert", "outgoing")
 _INTROVERT_KEYWORDS = ("内向", "安静", "害羞", "社恐", "introvert", "shy")
@@ -44,6 +44,7 @@ class World:
         self.pending_events: List[Event] = []
         self.relationships: Dict[Tuple[str, str], Relationship] = {}
         self.weather: WeatherType = WeatherType.sunny
+        self.season: str = "spring"
         self.path_cache: PathCache = PathCache()
         self.grid_chunk_size: int = max(1, self.config.interaction_distance)
         self.grid_index: Dict[Tuple[int, int], List[Agent]] = {}
@@ -281,6 +282,8 @@ class World:
         if building.type == "home":
             agent.resident.mood = "neutral"
             agent.resident.occupation = "unemployed"
+            # Recover energy at home
+            agent.resident.energy = min(1.0, agent.resident.energy + 0.05)
         elif building.type in _OCCUPATION_MAP:
             occupation, income = _OCCUPATION_MAP[building.type]
             agent.resident.occupation = occupation
@@ -289,6 +292,8 @@ class World:
             hour = (self.current_tick % tick_per_day) * 24.0 / tick_per_day
             if 8.0 <= hour < 12.0 or 13.0 <= hour < 17.0:
                 agent.resident.coins += income
+                # Work drains energy
+                agent.resident.energy = max(0.0, agent.resident.energy - 0.03)
 
     def building_stay_duration(self) -> int:
         """Return the random number of ticks an agent stays indoors."""
@@ -325,6 +330,44 @@ class World:
         self.current_tick += 1
         sim_time = self.simulation_time()
 
+        # ── Season: change every 240 ticks (spring → summer → autumn → winter) ──
+        _SEASONS = ["spring", "summer", "autumn", "winter"]
+        season_index = (self.current_tick // 240) % 4
+        self.season = _SEASONS[season_index]
+
+        # ── Season-based weather probability: auto-change each tick with low probability ──
+        _WEATHER_WEIGHTS: dict[str, dict[str, float]] = {
+            "spring": {"sunny": 0.50, "cloudy": 0.30, "rainy": 0.20, "stormy": 0.00, "snowy": 0.00},
+            "summer": {"sunny": 0.40, "cloudy": 0.20, "rainy": 0.15, "stormy": 0.25, "snowy": 0.00},
+            "autumn": {"sunny": 0.30, "cloudy": 0.35, "rainy": 0.25, "stormy": 0.10, "snowy": 0.00},
+            "winter": {"sunny": 0.20, "cloudy": 0.30, "rainy": 0.10, "stormy": 0.05, "snowy": 0.35},
+        }
+        if random.random() < 0.05:  # 5% chance each tick to change weather
+            weights = _WEATHER_WEIGHTS[self.season]
+            weather_choices = list(weights.keys())
+            weather_probs = [weights[w] for w in weather_choices]
+            chosen = random.choices(weather_choices, weights=weather_probs, k=1)[0]
+            self.weather = WeatherType(chosen)
+
+        # ── Season mood baseline nudge (spring +0.1, winter -0.1) ─────────
+        _SEASON_MOOD_NUDGE = {"spring": 0.1, "summer": 0.0, "autumn": 0.0, "winter": -0.1}
+        season_nudge = _SEASON_MOOD_NUDGE.get(self.season, 0.0)
+        if season_nudge != 0.0:
+            _MOOD_LADDER_LOCAL = [
+                "sad", "fearful", "angry", "tired",
+                "neutral", "calm", "content",
+                "happy", "excited", "ecstatic",
+            ]
+            _MOOD_RANK_LOCAL = {mood: i for i, mood in enumerate(_MOOD_LADDER_LOCAL)}
+            for agent in self.agents:
+                if random.random() < abs(season_nudge):
+                    rank = _MOOD_RANK_LOCAL.get(agent.resident.mood, 4)
+                    if season_nudge > 0:
+                        new_rank = min(rank + 1, len(_MOOD_LADDER_LOCAL) - 1)
+                    else:
+                        new_rank = max(rank - 1, 0)
+                    agent.resident.mood = _MOOD_LADDER_LOCAL[new_rank]
+
         # ── Mood contagion: co-occupants influence each other's mood ──────
         from engine.act import apply_mood_contagion
         apply_mood_contagion(self)
@@ -351,8 +394,19 @@ class World:
             if a.resident.location is None
         ]
 
-        return TickState(tick=self.current_tick, time=sim_time, movements=movements,
-                         weather=self.weather.value)
+        energy_updates = [
+            EnergyUpdate(id=a.resident.id, energy=round(a.resident.energy, 3))
+            for a in self.agents
+        ]
+
+        return TickState(
+            tick=self.current_tick,
+            time=sim_time,
+            movements=movements,
+            weather=self.weather.value,
+            season=self.season,
+            energy_updates=energy_updates,
+        )
 
     # ------------------------------------------------------------------
     # Helpers

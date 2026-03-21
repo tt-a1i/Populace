@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-import type { Building, DialogueUpdate, MovementUpdate, Resident, TickState } from '../types'
+import type { Building, DialogueUpdate, EnergyUpdate, MovementUpdate, Resident, TickState } from '../types'
 
 export type SimulationSpeed = 0 | 1 | 2 | 5 | 10 | 50
 export type ResidentStatus =
@@ -33,6 +33,7 @@ export interface ResidentPosition {
   currentGoal?: string | null   // active short-term goal for thought bubble
   coins?: number
   occupation?: string
+  energy?: number
 }
 
 export interface TickMovement extends Omit<MovementUpdate, 'action'> {
@@ -96,6 +97,7 @@ interface SimulationState {
   speed: SimulationSpeed
   lastAppliedTick: number
   weather: string
+  season: string
   residents: ResidentPosition[]
   history: SimulationHistoryFrame[]
   buildings: Array<Building & { occupants: number }>
@@ -199,6 +201,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   speed: 1,
   lastAppliedTick: 0,
   weather: 'sunny',
+  season: 'spring',
   residents: [],
   history: [],
   buildings: [],
@@ -290,6 +293,14 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         }
       }
 
+      // Apply energy updates from this tick
+      for (const energyUpdate of (tickState.energy_updates ?? []) as EnergyUpdate[]) {
+        const existing = residentMap.get(energyUpdate.id)
+        if (existing) {
+          residentMap.set(energyUpdate.id, { ...existing, energy: energyUpdate.energy })
+        }
+      }
+
       for (const resident of state.residents) {
         if (seenResidents.has(resident.id)) {
           continue
@@ -333,6 +344,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         time: tickState.time,
         lastAppliedTick: tickState.tick,
         weather: tickState.weather ?? state.weather,
+        season: tickState.season ?? state.season,
         history,
         buildings: recomputeBuildingOccupancy(state.buildings, nextResidents),
         messageFeed: appendRecentMessages(state.messageFeed, freshMessages),
@@ -367,6 +379,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           dialogueText: prev?.dialogueText ?? null,
           coins: (r as { coins?: number }).coins ?? prev?.coins ?? 100,
           occupation: (r as { occupation?: string }).occupation ?? prev?.occupation ?? 'unemployed',
+          energy: (r as { energy?: number }).energy ?? prev?.energy ?? 1.0,
         }
       })
 

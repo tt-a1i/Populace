@@ -41,6 +41,7 @@ interface SimulationMeta {
   tick: number
   tickPerDay: number
   time: string
+  season?: string
 }
 
 interface OverlayStyle {
@@ -837,12 +838,21 @@ export class TownRenderer {
   private renderHud(): void {
     const statusLabel = this.simulationMeta.running ? `${this.simulationMeta.speed}x` : 'Paused'
     const followLabel = this.followedResidentId ? `Follow ${this.followedResidentId}` : 'Free Camera'
+    const _SEASON_ICONS: Record<string, string> = {
+      spring: '🌸',
+      summer: '☀️',
+      autumn: '🍂',
+      winter: '❄️',
+    }
+    const seasonIcon = _SEASON_ICONS[this.simulationMeta.season ?? 'spring'] ?? '🌸'
+    const seasonLabel = `${seasonIcon} ${(this.simulationMeta.season ?? 'spring').charAt(0).toUpperCase() + (this.simulationMeta.season ?? 'spring').slice(1)}`
 
     this.hudLabel.text = [
       `Town Grid ${MAP_WIDTH}x${MAP_HEIGHT}`,
       `Tick ${this.simulationMeta.tick}`,
       this.simulationMeta.time,
       statusLabel,
+      seasonLabel,
       followLabel,
       `Zoom ${this.zoom.toFixed(2)}x`,
     ].join('  •  ')

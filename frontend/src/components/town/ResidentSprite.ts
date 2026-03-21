@@ -117,6 +117,9 @@ export class ResidentSprite extends Container {
   private readonly thoughtBubble = new Container()
   private readonly thoughtBackground = new Graphics()
   private readonly thoughtLabel: Text
+  // Low-energy warning icon — shown when energy < 0.2
+  private readonly energyWarning = new Container()
+  private readonly energyWarningLabel: Text
 
   private readonly nameLabel: Text
   private onFocusRequest?: (residentId: string) => void
@@ -205,7 +208,21 @@ export class ResidentSprite extends Container {
     this.thoughtBubble.zIndex = 4
     this.thoughtBubble.visible = false
 
-    this.addChild(this.shadow, this.highlightGlow, this.body, this.emotionAccent, this.thoughtBubble, this.bubble, this.nameLabel)
+    // Low-energy warning icon
+    this.energyWarningLabel = new Text({
+      text: '⚡',
+      anchor: { x: 0.5, y: 0.5 },
+      style: {
+        fontSize: 13,
+        fontFamily: 'Avenir Next, Helvetica Neue, sans-serif',
+      },
+    })
+    this.energyWarning.addChild(this.energyWarningLabel)
+    this.energyWarning.position.set(12, -20)
+    this.energyWarning.zIndex = 6
+    this.energyWarning.visible = false
+
+    this.addChild(this.shadow, this.highlightGlow, this.body, this.emotionAccent, this.thoughtBubble, this.bubble, this.energyWarning, this.nameLabel)
     this.on('pointertap', this.handlePointerTap)
 
     this.applyResident(resident, true)
@@ -257,6 +274,7 @@ export class ResidentSprite extends Container {
     this.moveTo(resident.targetX, resident.targetY, immediate)
     this.updateStatus(resident.status, resident.dialogueText)
     this.updateGoal(resident.currentGoal)
+    this.updateEnergy(resident.energy)
   }
 
   setSimulationSpeed(speed: SimulationSpeed): void {
@@ -303,6 +321,11 @@ export class ResidentSprite extends Container {
   showDialogue(text: string): void {
     this.dialogueUntil = performance.now() + DIALOGUE_DURATION_MS
     this.renderBubble(text)
+  }
+
+  /** Show or hide the low-energy warning icon based on energy level. */
+  updateEnergy(energy: number | null | undefined): void {
+    this.energyWarning.visible = energy != null && energy < 0.2
   }
 
   /** Update the thought bubble with the agent's current short-term goal. */

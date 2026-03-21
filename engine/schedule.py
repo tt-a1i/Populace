@@ -135,6 +135,21 @@ class DailySchedule:
         phase = self.current_phase(hour)
         resident = agent.resident  # type: ignore[attr-defined]
 
+        # Energy override: force home when energy is critically low
+        energy = getattr(resident, "energy", 1.0)
+        if energy < 0.2:
+            home_id = getattr(resident, "home_building_id", None)
+            if home_id:
+                home_building = world.get_building(home_id)
+                if home_building is not None:
+                    if resident.location == home_id:
+                        if hasattr(resident, "current_goal"):
+                            resident.current_goal = "精疲力竭，需要休息"
+                        return {"action": "idle"}
+                    if hasattr(resident, "current_goal"):
+                        resident.current_goal = "精疲力竭，回家休息"
+                    return {"action": "move", "target": list(home_building.position)}
+
         # Phase → default goal text (used when no specific building found)
         _PHASE_GOALS = {
             "sleep":     "睡觉休息",

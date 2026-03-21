@@ -412,6 +412,10 @@ async def initiate_dialogue(
         )
         agent_b.memory_stream.add(mem_b)
 
+    # Social interaction costs energy for both participants
+    agent_a.resident.energy = max(0.0, agent_a.resident.energy - 0.02)
+    agent_b.resident.energy = max(0.0, agent_b.resident.energy - 0.02)
+
     # Gossip: speaker A may share info about an absent third party
     from engine.gossip import generate_gossip, spread_gossip
     gossip = generate_gossip(agent_a, world)

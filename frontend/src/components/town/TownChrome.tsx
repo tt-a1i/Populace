@@ -485,6 +485,29 @@ export function TownChrome({
               <p className="text-[11px] uppercase tracking-[0.24em] text-sky-400/70">Occupation</p>
               <p className="mt-2 text-base font-semibold text-sky-200" data-testid="occupation-badge">{selectedResident.occupation ?? 'unemployed'}</p>
             </div>
+            <div className="rounded-2xl border border-lime-400/15 bg-lime-400/[0.06] px-4 py-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] uppercase tracking-[0.24em] text-lime-400/70">Energy</p>
+                {(selectedResident.energy ?? 1.0) < 0.2 && (
+                  <span className="text-xs font-semibold text-amber-400">⚡ Low</span>
+                )}
+              </div>
+              <div className="mt-2 h-2 w-full rounded-full bg-white/10">
+                <div
+                  className="h-2 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${Math.round((selectedResident.energy ?? 1.0) * 100)}%`,
+                    backgroundColor: (selectedResident.energy ?? 1.0) < 0.2
+                      ? '#f59e0b'
+                      : (selectedResident.energy ?? 1.0) < 0.5
+                      ? '#84cc16'
+                      : '#4ade80',
+                  }}
+                  data-testid="energy-bar"
+                />
+              </div>
+              <p className="mt-1 text-xs text-lime-300/70">{Math.round((selectedResident.energy ?? 1.0) * 100)}%</p>
+            </div>
           </div>
           {/* ── Tab switcher: memories / diary / relationships / achievements ── */}
           <div className="mt-5 inline-flex flex-wrap gap-1 rounded-full border border-white/10 bg-white/5 p-1">

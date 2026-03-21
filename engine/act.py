@@ -109,6 +109,8 @@ def _step_astar(agent: "Agent", target: tuple, world: "World") -> None:
             res.x, res.y = next_pos
             world.mark_grid_index_dirty()
             agent.current_path = agent.current_path[1:]
+            # Moving costs energy
+            res.energy = max(0.0, res.energy - 0.01)
             _maybe_enter_building(agent, world)
         else:
             # Path became blocked; clear so next tick recomputes
@@ -130,6 +132,7 @@ def _step_random(agent: "Agent", world: "World") -> None:
     if walkable:
         res.x, res.y = random.choice(walkable)
         world.mark_grid_index_dirty()
+        res.energy = max(0.0, res.energy - 0.01)
         _maybe_enter_building(agent, world)
 
 

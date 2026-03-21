@@ -32,6 +32,7 @@ export function TownCanvas() {
   const speed = useSimulationStore((state) => state.speed)
   const hoveredPairIds = useSimulationStore((state) => state.hoveredPairIds)
   const weather = useSimulationStore((state) => state.weather)
+  const season = useSimulationStore((state) => state.season)
   const messageFeed = useSimulationStore((state) => state.messageFeed)
   const replayFrozenFrame = useSimulationStore((state) => state.replayFrozenFrame)
   const getFrameByTick = useSimulationStore((state) => state.getFrameByTick)
@@ -63,8 +64,9 @@ export function TownCanvas() {
       tick: liveTick,
       tickPerDay,
       time: liveTime,
+      season,
     }),
-    [liveRunning, speed, liveTick, tickPerDay, liveTime],
+    [liveRunning, speed, liveTick, tickPerDay, liveTime, season],
   )
 
   const residents = useMemo(
@@ -88,6 +90,7 @@ export function TownCanvas() {
             tick: replayFrame?.tick ?? replayFrozenFrame?.meta.tick ?? liveMeta.tick,
             tickPerDay: replayFrozenFrame?.meta.tickPerDay ?? liveMeta.tickPerDay,
             time: replayFrame?.time ?? replayFrozenFrame?.meta.time ?? liveMeta.time,
+            season: liveMeta.season,
           }
         : liveMeta,
     [liveMeta, replayFrame, replayFrozenFrame, replayTick],

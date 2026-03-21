@@ -124,6 +124,7 @@ class ResidentResponse(BaseModel):
     current_goal: str | None = None
     coins: int = 100
     occupation: str = "unemployed"
+    energy: float = 1.0
 
 
 class DiaryEntryResponse(BaseModel):
