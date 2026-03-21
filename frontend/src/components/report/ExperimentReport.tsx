@@ -149,7 +149,7 @@ export function ExperimentReport() {
             type="button"
             onClick={() => void handleGenerate()}
             disabled={busy}
-            className="rounded-full border border-cyan-300/30 bg-cyan-300/15 px-4 py-2 text-sm text-cyan-50 transition hover:bg-cyan-300/25 disabled:opacity-60"
+            className="rounded-full border border-cyan-300/30 bg-cyan-300/15 px-4 py-2 text-sm text-cyan-50 transition duration-200 hover:bg-cyan-300/25 active:scale-95 disabled:opacity-60"
           >
             生成实验报告
           </button>
@@ -157,7 +157,7 @@ export function ExperimentReport() {
             type="button"
             onClick={() => void handleExportPdf()}
             disabled={!reportRef.current || busy}
-            className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 transition hover:bg-white/10 disabled:opacity-60"
+            className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 transition duration-200 hover:bg-white/10 active:scale-95 disabled:opacity-60"
           >
             导出 PDF
           </button>

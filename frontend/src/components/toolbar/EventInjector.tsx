@@ -129,7 +129,7 @@ export function EventInjector() {
               title={preset.description}
               onClick={() => void handlePreset(preset.id, preset.name)}
               className={[
-                'group flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition disabled:opacity-60',
+                'group flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition duration-200 active:scale-95 disabled:opacity-60',
                 meta.color,
               ].join(' ')}
             >
@@ -179,13 +179,13 @@ export function EventInjector() {
             onChange={(e) => setCustomEvent(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void handleCustom()}
             placeholder={t('event_injector.custom_placeholder')}
-            className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-slate-50 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/40 focus:bg-white/10"
+            className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-slate-50 outline-none transition duration-200 placeholder:text-slate-500 focus:border-cyan-300/40 focus:bg-white/10"
           />
           <button
             type="button"
             disabled={!canSubmitCustom || busy}
             onClick={() => void handleCustom()}
-            className="rounded-2xl border border-amber-300/30 bg-amber-300/15 px-5 py-3 text-sm font-medium text-amber-50 transition hover:bg-amber-300/25 disabled:opacity-50"
+            className="rounded-2xl border border-amber-300/30 bg-amber-300/15 px-5 py-3 text-sm font-medium text-amber-50 transition duration-200 hover:bg-amber-300/25 active:scale-95 disabled:opacity-50"
           >
             {t('event_injector.submit')}
           </button>

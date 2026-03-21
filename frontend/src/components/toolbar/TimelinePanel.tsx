@@ -65,7 +65,7 @@ export function TimelinePanel() {
           type="button"
           onClick={load}
           disabled={loading}
-          className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 transition hover:bg-white/10 disabled:opacity-40"
+          className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 transition duration-200 hover:bg-white/10 active:scale-95 disabled:opacity-40"
         >
           {loading ? '…' : t('timeline.refresh')}
         </button>
@@ -76,7 +76,7 @@ export function TimelinePanel() {
         <button
           type="button"
           onClick={() => setFilter('all')}
-          className={`rounded-full border px-3 py-1 text-xs transition ${filter === 'all' ? 'border-white/20 bg-white/10 text-white' : 'border-white/8 text-slate-400 hover:bg-white/6'}`}
+          className={`rounded-full border px-3 py-1 text-xs transition duration-200 active:scale-95 ${filter === 'all' ? 'border-white/20 bg-white/10 text-white' : 'border-white/8 text-slate-400 hover:bg-white/6'}`}
         >
           {t('timeline.all')}
         </button>
@@ -87,7 +87,7 @@ export function TimelinePanel() {
               key={type}
               type="button"
               onClick={() => setFilter(type)}
-              className={`rounded-full border px-3 py-1 text-xs transition ${filter === type ? 'border-white/20 bg-white/10 text-white' : 'border-white/8 text-slate-400 hover:bg-white/6'}`}
+              className={`rounded-full border px-3 py-1 text-xs transition duration-200 active:scale-95 ${filter === type ? 'border-white/20 bg-white/10 text-white' : 'border-white/8 text-slate-400 hover:bg-white/6'}`}
             >
               {cfg.icon} {t(cfg.labelKey)}
             </button>

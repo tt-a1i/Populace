@@ -273,7 +273,7 @@ export function DirectorConsole() {
             type="button"
             onClick={() => setActiveTab(tab.key)}
             className={[
-              'flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition',
+              'flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition duration-200 active:scale-95',
               activeTab === tab.key
                 ? 'bg-cyan-400/15 text-cyan-50'
                 : 'text-slate-400 hover:text-slate-200',
@@ -300,7 +300,7 @@ export function DirectorConsole() {
                   title={preset.description}
                   onClick={() => void handlePreset(preset.id, preset.name)}
                   className={[
-                    'group flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition disabled:opacity-60',
+                    'group flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition duration-200 active:scale-[0.97] disabled:opacity-60',
                     meta.color,
                   ].join(' ')}
                 >
@@ -356,7 +356,7 @@ export function DirectorConsole() {
                 type="button"
                 disabled={!canSubmitCustom || busy}
                 onClick={() => void handleCustom()}
-                className="rounded-2xl border border-amber-300/30 bg-amber-300/15 px-5 py-3 text-sm font-medium text-amber-50 transition hover:bg-amber-300/25 disabled:opacity-50"
+                className="rounded-2xl border border-amber-300/30 bg-amber-300/15 px-5 py-3 text-sm font-medium text-amber-50 transition duration-200 hover:bg-amber-300/25 active:scale-95 disabled:opacity-50"
               >
                 {t('event_injector.submit')}
               </button>
@@ -386,7 +386,7 @@ export function DirectorConsole() {
                 type="button"
                 onClick={() => setSelectedEmotion(em.key)}
                 className={[
-                  'flex flex-col items-center gap-1 rounded-xl border p-3 transition',
+                  'flex flex-col items-center gap-1 rounded-xl border p-3 transition duration-200 active:scale-95',
                   selectedEmotion === em.key
                     ? 'border-cyan-300/40 bg-cyan-300/15 text-cyan-50'
                     : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10',
@@ -410,7 +410,7 @@ export function DirectorConsole() {
             type="button"
             disabled={!emotionResidentId || !selectedEmotion || busy}
             onClick={() => void handleInjectEmotion()}
-            className="rounded-2xl border border-cyan-300/30 bg-cyan-300/15 px-5 py-3 text-sm font-medium text-cyan-50 transition hover:bg-cyan-300/25 disabled:opacity-50"
+            className="rounded-2xl border border-cyan-300/30 bg-cyan-300/15 px-5 py-3 text-sm font-medium text-cyan-50 transition duration-200 hover:bg-cyan-300/25 active:scale-95 disabled:opacity-50"
           >
             {t('director.inject_emotion')}
           </button>
@@ -442,7 +442,7 @@ export function DirectorConsole() {
               type="button"
               onClick={() => setRelationAction('encounter')}
               className={[
-                'flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition',
+                'flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition duration-200 active:scale-[0.97]',
                 relationAction === 'encounter'
                   ? 'border-pink-300/40 bg-pink-300/15 text-pink-50'
                   : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10',
@@ -458,7 +458,7 @@ export function DirectorConsole() {
               type="button"
               onClick={() => setRelationAction('rumor')}
               className={[
-                'flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition',
+                'flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition duration-200 active:scale-[0.97]',
                 relationAction === 'rumor'
                   ? 'border-amber-300/40 bg-amber-300/15 text-amber-50'
                   : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10',
@@ -474,7 +474,7 @@ export function DirectorConsole() {
               type="button"
               onClick={() => setRelationAction('jealousy')}
               className={[
-                'flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition',
+                'flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition duration-200 active:scale-[0.97]',
                 relationAction === 'jealousy'
                   ? 'border-red-300/40 bg-red-300/15 text-red-50'
                   : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10',
@@ -492,7 +492,7 @@ export function DirectorConsole() {
               type="button"
               disabled={!residentAId || !residentBId || busy}
               onClick={() => void handleForceEncounter()}
-              className="rounded-2xl border border-pink-300/30 bg-pink-300/15 px-5 py-3 text-sm font-medium text-pink-50 transition hover:bg-pink-300/25 disabled:opacity-50"
+              className="rounded-2xl border border-pink-300/30 bg-pink-300/15 px-5 py-3 text-sm font-medium text-pink-50 transition duration-200 hover:bg-pink-300/25 active:scale-95 disabled:opacity-50"
             >
               {t('director.arrange_encounter')}
             </button>
@@ -532,7 +532,7 @@ export function DirectorConsole() {
                 type="button"
                 disabled={!residentAId || !residentBId || !rumorContent.trim() || busy}
                 onClick={() => void handleSpreadRumor()}
-                className="rounded-2xl border border-amber-300/30 bg-amber-300/15 px-5 py-3 text-sm font-medium text-amber-50 transition hover:bg-amber-300/25 disabled:opacity-50"
+                className="rounded-2xl border border-amber-300/30 bg-amber-300/15 px-5 py-3 text-sm font-medium text-amber-50 transition duration-200 hover:bg-amber-300/25 active:scale-95 disabled:opacity-50"
               >
                 {t('director.spread_rumor')}
               </button>
@@ -544,7 +544,7 @@ export function DirectorConsole() {
               type="button"
               disabled={!residentAId || !residentBId || busy}
               onClick={() => void handleTriggerJealousy()}
-              className="rounded-2xl border border-red-300/30 bg-red-300/15 px-5 py-3 text-sm font-medium text-red-50 transition hover:bg-red-300/25 disabled:opacity-50"
+              className="rounded-2xl border border-red-300/30 bg-red-300/15 px-5 py-3 text-sm font-medium text-red-50 transition duration-200 hover:bg-red-300/25 active:scale-95 disabled:opacity-50"
             >
               {t('director.trigger_jealousy')}
             </button>
@@ -566,7 +566,7 @@ export function DirectorConsole() {
                 title={preset.description}
                 onClick={() => void handlePreset(preset.id, preset.name)}
                 className={[
-                  'group flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition disabled:opacity-60',
+                  'group flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition duration-200 active:scale-95 disabled:opacity-60',
                   meta.color,
                 ].join(' ')}
               >

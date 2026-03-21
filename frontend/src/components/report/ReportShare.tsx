@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { toBlob, toPng } from 'html-to-image'
 
@@ -8,6 +9,7 @@ interface ReportShareProps {
 }
 
 export function ReportShare({ reportElement, title }: ReportShareProps) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -62,17 +64,17 @@ export function ReportShare({ reportElement, title }: ReportShareProps) {
         type="button"
         disabled={!reportElement || busy}
         onClick={() => void handleCopy()}
-        className="rounded-full border border-rose-300/30 bg-rose-300/15 px-4 py-2 text-sm text-rose-50 transition hover:bg-rose-300/25 disabled:opacity-50"
+        className="rounded-full border border-rose-300/30 bg-rose-300/15 px-4 py-2 text-sm text-rose-50 transition duration-200 hover:bg-rose-300/25 active:scale-95 disabled:opacity-50"
       >
-        {copied ? '已复制图片' : '复制为图片'}
+        {copied ? t('report.copied') : t('report.copy_image')}
       </button>
       <button
         type="button"
         disabled={!reportElement || busy}
         onClick={() => void handleDownload()}
-        className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 transition hover:bg-white/10 disabled:opacity-50"
+        className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 transition duration-200 hover:bg-white/10 active:scale-95 disabled:opacity-50"
       >
-        下载 PNG
+        {t('report.download_png')}
       </button>
     </div>
   )

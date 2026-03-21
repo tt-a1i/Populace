@@ -93,7 +93,7 @@ export function BuildPanel() {
         <button
           type="button"
           onClick={() => { setFormOpen((o) => !o); setError(null) }}
-          className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-sm font-medium text-emerald-200 transition hover:bg-emerald-300/20"
+          className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-sm font-medium text-emerald-200 transition duration-200 hover:bg-emerald-300/20 active:scale-95"
         >
           {formOpen ? t('build_panel.collapse') : t('build_panel.new_building')}
         </button>
@@ -166,7 +166,7 @@ export function BuildPanel() {
               type="button"
               disabled={busy}
               onClick={() => void handleBuild()}
-              className="flex-1 rounded-xl bg-emerald-600/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+              className="flex-1 rounded-xl bg-emerald-600/80 px-3 py-2 text-sm font-semibold text-white transition duration-200 hover:bg-emerald-500 active:scale-95 disabled:opacity-50"
             >
               {busy ? t('build_panel.building_busy') : t('build_panel.building_btn')}
             </button>
@@ -216,7 +216,7 @@ export function BuildPanel() {
                   type="button"
                   disabled={demolishBusy === b.id}
                   onClick={() => void handleDemolish(b.id)}
-                  className="shrink-0 rounded-xl border border-rose-400/25 bg-rose-400/8 px-2.5 py-1.5 text-xs font-medium text-rose-300 transition hover:bg-rose-400/18 disabled:opacity-40"
+                  className="shrink-0 rounded-xl border border-rose-400/25 bg-rose-400/8 px-2.5 py-1.5 text-xs font-medium text-rose-300 transition duration-200 hover:bg-rose-400/18 active:scale-95 disabled:opacity-40"
                 >
                   {demolishBusy === b.id ? '…' : t('build_panel.demolish')}
                 </button>

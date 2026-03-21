@@ -1,26 +1,30 @@
 import { useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { useSound } from '../../audio'
 import { generateReport, getLatestReport, type ReportPayload } from '../../services/api'
 import { useToast } from '../ui/ToastProvider'
 import { ReportShare } from './ReportShare'
 
-const fallbackReport: ReportPayload = {
-  title: 'Populace 小镇日报',
-  generated_at: '',
-  tick: 0,
-  sections: [
-    { heading: '标题新闻', content: '点击按钮后，这里会出现今天最值得围观的头条。' },
-    { heading: '八卦专栏', content: '邻里耳语、暧昧升温和突发冲突都会汇成一版短报。' },
-    { heading: '关系变动', content: '系统会总结最近一轮关系变化，方便截图与分享。' },
-    { heading: '天气预报', content: '连天气都将成为剧情氛围的一部分。' },
-  ],
+function makeFallbackReport(t: (key: string) => string): ReportPayload {
+  return {
+    title: t('report.fallback_title'),
+    generated_at: '',
+    tick: 0,
+    sections: [
+      { heading: t('report.fallback_s1_heading'), content: t('report.fallback_s1_content') },
+      { heading: t('report.fallback_s2_heading'), content: t('report.fallback_s2_content') },
+      { heading: t('report.fallback_s3_heading'), content: t('report.fallback_s3_content') },
+      { heading: t('report.fallback_s4_heading'), content: t('report.fallback_s4_content') },
+    ],
+  }
 }
 
 export function DailyReport() {
+  const { t } = useTranslation()
   const { play } = useSound()
   const { pushToast } = useToast()
-  const [report, setReport] = useState<ReportPayload>(fallbackReport)
+  const [report, setReport] = useState<ReportPayload>(() => makeFallbackReport(t))
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const reportRef = useRef<HTMLElement | null>(null)
@@ -34,15 +38,15 @@ export function DailyReport() {
       play('report')
       pushToast({
         type: 'success',
-        title: '日报已生成',
+        title: t('report.generated_toast'),
         description: nextReport.title,
       })
     } catch {
-      setMessage('生成失败，已保留当前日报内容。')
+      setMessage(t('report.generate_failed_desc'))
       pushToast({
         type: 'error',
-        title: '日报生成失败',
-        description: '已保留当前日报内容。',
+        title: t('report.generate_failed_toast'),
+        description: t('report.generate_failed_desc'),
       })
     } finally {
       setBusy(false)
@@ -57,14 +61,14 @@ export function DailyReport() {
       setReport(latest)
       pushToast({
         type: 'info',
-        title: '已载入最近日报',
+        title: t('report.loaded_toast'),
         description: latest.title,
       })
     } catch {
-      setMessage('暂无已生成日报，请先点击“生成日报”。')
+      setMessage(t('report.no_latest_hint'))
       pushToast({
         type: 'warning',
-        title: '暂无最近日报',
+        title: t('report.no_latest_toast'),
       })
     } finally {
       setBusy(false)
@@ -75,10 +79,10 @@ export function DailyReport() {
     <div className="grid gap-4 rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(68,32,17,0.92),rgba(21,16,13,0.96))] p-4 text-amber-50 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.3em] text-amber-200/70">Town Gazette</p>
-          <h3 className="mt-2 font-display text-3xl text-amber-50">小镇日报</h3>
+          <p className="text-[11px] uppercase tracking-[0.3em] text-amber-200/70">{t('report.badge')}</p>
+          <h3 className="mt-2 font-display text-3xl text-amber-50">{t('report.title')}</h3>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-amber-100/75">
-            像一张带八卦味的报纸，把当前周期的居民戏剧、关系震荡和天气气氛压缩成可分享的卡片。
+            {t('report.desc')}
           </p>
         </div>
 
@@ -87,17 +91,17 @@ export function DailyReport() {
             type="button"
             onClick={() => void handleGenerate()}
             disabled={busy}
-            className="rounded-full border border-amber-200/30 bg-amber-100/10 px-4 py-2 text-sm text-amber-50 transition hover:bg-amber-100/20 disabled:opacity-60"
+            className="rounded-full border border-amber-200/30 bg-amber-100/10 px-4 py-2 text-sm text-amber-50 transition duration-200 hover:bg-amber-100/20 active:scale-95 disabled:opacity-60"
           >
-            生成日报
+            {t('report.generate')}
           </button>
           <button
             type="button"
             onClick={() => void handleLoadLatest()}
             disabled={busy}
-            className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-amber-50 transition hover:bg-white/10 disabled:opacity-60"
+            className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-amber-50 transition duration-200 hover:bg-white/10 active:scale-95 disabled:opacity-60"
           >
-            获取最近一版
+            {t('report.latest')}
           </button>
         </div>
       </div>
@@ -118,7 +122,7 @@ export function DailyReport() {
               <p className="mt-1 text-sm font-medium text-slate-700">Tick {report.tick || '--'}</p>
             </div>
           </div>
-          <p className="mt-3 text-sm text-slate-600">{report.generated_at || '等待生成'}</p>
+          <p className="mt-3 text-sm text-slate-600">{report.generated_at || t('report.waiting')}</p>
         </div>
 
         <div className="relative mt-5 grid gap-4 lg:grid-cols-2">
@@ -146,7 +150,7 @@ export function DailyReport() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <ReportShare title={report.title} reportElement={reportRef.current} />
         <p className="text-xs uppercase tracking-[0.24em] text-amber-100/65">
-          {message || '生成后可直接复制 PNG 到图片编辑器，或下载分享卡片。'}
+          {message || t('report.hint')}
         </p>
       </div>
     </div>

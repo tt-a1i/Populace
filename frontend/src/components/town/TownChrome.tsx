@@ -111,7 +111,7 @@ export function TownChrome({
       {selectedResidentId && (
         <aside
           data-testid="resident-sidebar"
-          className="absolute bottom-14 right-3 top-3 z-30 flex w-[min(20rem,calc(100%-2rem))] flex-col rounded-xl border border-white/10 bg-slate-950/85 p-4 text-slate-100 shadow-xl backdrop-blur-sm"
+          className="absolute bottom-14 right-3 top-3 z-30 flex w-[min(20rem,calc(100%-2rem))] flex-col rounded-xl border border-white/10 bg-slate-950/85 p-4 text-slate-100 shadow-xl backdrop-blur-sm animate-[slideInRight_250ms_ease-out]"
         >
           <ResidentStoryPanel
             key={selectedResidentId}

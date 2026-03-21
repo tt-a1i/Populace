@@ -191,7 +191,7 @@ export function PersonaEditor() {
         type="button"
         disabled={busy || !residentId}
         onClick={() => void handleSave()}
-        className="rounded-2xl border border-amber-300/30 bg-amber-300/15 px-5 py-3 text-sm font-medium text-amber-50 transition hover:bg-amber-300/25 disabled:opacity-50"
+        className="rounded-2xl border border-amber-300/30 bg-amber-300/15 px-5 py-3 text-sm font-medium text-amber-50 transition duration-200 hover:bg-amber-300/25 active:scale-95 disabled:opacity-50"
       >
         {t('persona.save')}
       </button>
