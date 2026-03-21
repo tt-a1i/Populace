@@ -211,7 +211,7 @@ export function GraphPanel() {
         </div>
 
         <div className="pointer-events-none self-start rounded-full border border-white/10 bg-slate-950/65 px-3 py-1 text-[11px] uppercase tracking-[0.28em] text-amber-100/70">
-          {replaySnapshot ? `Replay Tick ${replaySnapshot.tick}` : `Live Tick ${lastAppliedTick || '...'}`}
+          {replaySnapshot ? t('graph.replay_tick', { tick: replaySnapshot.tick }) : t('graph.live_tick', { tick: lastAppliedTick || '...' })}
         </div>
       </div>
       <RelationCard

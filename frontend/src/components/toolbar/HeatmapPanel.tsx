@@ -83,7 +83,7 @@ export function HeatmapPanel() {
   if (n === 0) {
     return (
       <div className="rounded-xl border border-fuchsia-300/20 bg-slate-950/70 p-5 text-slate-100 ">
-        <p className="text-[11px] uppercase tracking-[0.3em] text-fuchsia-200/70">Heatmap</p>
+        <p className="text-[11px] uppercase tracking-[0.3em] text-fuchsia-200/70">{t('heatmap_panel.badge')}</p>
         <h3 className="mt-1 font-display text-2xl text-white">{t('heatmap_panel.title')}</h3>
         <p className="mt-4 text-sm text-slate-500">{t('heatmap_panel.loading')}</p>
       </div>
@@ -94,7 +94,7 @@ export function HeatmapPanel() {
     <div className="rounded-xl border border-fuchsia-300/20 bg-slate-950/70 p-5 text-slate-100 ">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.3em] text-fuchsia-200/70">Heatmap</p>
+          <p className="text-[11px] uppercase tracking-[0.3em] text-fuchsia-200/70">{t('heatmap_panel.badge')}</p>
           <h3 className="mt-1 font-display text-2xl text-white">{t('heatmap_panel.title')}</h3>
         </div>
         <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400">

@@ -265,9 +265,9 @@ export function ResidentStoryPanel({
             type="button"
             onClick={async () => {
               try {
-                await injectResidentMemory(residentId, { content: `${resident.name}有了一段新的深刻记忆`, importance: 0.8, emotion: 'happy' })
+                await injectResidentMemory(residentId, { content: t('resident_panel.new_memory_text', { name: resident.name }), importance: 0.8, emotion: 'happy' })
                 pushToast({ type: 'success', title: t('resident_panel.inject_memory') + ' \u2713' })
-              } catch { pushToast({ type: 'error', title: 'Failed' }) }
+              } catch { pushToast({ type: 'error', title: t('resident_panel.memory_failed') }) }
             }}
             className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-2.5 py-1 text-[11px] font-medium text-cyan-200 transition hover:bg-cyan-300/20"
           >

@@ -162,7 +162,7 @@ describe('TownChrome', () => {
     )
 
     expect(screen.getByTestId('town-context-menu')).toBeInTheDocument()
-    expect(screen.getByText('Tile 4, 5')).toBeInTheDocument()
+    expect(screen.getByText('位置 4, 5')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '\u6295\u653e\u4e8b\u4ef6' }))
     await user.click(screen.getByRole('button', { name: '\u67e5\u770b\u4f4d\u7f6e' }))

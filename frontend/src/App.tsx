@@ -35,12 +35,6 @@ const SEASON_EMOJI: Record<string, string> = {
   winter: '\u2744\uFE0F',
 }
 
-const SEASON_LABEL_ZH: Record<string, string> = {
-  spring: '\u6625\u5929',
-  summer: '\u590F\u5929',
-  autumn: '\u79CB\u5929',
-  winter: '\u51AC\u5929',
-}
 
 const TownCanvas = lazy(() =>
   import('./components/town/TownCanvas').then((module) => ({ default: module.TownCanvas })),
@@ -52,7 +46,7 @@ const GraphPanel = lazy(() =>
 type AppPage = 'welcome' | 'picking' | 'simulation'
 
 function SimulationView() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const {
     connected,
     disconnected,
@@ -79,18 +73,6 @@ function SimulationView() {
   // Hide graph when sidebar is open (they share the right side)
   const graphVisible = showGraph && !selectedResidentId
 
-  // Close drawers with Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (showToolbar) { setShowToolbar(false); setActiveQuickTool(null) }
-        else if (showGraph) { setShowGraph(false) }
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showToolbar, showGraph])
-
   const toggleTool = (tool: string, eventName?: string) => {
     if (showToolbar && activeQuickTool === tool) {
       setShowToolbar(false)
@@ -105,10 +87,9 @@ function SimulationView() {
   }
 
 
-  const isZh = i18n.language === 'zh'
   const weatherEmoji = WEATHER_EMOJI[weather] ?? WEATHER_EMOJI.sunny
   const seasonEmoji = SEASON_EMOJI[season] ?? SEASON_EMOJI.spring
-  const seasonLabel = isZh ? (SEASON_LABEL_ZH[season] ?? season) : season
+  const seasonLabel = t(`app.season_${season}`, season)
 
   if (!hasInitialSnapshot) {
     return <LoadingTransition onRetry={retry} timedOut={startupTimedOut} />
@@ -131,7 +112,7 @@ function SimulationView() {
               <>
                 <span className="text-2xl">{'\u26A0\uFE0F'}</span>
                 <div className="text-center">
-                  <p className="text-[11px] uppercase tracking-[0.34em] text-amber-100/70">Connection Failed</p>
+                  <p className="text-[11px] uppercase tracking-[0.34em] text-amber-100/70">{t('app.conn_failed_badge')}</p>
                   <p className="mt-3 text-base font-medium text-amber-50">{t('app.conn_failed')}</p>
                   <button
                     type="button"
@@ -146,7 +127,7 @@ function SimulationView() {
               <>
                 <span className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-300/90 border-t-transparent" />
                 <div className="text-center">
-                  <p className="text-[11px] uppercase tracking-[0.34em] text-cyan-100/70">Connection Interrupted</p>
+                  <p className="text-[11px] uppercase tracking-[0.34em] text-cyan-100/70">{t('app.conn_interrupted_badge')}</p>
                   <p className="mt-3 text-base font-medium text-cyan-50">
                     {reconnectCountdown > 0 ? t('app.reconnecting', { seconds: reconnectCountdown }) : t('app.conn_interrupted')}
                   </p>
@@ -159,7 +140,7 @@ function SimulationView() {
 
       {/* -- TOP-LEFT HUD: Status -- */}
       <div className="fixed left-3 top-3 z-20 pointer-events-auto">
-        <div className="rounded-xl border border-white/8 bg-slate-950/70 px-3 py-2 shadow-lg backdrop-blur-sm transition-colors hover:border-white/15">
+        <div className="rounded-xl border border-white/8 bg-slate-950/65 px-3 py-2 shadow-lg backdrop-blur-sm">
           <div className="flex items-center gap-2 text-[11px]">
             <span className="font-mono font-bold uppercase tracking-wider text-cyan-300/80">POPULACE</span>
             <span className="text-slate-600">|</span>
@@ -192,8 +173,8 @@ function SimulationView() {
       </div>
 
       {/* -- BOTTOM-CENTER: Quick Action Bar -- */}
-      <div className="fixed inset-x-0 bottom-3 z-30 flex justify-center pointer-events-none px-2 sm:px-3">
-        <div className="pointer-events-auto flex items-center gap-0.5 rounded-2xl border border-white/10 bg-slate-950/80 px-1 py-1 shadow-xl backdrop-blur-sm sm:gap-1 sm:px-1.5 sm:py-1.5">
+      <div className="fixed inset-x-0 bottom-3 z-30 flex justify-center pointer-events-none px-3">
+        <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-950/80 px-1.5 py-1.5 shadow-xl backdrop-blur-sm">
           {[
             { key: 'director', icon: '\u26A1', event: 'populace:open-director' },
             { key: 'persona', icon: '\uD83D\uDC64', event: 'populace:open-persona' },
@@ -205,7 +186,7 @@ function SimulationView() {
               type="button"
               onClick={() => toggleTool(tool.key, tool.event)}
               title={t(`toolbar.${tool.key}`)}
-              className={`min-h-[36px] rounded-lg border px-2.5 py-2 text-xs font-medium transition active:scale-95 sm:px-3 ${
+              className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
                 showToolbar && activeQuickTool === tool.key
                   ? 'border-cyan-300/40 bg-cyan-300/15 text-cyan-50'
                   : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
@@ -220,15 +201,17 @@ function SimulationView() {
           <button
             type="button"
             onClick={() => setShowGraph((v) => !v)}
-            className={`min-h-[36px] rounded-lg border px-2 py-2 text-xs transition active:scale-95 ${graphVisible ? 'border-amber-300/40 bg-amber-300/15 text-amber-50' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+            className={`rounded-lg border px-2 py-1.5 text-xs transition ${graphVisible ? 'border-amber-300/40 bg-amber-300/15 text-amber-50' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
             title={t('app.relationship_graph')}
           >
             {'\uD83D\uDD78\uFE0F'}
           </button>
 
-          <div className="mx-0.5 h-5 w-px bg-white/10" />
+          <div className="mx-0.5 h-5 w-px bg-white/10 hidden sm:block" />
 
-          <SpeedControl />
+          <div className="hidden sm:flex">
+            <SpeedControl />
+          </div>
         </div>
       </div>
 
@@ -236,13 +219,13 @@ function SimulationView() {
       <div
         className={`fixed right-0 top-0 bottom-0 z-30 w-full transform transition-transform duration-300 sm:w-96 ${graphVisible ? 'translate-x-0' : 'translate-x-full'} pointer-events-auto`}
       >
-        <div className="h-full border-l border-amber-400/15 bg-slate-950/92 p-3 backdrop-blur-md sm:p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-xs font-medium uppercase tracking-wider text-amber-200/70">{t('app.relationship_graph')}</h3>
+        <div className="h-full border-l border-white/10 bg-slate-950/92 p-3 backdrop-blur-md sm:p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white">{t('app.relationship_graph')}</h3>
             <button
               type="button"
               onClick={() => setShowGraph(false)}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xs text-slate-400 transition hover:bg-white/10 hover:text-white active:scale-95"
+              className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-400 transition hover:bg-white/10 hover:text-white"
             >
               {'\u2715'}
             </button>

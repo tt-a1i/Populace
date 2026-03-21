@@ -407,7 +407,7 @@ export function TownCanvas() {
       {residents.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/45 backdrop-blur-[2px]">
           <div className="rounded-[22px] border border-cyan-300/15 bg-slate-950/80 px-6 py-5 text-center shadow-[0_18px_44px_rgba(8,15,31,0.4)]">
-            <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-100/70">Town Waiting Room</p>
+            <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-100/70">{t('canvas.waiting_badge')}</p>
             <p className="mt-3 font-display text-2xl text-white">{t('canvas.waiting')}</p>
           </div>
         </div>

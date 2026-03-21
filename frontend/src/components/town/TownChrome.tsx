@@ -80,7 +80,7 @@ export function TownChrome({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] uppercase tracking-[0.3em] text-cyan-100/70">{t('chrome.inspect_badge')}</p>
-              <h3 className="mt-2 font-mono text-lg font-bold text-white">Tile {inspection.tileX}, {inspection.tileY}</h3>
+              <h3 className="mt-2 font-mono text-lg font-bold text-white">{t('chrome.tile_label', { x: inspection.tileX, y: inspection.tileY })}</h3>
             </div>
             <button
               type="button"
@@ -188,7 +188,7 @@ export function TownChrome({
           style={{ left: contextMenu.screenX, top: contextMenu.screenY }}
         >
           <div className="border-b border-white/8 px-3 py-2">
-            <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-100/70">Tile {contextMenu.tileX}, {contextMenu.tileY}</p>
+            <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-100/70">{t('chrome.tile_label', { x: contextMenu.tileX, y: contextMenu.tileY })}</p>
             <p className="mt-1 text-xs text-slate-400">{formatTileKind(contextMenu.tileKind)}</p>
           </div>
           <div className="grid gap-1 px-1 py-2">

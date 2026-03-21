@@ -75,6 +75,13 @@
     "refresh": "Refresh",
     "all": "All",
     "empty": "No world events recorded yet — keep simulating to see relationship milestones, weather changes, and more",
+    "replay_badge": "Timeline Replay",
+    "live_tick": "Live Tick {{tick}}",
+    "replay_tick": "Replay Tick {{tick}}",
+    "tick_label": "Tick {{tick}}",
+    "live_label": "Live",
+    "back_to_live": "Back to Live",
+    "preparing": "Timeline preparing, waiting for tick data…",
     "type_relationship_milestone": "Relationship Milestone",
     "type_weather_change": "Weather Change",
     "type_custom_event": "Custom Event",
@@ -232,7 +239,9 @@
     "retry_hint": "Please try again later."
   },
   "lang": {
-    "switch": "中文"
+    "switch": "中文",
+    "switch_to_en": "Switch to English",
+    "switch_to_zh": "Switch to Chinese"
   },
   "settings": {
     "badge": "Settings",
@@ -257,6 +266,7 @@
     "action": "Go to Settings"
   },
   "heatmap_panel": {
+    "badge": "Heatmap",
     "title": "Relationship Heatmap",
     "loading": "Waiting for resident data…",
     "desc": "Row → Column directed relationship intensity; diagonal is self (gray).",
@@ -279,6 +289,8 @@
     "edit_mood": "Edit Mood",
     "teleport": "Teleport",
     "inject_memory": "Inject Memory",
+    "new_memory_text": "{{name}} gained a profound new memory",
+    "memory_failed": "Failed",
     "generate_memoir": "Memoir",
     "coins": "Coins",
     "energy": "Energy",
@@ -369,10 +381,16 @@
     "close": "Close",
     "relationship_graph": "Relationship Graph",
     "conn_failed": "Connection failed — please refresh the page",
+    "conn_failed_badge": "Connection Failed",
+    "conn_interrupted_badge": "Connection Interrupted",
     "reconnect": "Reconnect",
     "reconnecting": "Reconnecting {{seconds}}s…",
     "conn_interrupted": "Connection interrupted, reconnecting…",
-    "open_tools": "Tools"
+    "open_tools": "Tools",
+    "season_spring": "spring",
+    "season_summer": "summer",
+    "season_autumn": "autumn",
+    "season_winter": "winter"
   },
   "build_panel": {
     "badge": "Build Mode",
@@ -429,6 +447,7 @@
   },
   "chrome": {
     "inspect_badge": "Inspect Tile",
+    "tile_label": "Tile {{x}}, {{y}}",
     "close": "Close",
     "terrain": "Terrain",
     "building_label": "Building",
@@ -443,6 +462,8 @@
   "graph": {
     "filter_label": "Filter Relations",
     "all": "All",
+    "live_tick": "Live Tick {{tick}}",
+    "replay_tick": "Replay Tick {{tick}}",
     "intensity_above": "Intensity > {{value}}",
     "related_nodes_only": "Only related nodes",
     "intensity_threshold_aria": "Relationship intensity threshold",
@@ -466,7 +487,8 @@
     "event_success_desc": "Map event at tile {{x}}, {{y}} has been queued.",
     "event_fail_title": "Event Injection Failed",
     "event_fail_desc": "Please make sure the backend is available and try again.",
-    "waiting": "Waiting for residents to load…"
+    "waiting": "Waiting for residents to load…",
+    "waiting_badge": "Town Waiting Room"
   },
   "error": {
     "badge": "Application Error",

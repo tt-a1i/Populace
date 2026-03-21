@@ -75,6 +75,13 @@
     "refresh": "刷新",
     "all": "全部",
     "empty": "暂无世界事件记录，继续模拟后会出现关系里程碑、天气变化等事件",
+    "replay_badge": "时间线回放",
+    "live_tick": "实时 Tick {{tick}}",
+    "replay_tick": "回放 Tick {{tick}}",
+    "tick_label": "Tick {{tick}}",
+    "live_label": "实时",
+    "back_to_live": "回到实时",
+    "preparing": "时间线准备中，等待 tick 数据…",
     "type_relationship_milestone": "关系里程碑",
     "type_weather_change": "天气变化",
     "type_custom_event": "自定义事件",
@@ -232,7 +239,9 @@
     "retry_hint": "请稍后重试。"
   },
   "lang": {
-    "switch": "EN"
+    "switch": "EN",
+    "switch_to_en": "Switch to English",
+    "switch_to_zh": "切换为中文"
   },
   "settings": {
     "badge": "Settings",
@@ -257,6 +266,7 @@
     "action": "前往设置"
   },
   "heatmap_panel": {
+    "badge": "热力图",
     "title": "关系热力图",
     "loading": "等待居民数据加载…",
     "desc": "行 → 列方向的有向关系强度；对角线为自身（灰色）。",
@@ -279,6 +289,8 @@
     "edit_mood": "改情绪",
     "teleport": "传送",
     "inject_memory": "注入记忆",
+    "new_memory_text": "{{name}}有了一段新的深刻记忆",
+    "memory_failed": "失败",
     "generate_memoir": "回忆录",
     "coins": "金币",
     "energy": "能量",
@@ -369,10 +381,16 @@
     "close": "关闭",
     "relationship_graph": "关系图谱",
     "conn_failed": "连接失败，请手动刷新页面",
+    "conn_failed_badge": "连接失败",
+    "conn_interrupted_badge": "连接中断",
     "reconnect": "重新连接",
     "reconnecting": "重连中 {{seconds}}s...",
     "conn_interrupted": "连接中断，正在重连...",
-    "open_tools": "工具面板"
+    "open_tools": "工具面板",
+    "season_spring": "春天",
+    "season_summer": "夏天",
+    "season_autumn": "秋天",
+    "season_winter": "冬天"
   },
   "build_panel": {
     "badge": "Build Mode",
@@ -429,6 +447,7 @@
   },
   "chrome": {
     "inspect_badge": "查看位置",
+    "tile_label": "位置 {{x}}, {{y}}",
     "close": "关闭",
     "terrain": "地形",
     "building_label": "建筑",
@@ -443,6 +462,8 @@
   "graph": {
     "filter_label": "关系过滤",
     "all": "全部",
+    "live_tick": "实时 Tick {{tick}}",
+    "replay_tick": "回放 Tick {{tick}}",
     "intensity_above": "强度 > {{value}}",
     "related_nodes_only": "仅显示相关节点",
     "intensity_threshold_aria": "关系强度阈值",
@@ -466,7 +487,8 @@
     "event_success_desc": "Tile {{x}}, {{y}} 的地图事件已加入队列。",
     "event_fail_title": "事件投放失败",
     "event_fail_desc": "请确认后端服务可用后重试。",
-    "waiting": "等待居民加载..."
+    "waiting": "等待居民加载...",
+    "waiting_badge": "小镇候场区"
   },
   "error": {
     "badge": "应用错误",
