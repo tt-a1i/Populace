@@ -21,7 +21,8 @@ from backend.api.schemas import (
     error_responses,
 )
 from backend.api.simulation import get_simulation_state
-from engine.types import WeatherType
+from engine.pathfinding import PathCache
+from engine.types import Building, WeatherType
 
 
 router = APIRouter(prefix="/api/world", tags=["world"])
@@ -204,6 +205,92 @@ async def list_buildings(request: Request) -> list[BuildingResponse]:
     """Return the currently loaded buildings and their map positions."""
     state = get_simulation_state(request)
     return [BuildingResponse(**asdict(building)) for building in state.world.buildings]
+
+
+_VALID_BUILDING_TYPES = {"home", "cafe", "park", "shop", "school", "gym", "library", "hospital"}
+
+
+class AddBuildingRequest(BaseModel):
+    id: str = Field(default="")
+    type: str = Field(description="Building type: home|cafe|park|shop|school|…")
+    name: str = Field(min_length=1, max_length=60)
+    capacity: int = Field(ge=1, le=200, default=4)
+    position: tuple[int, int] = Field(description="[x, y] entrance tile")
+
+    @field_validator("type")
+    @classmethod
+    def validate_type(cls, value: str) -> str:
+        v = value.strip().lower()
+        if v not in _VALID_BUILDING_TYPES:
+            raise ValueError(f"Unknown building type '{v}'. Valid: {sorted(_VALID_BUILDING_TYPES)}")
+        return v
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("id")
+    @classmethod
+    def strip_id(cls, value: str) -> str:
+        return value.strip()
+
+
+@router.post(
+    "/buildings",
+    response_model=BuildingResponse,
+    status_code=201,
+    responses=error_responses(400, 422, 503),
+)
+async def add_building(payload: AddBuildingRequest, request: Request) -> BuildingResponse:
+    """Add a new building to the running world at runtime (Task 61)."""
+    state = get_simulation_state(request)
+    w = state.world.config.map_width_tiles
+    h = state.world.config.map_height_tiles
+    x, y = payload.position
+
+    if not (0 <= x < w and 0 <= y < h):
+        raise api_error(400, f"Position ({x}, {y}) out of bounds (map is {w}×{h})", "position_out_of_bounds")
+
+    for existing in state.world.buildings:
+        if existing.position == (x, y):
+            raise api_error(400, f"Building already exists at ({x}, {y}): '{existing.name}'", "position_occupied")
+
+    building_id = payload.id or f"dyn_{payload.type}_{x}_{y}_{uuid4().hex[:6]}"
+    building = Building(
+        id=building_id,
+        type=payload.type,
+        name=payload.name,
+        capacity=payload.capacity,
+        position=(x, y),
+    )
+    state.world.add_building(building)
+
+    # Apply grid tiles: mark 2×2 footprint body as impassable, entrance walkable
+    def _set(tx: int, ty: int, walkable: bool) -> None:
+        if 0 <= tx < w and 0 <= ty < h:
+            state.world.grid[ty][tx] = walkable
+
+    _set(x, y, True)
+    for dy in range(1, 3):
+        for dx in range(0, 2):
+            _set(x + dx, y + dy, False)
+
+    state.world.path_cache = PathCache()
+    return BuildingResponse(**asdict(building))
+
+
+@router.delete(
+    "/buildings/{building_id}",
+    status_code=204,
+    responses=error_responses(404, 503),
+)
+async def remove_building(building_id: str, request: Request) -> None:
+    """Remove a building from the running world, evicting any occupants (Task 61)."""
+    state = get_simulation_state(request)
+    removed = state.world.remove_building(building_id)
+    if removed is None:
+        raise api_error(404, f"Building '{building_id}' not found", "building_not_found")
 
 
 class SetWeatherRequest(BaseModel):

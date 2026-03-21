@@ -224,6 +224,41 @@ class World:
         probability = 0.15 + extroversion_bonus + relation_bonus + self.get_social_probability_bonus(agent_a, agent_b)
         return max(0.05, min(0.95, probability))
 
+    def remove_building(self, building_id: str) -> Optional["Building"]:
+        """Remove a building, evict its occupants, and restore grid tiles.
+
+        Returns the removed :class:`~engine.types.Building` or ``None`` if
+        the building was not found.
+        """
+        building = self.get_building(building_id)
+        if building is None:
+            return None
+
+        # Evict all occupants before removing
+        for agent in self.get_occupants(building_id):
+            self.leave_building(agent)
+
+        self.buildings = [b for b in self.buildings if b.id != building_id]
+
+        # Restore grid: mark entrance + 2×2 footprint body as walkable
+        w = self.config.map_width_tiles
+        h = self.config.map_height_tiles
+        ex, ey = building.position
+
+        def _restore(x: int, y: int) -> None:
+            if 0 <= x < w and 0 <= y < h:
+                self.grid[y][x] = True
+
+        _restore(ex, ey)
+        for dy in range(1, 3):
+            for dx in range(0, 2):
+                _restore(ex + dx, ey + dy)
+
+        # Flush path cache so agents re-route around the now-open tiles
+        self.path_cache = PathCache()
+        self.mark_grid_index_dirty()
+        return building
+
     def apply_building_effects(self, agent: Agent) -> None:
         """Apply passive effects from the building the agent is inside."""
         building_id = agent.resident.location

@@ -4,9 +4,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "5173:5173"
     depends_on:
       - backend
+    restart: unless-stopped
 
   backend:
     build:
@@ -18,24 +19,29 @@ services:
       - neo4j
       - redis
     environment:
-      NEO4J_URI: ${NEO4J_URI}
-      REDIS_URL: ${REDIS_URL}
+      NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       LLM_API_KEY: ${LLM_API_KEY}
       LLM_BASE_URL: ${LLM_BASE_URL}
       LLM_MODEL_NAME: ${LLM_MODEL_NAME}
+    restart: unless-stopped
 
   neo4j:
     image: neo4j:5.26
     ports:
       - "7474:7474"
       - "7687:7687"
+    environment:
+      NEO4J_AUTH: ${NEO4J_AUTH:-none}
     volumes:
       - neo4j_data:/data
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    restart: unless-stopped
 
 volumes:
   neo4j_data:

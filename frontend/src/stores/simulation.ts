@@ -103,6 +103,7 @@ interface SimulationState {
   hoveredPairIds: [string, string] | null
   setRunning: (running: boolean) => void
   setSpeed: (speed: SimulationSpeed) => void
+  setBuildings: (buildings: Array<Building & { occupants: number }>) => void
   selectResident: (residentId: string | null) => void
   setHoveredPairIds: (pairIds: [string, string] | null) => void
   freezeForReplay: () => void
@@ -208,6 +209,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   hoveredPairIds: null,
   setRunning: (running) => set({ running }),
   setSpeed: (speed) => set({ speed, running: speed !== 0 }),
+  setBuildings: (buildings) => set({ buildings }),
   selectResident: (residentId) => set({ selectedResidentId: residentId }),
   setHoveredPairIds: (pairIds) => set({ hoveredPairIds: pairIds }),
   freezeForReplay: () =>

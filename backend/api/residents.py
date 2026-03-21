@@ -4,7 +4,7 @@ from dataclasses import asdict
 from typing import Any, Optional
 
 from fastapi import APIRouter, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.api.schemas import (
     ResidentMemoryResponse,
@@ -221,3 +221,81 @@ async def teleport_resident(
     agent.current_path = []
     state.world.mark_grid_index_dirty()
     return ResidentResponse(**asdict(agent.resident))
+
+
+class InitialRelationship(BaseModel):
+    resident_id: str
+    type: str = "knows"
+    intensity: float = 0.5
+
+
+class ResidentCreateRequest(BaseModel):
+    name: str
+    personality: str
+    mood: str = "neutral"
+    home_building_id: Optional[str] = None
+    initial_relationships: list[InitialRelationship] = Field(default_factory=list)
+
+
+@router.post("/create", response_model=ResidentResponse, responses=error_responses(400, 422, 503))
+async def create_resident(payload: ResidentCreateRequest, request: Request) -> ResidentResponse:
+    """Create a new resident and inject them into the live simulation world."""
+    import random
+    import uuid
+
+    from engine.generative_agent import GenerativeAgent
+    from engine.types import Relationship, RelationType, Resident
+    from backend.world.town import generate_resident_appearance
+
+    if not payload.name.strip():
+        raise api_error(400, "name cannot be empty", "invalid_name")
+
+    state = get_simulation_state(request)
+    cfg = state.world.config
+    resident_id = str(uuid.uuid4())
+    appearance = generate_resident_appearance(resident_id)
+
+    start_x = random.randint(0, cfg.map_width_tiles - 1)
+    start_y = random.randint(0, cfg.map_height_tiles - 1)
+
+    home_building = None
+    if payload.home_building_id:
+        home_building = state.world.get_building(payload.home_building_id)
+        if home_building is None:
+            raise api_error(400, f"building '{payload.home_building_id}' not found", "building_not_found")
+        start_x, start_y = home_building.position
+
+    resident = Resident(
+        id=resident_id,
+        name=payload.name.strip(),
+        personality=payload.personality,
+        mood=payload.mood,
+        home_building_id=payload.home_building_id,
+        x=start_x,
+        y=start_y,
+        **appearance,
+    )
+
+    agent = GenerativeAgent(resident)
+    state.world.add_agent(agent)
+
+    if home_building is not None:
+        state.world.enter_building(agent, home_building)
+
+    for rel_input in payload.initial_relationships:
+        target_agent = _find_agent(state, rel_input.resident_id)
+        if target_agent is None:
+            continue
+        try:
+            rel_type = RelationType(rel_input.type)
+        except ValueError:
+            rel_type = RelationType.knows
+        intensity = max(0.0, min(1.0, rel_input.intensity))
+        state.world.set_relationship(
+            Relationship(from_id=resident_id, to_id=rel_input.resident_id, type=rel_type, intensity=intensity)
+        )
+        state.world.set_relationship(
+            Relationship(from_id=rel_input.resident_id, to_id=resident_id, type=rel_type, intensity=intensity)
+        )
+
+    return ResidentResponse(**asdict(resident))

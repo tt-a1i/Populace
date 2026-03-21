@@ -279,6 +279,37 @@ export function getNetworkAnalysis() {
   return request<NetworkAnalysisEntry[]>('/api/simulation/network-analysis')
 }
 
+export interface BuildingData {
+  id: string
+  type: string
+  name: string
+  capacity: number
+  position: [number, number]
+}
+
+export interface AddBuildingPayload {
+  id?: string
+  type: string
+  name: string
+  capacity: number
+  position: [number, number]
+}
+
+export function getBuildings() {
+  return request<BuildingData[]>('/api/world/buildings')
+}
+
+export function addBuilding(payload: AddBuildingPayload) {
+  return request<BuildingData>('/api/world/buildings', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function removeBuilding(id: string) {
+  return request<void>(`/api/world/buildings/${id}`, { method: 'DELETE' })
+}
+
 export function generateReport() {
   return request<ReportPayload>('/api/report/generate', { method: 'POST' })
 }
@@ -376,4 +407,23 @@ export function loadSave(id: string) {
 
 export function deleteSave(id: string) {
   return request('/api/saves/' + id, { method: 'DELETE' })
+}
+
+// ---------------------------------------------------------------------------
+// Resident creation
+// ---------------------------------------------------------------------------
+
+export interface ResidentCreatePayload {
+  name: string
+  personality: string
+  mood?: string
+  home_building_id?: string
+  initial_relationships?: Array<{ resident_id: string; type: string; intensity: number }>
+}
+
+export function createResident(payload: ResidentCreatePayload) {
+  return request<ApiResident>('/api/residents/create', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
 }
