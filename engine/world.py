@@ -117,8 +117,8 @@ class World:
 
         Returns:
             Agents whose tile position is within *radius* of (x, y),
-            excluding any agent located exactly at (x, y) (i.e. the
-            querying agent itself).
+            including agents at the exact origin tile.  Callers that
+            need to exclude "self" should filter by identity.
         """
         if radius is None:
             radius = self.config.interaction_distance
@@ -133,7 +133,7 @@ class World:
             for bucket_y in range(origin_bucket_y - bucket_span, origin_bucket_y + bucket_span + 1):
                 for agent in self.grid_index.get((bucket_x, bucket_y), []):
                     distance = abs(agent.resident.x - x) + abs(agent.resident.y - y)
-                    if 0 < distance <= radius:
+                    if 0 <= distance <= radius:
                         nearby.append(agent)
 
         return nearby
@@ -335,7 +335,6 @@ class World:
             changed this tick (pushed to the frontend via WebSocket).
         """
         self.rebuild_grid_index()
-        self.path_cache.clear()
         self.current_tick += 1
         sim_time = self.simulation_time()
 
@@ -407,6 +406,9 @@ class World:
             EnergyUpdate(id=a.resident.id, energy=round(a.resident.energy, 3))
             for a in self.agents
         ]
+
+        # Clear path cache after tick so the next tick's agent cycle starts fresh
+        self.path_cache.clear()
 
         return TickState(
             tick=self.current_tick,

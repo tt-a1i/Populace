@@ -376,6 +376,8 @@ async def initiate_dialogue(
                 # LLM failure → end dialogue early
                 break
             text = text.strip()
+            if not text:
+                break
             messages.append({"speaker_id": speaker.resident.id, "text": text})
             context_history += f"{speaker.resident.name}：{text}\n"
         else:

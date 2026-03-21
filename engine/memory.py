@@ -61,8 +61,9 @@ class MemoryStream:
         if not self._memories:
             return []
         n = len(self._memories)
+        last = max(n - 1, 1)
         scored = [
-            (m, m.importance * (1.0 + idx / n))
+            (m, m.importance * 0.6 + (idx / last) * 0.4)
             for idx, m in enumerate(self._memories)
         ]
         scored.sort(key=lambda t: t[1], reverse=True)

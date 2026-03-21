@@ -32,7 +32,14 @@ SAVES_DIR.mkdir(exist_ok=True)
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _validate_save_id(save_id: str) -> None:
+    """Reject save_id values that could escape SAVES_DIR (path traversal)."""
+    if not save_id or "/" in save_id or "\\" in save_id or ".." in save_id:
+        raise api_error(400, "Invalid save id", "invalid_save_id")
+
+
 def _save_path(save_id: str) -> pathlib.Path:
+    _validate_save_id(save_id)
     return SAVES_DIR / f"{save_id}.json"
 
 
@@ -40,8 +47,11 @@ def _read_save(save_id: str) -> dict[str, Any]:
     path = _save_path(save_id)
     if not path.exists():
         raise api_error(404, f"Save '{save_id}' not found", "save_not_found")
-    with open(path, encoding="utf-8") as fh:
-        return json.load(fh)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except json.JSONDecodeError:
+        raise api_error(400, "Corrupt save file", "corrupt_save")
 
 
 def _save_meta(save_id: str, data: dict[str, Any]) -> dict[str, Any]:

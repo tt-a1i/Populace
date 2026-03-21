@@ -299,7 +299,13 @@ export class GraphRenderer {
   }
 
   destroy(): void {
-    this.simulation?.stop()
+    if (this.simulation) {
+      this.simulation.on('tick', null)
+      this.simulation.stop()
+      this.simulation = null
+    }
+    // Remove D3 event listeners on background before DOM removal
+    this.background?.on('click', null)
     this.options.onHoverLink(null, null)
     this.options.onHoverPair(null)
     this.root.replaceChildren()

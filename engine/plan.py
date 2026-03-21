@@ -74,9 +74,10 @@ async def plan(
     """
     messages = _build_plan_messages(agent, memories, reflections)
 
-    # Inject perceived_events into the user message so the LLM has full context
+    # Inject perceived_events into a copy so we don't mutate the original list
     if perceived_events:
         events_text = "\n".join(f"- {e.description}" for e in perceived_events)
+        messages = [dict(msg) for msg in messages]
         for msg in reversed(messages):
             if msg["role"] == "user":
                 msg["content"] += f"\n\n当前感知到的事件：\n{events_text}"

@@ -56,7 +56,7 @@ def test_get_nearby_agents(mock_world):
     nearby = mock_world.get_nearby_agents(5, 5)
     ids = {a.resident.id for a in nearby}
     assert "a2" in ids
-    assert "a1" not in ids   # self excluded (distance 0)
+    assert "a1" in ids       # same-tile agents are included (caller filters self)
     assert "a3" not in ids   # at (15,15), too far
 
 

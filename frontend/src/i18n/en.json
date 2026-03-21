@@ -227,5 +227,24 @@
   "api_key_banner": {
     "message": "No LLM API key configured — AI dialogue will be unavailable.",
     "action": "Go to Settings"
+  },
+  "app": {
+    "panel_loading": "Loading module…",
+    "mobile_tool_drawer": "Mobile Tool Drawer",
+    "close": "Close",
+    "town_map": "Town Map",
+    "relationship_graph": "Relationship Graph",
+    "header_title": "Modern Community",
+    "header_subtitle": "Graph, map & god-mode linked panels",
+    "connected": "● Connected",
+    "connecting": "○ Connecting…",
+    "conn_failed": "Connection failed — please refresh the page",
+    "reconnect": "Reconnect",
+    "reconnecting": "Reconnecting {{seconds}}s…",
+    "conn_interrupted": "Connection interrupted, reconnecting…",
+    "open_tools": "Open Tools",
+    "close_tools": "Close Tools",
+    "tab_map": "Map",
+    "tab_graph": "Graph"
   }
 }

@@ -62,8 +62,8 @@ async def reflect(agent: "Agent", memories: list[Memory]) -> Reflection | None:
     if summary is None:
         return None
 
-    # Use the timestamp of the most recent memory as the reflection time
-    latest_ts = memories[-1].timestamp if memories else "unknown"
+    # Use the most recent timestamp among input memories (sorted by relevance, not time)
+    latest_ts = max((m.timestamp for m in memories), default="unknown")
 
     return Reflection(
         id=str(uuid.uuid4()),

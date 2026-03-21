@@ -88,6 +88,7 @@ function useIsMobileViewport(breakpoint = 768): boolean {
 }
 
 function PanelFallback({ tone, title }: { tone: 'amber' | 'cyan'; title: string }) {
+  const { t } = useTranslation()
   const borderTone = tone === 'cyan' ? 'border-cyan-300/25' : 'border-amber-200/25'
   const textTone = tone === 'cyan' ? 'text-cyan-100/70' : 'text-amber-100/70'
 
@@ -100,7 +101,7 @@ function PanelFallback({ tone, title }: { tone: 'amber' | 'cyan'; title: string 
     >
       <div className="text-center">
         <p className={['text-xs uppercase tracking-[0.32em]', textTone].join(' ')}>{title}</p>
-        <p className="mt-3 text-sm text-slate-300">模块加载中…</p>
+        <p className="mt-3 text-sm text-slate-300">{t('app.panel_loading')}</p>
       </div>
     </div>
   )
@@ -149,6 +150,7 @@ function MobileToolbarSheet({
   open: boolean
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <>
       <button
@@ -169,14 +171,14 @@ function MobileToolbarSheet({
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <div>
             <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-100/70">Tool Drawer</p>
-            <p className="mt-1 text-sm text-slate-300">移动端工具面板</p>
+            <p className="mt-1 text-sm text-slate-300">{t('app.mobile_tool_drawer')}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-100"
           >
-            关闭
+            {t('app.close')}
           </button>
         </div>
         <div className="max-h-[calc(78vh-5rem)] overflow-y-auto p-4">
@@ -188,6 +190,7 @@ function MobileToolbarSheet({
 }
 
 function SimulationView() {
+  const { t } = useTranslation()
   const {
     connected,
     disconnected,
@@ -209,7 +212,7 @@ function SimulationView() {
       <SimulationPanelShell
         tone="cyan"
         eyebrow="PixiJS Town View"
-        title="小镇地图"
+        title={t('app.town_map')}
         badge={isMobile ? 'Map' : `${Math.round(splitRatio)}%`}
       >
         <Suspense fallback={<PanelFallback tone="cyan" title="PixiJS Town View" />}>
@@ -217,7 +220,7 @@ function SimulationView() {
         </Suspense>
       </SimulationPanelShell>
     ),
-    [isMobile, splitRatio],
+    [isMobile, splitRatio, t],
   )
 
   const graphPanel = useMemo(
@@ -225,7 +228,7 @@ function SimulationView() {
       <SimulationPanelShell
         tone="amber"
         eyebrow="D3 Relationship Graph"
-        title="关系图谱"
+        title={t('app.relationship_graph')}
         badge={isMobile ? 'Graph' : `${Math.round(100 - splitRatio)}%`}
       >
         <Suspense fallback={<PanelFallback tone="amber" title="D3 Relationship Graph" />}>
@@ -233,7 +236,7 @@ function SimulationView() {
         </Suspense>
       </SimulationPanelShell>
     ),
-    [isMobile, splitRatio],
+    [isMobile, splitRatio, t],
   )
 
   if (!hasInitialSnapshot) {
@@ -250,13 +253,13 @@ function SimulationView() {
                 <span className="text-2xl">⚠️</span>
                 <div className="text-center">
                   <p className="text-[11px] uppercase tracking-[0.34em] text-amber-100/70">Connection Failed</p>
-                  <p className="mt-3 text-base font-medium text-amber-50">连接失败，请手动刷新页面</p>
+                  <p className="mt-3 text-base font-medium text-amber-50">{t('app.conn_failed')}</p>
                   <button
                     type="button"
                     onClick={retry}
                     className="mt-4 rounded-full border border-amber-400/30 bg-amber-400/10 px-5 py-2 text-sm font-medium text-amber-200 transition hover:bg-amber-400/20"
                   >
-                    重新连接
+                    {t('app.reconnect')}
                   </button>
                 </div>
               </>
@@ -266,7 +269,7 @@ function SimulationView() {
                 <div className="text-center">
                   <p className="text-[11px] uppercase tracking-[0.34em] text-cyan-100/70">Connection Interrupted</p>
                   <p className="mt-3 text-base font-medium text-cyan-50">
-                    {reconnectCountdown > 0 ? `重连中 ${reconnectCountdown}s...` : '连接中断，正在重连...'}
+                    {reconnectCountdown > 0 ? t('app.reconnecting', { seconds: reconnectCountdown }) : t('app.conn_interrupted')}
                   </p>
                 </div>
               </>
@@ -283,7 +286,7 @@ function SimulationView() {
             : 'border border-amber-400/30 bg-amber-400/10 text-amber-300',
         ].join(' ')}
       >
-        {connected ? '● 已连接' : '○ 连接中…'}
+        {connected ? t('app.connected') : t('app.connecting')}
       </div>
 
       {isMobile && (
@@ -293,7 +296,7 @@ function SimulationView() {
             onClick={() => setMobileToolbarOpen((open) => !open)}
             className="fixed bottom-4 left-4 z-40 rounded-full border border-cyan-300/35 bg-cyan-300/14 px-4 py-3 text-sm font-medium text-cyan-50 shadow-[0_18px_44px_rgba(8,15,31,0.42)] md:hidden"
           >
-            {mobileToolbarVisible ? '关闭工具' : '打开工具'}
+            {mobileToolbarVisible ? t('app.close_tools') : t('app.open_tools')}
           </button>
           <MobileToolbarSheet open={mobileToolbarVisible} onClose={() => setMobileToolbarOpen(false)} />
         </>
@@ -311,7 +314,7 @@ function SimulationView() {
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <h1 className="font-mono text-2xl font-black tracking-tight text-white sm:text-3xl">
-                  现代小区
+                  {t('app.header_title')}
                 </h1>
                 <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">
                   10 residents · 8 buildings
@@ -320,7 +323,7 @@ function SimulationView() {
             </div>
             <div className="flex items-center gap-3">
               <div className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-sm text-cyan-50">
-                图谱、地图与上帝模式联动面板
+                {t('app.header_subtitle')}
               </div>
               <ThemeToggle />
             </div>
@@ -332,8 +335,8 @@ function SimulationView() {
             <div className="flex h-full min-h-[calc(100vh-13rem)] flex-col gap-4">
               <div className="inline-flex rounded-full border border-white/10 bg-white/5 p-1">
                 {([
-                  { key: 'town', label: '地图' },
-                  { key: 'graph', label: '图谱' },
+                  { key: 'town', label: t('app.tab_map') },
+                  { key: 'graph', label: t('app.tab_graph') },
                 ] as Array<{ key: MobilePane; label: string }>).map((item) => (
                   <button
                     key={item.key}

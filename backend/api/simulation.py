@@ -95,6 +95,7 @@ class SimulationState:
         # World timeline: list of timeline event dicts (max 500)
         self._world_timeline: list[dict[str, Any]] = []
         self._timeline_id_counter: int = 0
+        self._state_lock: asyncio.Lock = asyncio.Lock()
 
     async def restore_from_neo4j(self) -> None:
         """Restore prior session state at startup.
@@ -185,31 +186,55 @@ class SimulationState:
         import logging
         _log = logging.getLogger(__name__)
 
-        if self._task is not None and not self._task.done():
-            return
+        async with self._state_lock:
+            if self._task is not None and not self._task.done():
+                return
 
-        try:
-            validate_llm_config()
-        except ValueError as exc:
-            _log.warning(
-                "%s — starting in rule-only mode (llm_call_probability=0).", exc
-            )
-            # Patch config so _tick() skips LLM calls gracefully
-            object.__setattr__(self.world.config, "llm_call_probability", 0.0)
+            try:
+                validate_llm_config()
+            except ValueError as exc:
+                _log.warning(
+                    "%s — starting in rule-only mode (llm_call_probability=0).", exc
+                )
+                # Patch config so _tick() skips LLM calls gracefully
+                object.__setattr__(self.world.config, "llm_call_probability", 0.0)
 
-        self._task = asyncio.create_task(self.loop.start())
-        await asyncio.sleep(0)
+            self._task = asyncio.create_task(self.loop.start())
+            await asyncio.sleep(0)
 
     async def stop(self) -> None:
-        await self.loop.stop()
-        if self._task is not None:
-            await self._task
-            self._task = None
+        async with self._state_lock:
+            await self._stop_unlocked()
 
     def set_speed(self, speed: int) -> None:
         if speed not in {1, 2, 5, 10, 50}:
             raise ValueError("Input should be 1, 2, 5, 10 or 50")
         self.loop.clock.set_speed(float(speed))
+
+    async def _stop_unlocked(self) -> None:
+        """Stop the loop without acquiring _state_lock (caller must hold it)."""
+        await self.loop.stop()
+        if self._task is not None:
+            await self._task
+            self._task = None
+
+    def _clear_session_state(self) -> None:
+        """Reset all session-level counters and caches (called during reset)."""
+        for task in self._pending_dialogues:
+            task.cancel()
+        self._pending_dialogues.clear()
+        self._dialogue_pair_ids.clear()
+        self._active_dialogue_pairs.clear()
+        self._events.clear()
+        self._active_events.clear()
+        self._mood_history = []
+        self._total_dialogue_count = 0
+        self._total_relationship_change_count = 0
+        self._achievements_store = {}
+        self._buildings_visited = {}
+        self._rel_events_fired = set()
+        self._world_timeline = []
+        self._timeline_id_counter = 0
 
     async def reset_with_scene(self, scene_slug: str) -> None:
         """Stop simulation and reload a named preset template.
@@ -230,53 +255,25 @@ class SimulationState:
             )
             template_path = templates_dir / "modern_community.json"
 
-        await self.stop()
-        for task in self._pending_dialogues:
-            task.cancel()
-        self._pending_dialogues.clear()
-        self._dialogue_pair_ids.clear()
-        self._active_dialogue_pairs.clear()
-        self._events.clear()
-        self._active_events.clear()
-        self._mood_history = []
-        self._total_dialogue_count = 0
-        self._total_relationship_change_count = 0
-
-        self._achievements_store = {}
-        self._buildings_visited = {}
-        self._rel_events_fired = set()
-        self._world_timeline = []
-        self._timeline_id_counter = 0
-        self.world = load_scenario(template_path)
-        self.loop = SimulationLoop(self.world, tick_handler=self._tick)
-        self._task = None
+        async with self._state_lock:
+            await self._stop_unlocked()
+            self._clear_session_state()
+            self.world = load_scenario(template_path)
+            self.loop = SimulationLoop(self.world, tick_handler=self._tick)
+            self._task = None
 
     async def reset_with_scenario(self, scenario_data: dict[str, Any]) -> None:
         """Stop simulation and replace the world with a custom scenario."""
         from backend.world.town import load_scenario_from_dict
 
-        await self.stop()
-        for task in self._pending_dialogues:
-            task.cancel()
-        self._pending_dialogues.clear()
-        self._dialogue_pair_ids.clear()
-        self._active_dialogue_pairs.clear()
-        self._events.clear()
-        self._active_events.clear()
-        self._mood_history = []
-        self._total_dialogue_count = 0
-        self._total_relationship_change_count = 0
-
-        self._achievements_store = {}
-        self._buildings_visited = {}
-        self._rel_events_fired = set()
-        self._world_timeline = []
-        self._timeline_id_counter = 0
-        self.world = load_scenario_from_dict(scenario_data)
-        self.loop = SimulationLoop(self.world, tick_handler=self._tick)
-        self._task = None
-        self._experiment_history = []
-        self._max_experiment_history_ticks = max(200, self.world.config.tick_per_day * 30)
+        async with self._state_lock:
+            await self._stop_unlocked()
+            self._clear_session_state()
+            self.world = load_scenario_from_dict(scenario_data)
+            self.loop = SimulationLoop(self.world, tick_handler=self._tick)
+            self._task = None
+            self._experiment_history = []
+            self._max_experiment_history_ticks = max(200, self.world.config.tick_per_day * 30)
 
     def save_state(self) -> dict[str, Any]:
         """Serialise the full simulation state to a JSON-compatible dict."""

@@ -12,8 +12,11 @@ multiple ticks until the agent arrives or the path is blocked.
 """
 from __future__ import annotations
 
+import logging
 import random
 from typing import TYPE_CHECKING, List
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from engine.agent import Agent
@@ -93,6 +96,7 @@ def _step_astar(agent: "Agent", target: tuple, world: "World") -> None:
             world.path_cache.set(pos, target, new_path)
 
         if not new_path:
+            _log.debug("No path from (%d,%d) to (%d,%d) for %s", pos[0], pos[1], target[0], target[1], agent.resident.name)
             agent.current_path = []
             return
 

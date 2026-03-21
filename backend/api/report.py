@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from typing import Any
@@ -393,7 +394,10 @@ async def generate_report(request: Request) -> GeneratedReportResponse:
     residents, events, relationships, tick_info = _extract_report_inputs(state)
     fallback = _fallback_report(residents, events, relationships, tick_info)
     prompt = build_report_prompt(residents, events, relationships, tick_info)
-    content = await chat_completion(prompt, max_tokens=400)
+    try:
+        content = await asyncio.wait_for(chat_completion(prompt, max_tokens=400), timeout=30)
+    except asyncio.TimeoutError:
+        content = None
     report = _parse_report_response(content, fallback)
     payload = {
         **report,
@@ -423,7 +427,10 @@ async def generate_experiment_report(
         emotion_distribution=analysis["emotion_distribution"],
         social_hotspots=analysis["social_hotspots"],
     )
-    content = await chat_completion(prompt, max_tokens=900)
+    try:
+        content = await asyncio.wait_for(chat_completion(prompt, max_tokens=900), timeout=30)
+    except asyncio.TimeoutError:
+        content = None
     report = _parse_experiment_report_response(content, fallback)
     experiment_payload = {
         **report,

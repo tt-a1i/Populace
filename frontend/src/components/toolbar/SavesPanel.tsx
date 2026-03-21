@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useSound } from '../../audio'
@@ -16,6 +16,7 @@ export function SavesPanel() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
   const fetchSaves = async () => {
     try {
@@ -27,9 +28,14 @@ export function SavesPanel() {
 
   useEffect(() => { void fetchSaves() }, [])
 
+  useEffect(() => {
+    return () => { clearTimeout(flashTimerRef.current) }
+  }, [])
+
   const flash = (msg: string) => {
     setSuccessMsg(msg)
-    setTimeout(() => setSuccessMsg(null), 2500)
+    clearTimeout(flashTimerRef.current)
+    flashTimerRef.current = setTimeout(() => setSuccessMsg(null), 2500)
   }
 
   const playConfirmationSound = () => {

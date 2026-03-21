@@ -146,9 +146,8 @@ def test_rule_plan_idle_when_already_at_destination(world_with_buildings):
     assert plan["action"] == "idle"
 
 
-def test_generative_agent_plan_uses_schedule_on_rule_path(world_with_buildings):
+async def test_generative_agent_plan_uses_schedule_on_rule_path(world_with_buildings):
     """GenerativeAgent.plan() with use_llm=False returns schedule-driven action."""
-    import asyncio
     from engine.generative_agent import GenerativeAgent
 
     agent = GenerativeAgent(make_agent("a1").resident)
@@ -161,7 +160,7 @@ def test_generative_agent_plan_uses_schedule_on_rule_path(world_with_buildings):
         "use_llm": False,
         "world": world_with_buildings,
     }
-    result = asyncio.run(agent.plan(context))
+    result = await agent.plan(context)
     assert result["action"] in ("move", "idle")
     # Should NOT be a completely random move — target should exist
     if result["action"] == "move" and "target" in result:

@@ -68,10 +68,13 @@ async def update_resident(
     """Patch editable resident fields such as mood, goals, or map position."""
     state = get_simulation_state(request)
 
+    _PATCHABLE_FIELDS = {"name", "personality", "goals", "mood", "location", "x", "y"}
     for agent in state.world.agents:
         if agent.resident.id == resident_id:
             updates = payload.model_dump(exclude_unset=True)
             for field_name, value in updates.items():
+                if field_name not in _PATCHABLE_FIELDS:
+                    continue
                 setattr(agent.resident, field_name, value)
             return ResidentResponse(**asdict(agent.resident))
 

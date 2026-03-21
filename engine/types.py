@@ -234,7 +234,11 @@ else:
         """All tunable simulation parameters."""
 
         tick_interval_seconds: float = 3.0
-        tick_per_day: int = 48
+        tick_per_day: int = 48  # must be > 0
+
+        def __post_init__(self) -> None:
+            if self.tick_per_day < 1:
+                raise ValueError("tick_per_day must be >= 1")
         max_concurrent_llm_calls: int = 3
         llm_timeout_seconds: float = 5.0
         llm_call_probability: float = 0.2

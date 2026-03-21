@@ -13,8 +13,8 @@ from engine.world import World
 from tests.conftest import MockAgent, make_agent
 
 
-def _run_ticks_sync(world: World, n: int = 3) -> list[dict]:
-    """Run n ticks synchronously and return serialised TickState list."""
+async def _run_ticks(world: World, n: int = 3) -> list[dict]:
+    """Run n ticks and return serialised TickState list."""
     import asyncio
 
     from backend.api.simulation import SimulationState
@@ -25,15 +25,13 @@ def _run_ticks_sync(world: World, n: int = 3) -> list[dict]:
     state._events = []
     state._pending_dialogues = []
     state._active_dialogue_pairs = set()
+    state._state_lock = asyncio.Lock()
 
-    async def _run():
-        results = []
-        for _ in range(n):
-            ts = await state._tick()
-            results.append(asdict(ts))
-        return results
-
-    return asyncio.run(_run())
+    results = []
+    for _ in range(n):
+        ts = await state._tick()
+        results.append(asdict(ts))
+    return results
 
 
 def _make_deterministic_world(seed: int) -> World:
@@ -53,15 +51,15 @@ def _make_deterministic_world(seed: int) -> World:
     return world
 
 
-def test_deterministic_mode_same_seed_same_movements():
+async def test_deterministic_mode_same_seed_same_movements():
     """Two simulations with the same seed must produce identical movements."""
     seed = 42
 
     random.seed(seed)
-    ticks_a = _run_ticks_sync(_make_deterministic_world(seed))
+    ticks_a = await _run_ticks(_make_deterministic_world(seed))
 
     random.seed(seed)
-    ticks_b = _run_ticks_sync(_make_deterministic_world(seed))
+    ticks_b = await _run_ticks(_make_deterministic_world(seed))
 
     for i, (ta, tb) in enumerate(zip(ticks_a, ticks_b)):
         mvs_a = sorted(ta["movements"], key=lambda m: m["id"])
@@ -69,10 +67,10 @@ def test_deterministic_mode_same_seed_same_movements():
         assert mvs_a == mvs_b, f"Tick {i+1} movements differ: {mvs_a} vs {mvs_b}"
 
 
-def test_deterministic_mode_different_seeds_may_differ():
+async def test_deterministic_mode_different_seeds_may_differ():
     """Different seeds should (with overwhelming probability) produce different results."""
-    ticks_42 = _run_ticks_sync(_make_deterministic_world(42))
-    ticks_99 = _run_ticks_sync(_make_deterministic_world(99))
+    ticks_42 = await _run_ticks(_make_deterministic_world(42))
+    ticks_99 = await _run_ticks(_make_deterministic_world(99))
 
     # Check at least one tick differs (extremely unlikely they'd all be equal)
     all_same = all(

@@ -60,6 +60,11 @@ function relationshipBorderClass(title: string): string {
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = React.useState<Toast[]>([])
+  const timersRef = React.useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
+
+  React.useEffect(() => {
+    return () => { timersRef.current.forEach(clearTimeout) }
+  }, [])
 
   const pushToast = React.useCallback(
     (messageOrOpts: string | ToastOptions, opts?: ToastOptions) => {
@@ -82,9 +87,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       }
 
       setToasts((current) => [...current, { id, type, category, title, description }])
-      window.setTimeout(() => {
+      const timer = window.setTimeout(() => {
+        timersRef.current.delete(timer)
         setToasts((current) => current.filter((toast) => toast.id !== id))
       }, 3000)
+      timersRef.current.add(timer)
     },
     [],
   )

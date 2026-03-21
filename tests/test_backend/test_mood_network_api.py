@@ -1,8 +1,6 @@
 """Regression tests for Task 57: mood-history and network-analysis endpoints."""
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -27,11 +25,11 @@ def test_mood_history_returns_list(client: TestClient) -> None:
     assert isinstance(resp.json(), list)
 
 
-def test_mood_history_has_correct_fields_after_tick(client: TestClient) -> None:
+async def test_mood_history_has_correct_fields_after_tick(client: TestClient) -> None:
     """After running a tick mood-history entries contain expected fields."""
     state = client.app.state.simulation_state
-    # Force a tick synchronously to populate history
-    asyncio.run(state._tick())
+    # Force a tick to populate history
+    await state._tick()
 
     resp = client.get("/api/simulation/mood-history")
     assert resp.status_code == 200
@@ -44,7 +42,7 @@ def test_mood_history_has_correct_fields_after_tick(client: TestClient) -> None:
         assert "mood" in entry
 
 
-def test_mood_history_cleared_on_scene_switch(client: TestClient) -> None:
+async def test_mood_history_cleared_on_scene_switch(client: TestClient) -> None:
     """Switching scene clears mood history so stale data doesn't bleed across sessions.
 
     Specifically: modern_community residents (e.g. '小明') must not appear in
@@ -53,7 +51,7 @@ def test_mood_history_cleared_on_scene_switch(client: TestClient) -> None:
     """
     state = client.app.state.simulation_state
     # Populate history with modern_community entries
-    asyncio.run(state._tick())
+    await state._tick()
     modern_names = {entry["resident_name"] for entry in getattr(state, "_mood_history", [])}
     assert modern_names, "Expected modern_community history to be non-empty"
 
@@ -73,7 +71,7 @@ def test_mood_history_cleared_on_scene_switch(client: TestClient) -> None:
     client.post("/api/simulation/start", json={"scene": "modern_community"})
 
 
-def test_mood_history_max_100_ticks(client: TestClient) -> None:
+async def test_mood_history_max_100_ticks(client: TestClient) -> None:
     """Mood history is bounded to the last 100 ticks worth of entries."""
     state = client.app.state.simulation_state
     n_agents = len(state.world.agents)
@@ -83,7 +81,7 @@ def test_mood_history_max_100_ticks(client: TestClient) -> None:
         for i in range(200 * n_agents)
     ]
     # Run one more tick to trigger trim
-    asyncio.run(state._tick())
+    await state._tick()
 
     assert len(state._mood_history) <= 100 * max(1, n_agents) + n_agents
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useSound } from '../../audio'
@@ -36,7 +36,12 @@ export function EventInjector() {
   const [presets, setPresets] = useState<PresetEvent[]>([])
   const [activeEvents, setActiveEvents] = useState<ActiveEvent[]>([])
 
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const canSubmitCustom = useMemo(() => customEvent.trim().length > 0, [customEvent])
+
+  useEffect(() => {
+    return () => { clearTimeout(flashTimerRef.current) }
+  }, [])
 
   // Load presets once on mount
   useEffect(() => {
@@ -63,7 +68,8 @@ export function EventInjector() {
       await injectPresetEvent(presetId)
       setLastEvent(presetName)
       setFlashBorder(true)
-      setTimeout(() => setFlashBorder(false), 600)
+      clearTimeout(flashTimerRef.current)
+      flashTimerRef.current = setTimeout(() => setFlashBorder(false), 600)
       play('event')
       pushToast({
         type: 'success',
@@ -84,7 +90,8 @@ export function EventInjector() {
       setLastEvent(desc)
       setCustomEvent('')
       setFlashBorder(true)
-      setTimeout(() => setFlashBorder(false), 600)
+      clearTimeout(flashTimerRef.current)
+      flashTimerRef.current = setTimeout(() => setFlashBorder(false), 600)
       play('event')
       pushToast({
         type: 'success',
