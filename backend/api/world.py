@@ -313,7 +313,17 @@ async def set_weather(payload: SetWeatherRequest, request: Request) -> WeatherRe
             f"Unknown weather type '{payload.type}'. Valid: {[w.value for w in WeatherType]}",
             "invalid_weather_type",
         )
+    weather_labels = {
+        "sunny": "晴天", "cloudy": "多云", "rainy": "小雨", "stormy": "暴风雨", "snowy": "下雪",
+    }
+    old_weather = state.world.weather.value if hasattr(state.world.weather, "value") else str(state.world.weather)
     state.world.weather = weather
+    if old_weather != weather.value:
+        state._add_timeline_event(
+            "weather_change",
+            f"天气变化：{weather_labels.get(old_weather, old_weather)} → {weather_labels.get(weather.value, weather.value)}",
+            {"from": old_weather, "to": weather.value},
+        )
     return WeatherResponse(weather=weather.value)
 
 

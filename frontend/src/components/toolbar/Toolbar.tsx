@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import { SoundToggleButton } from './SoundToggleButton'
 import { BuildPanel } from './BuildPanel'
+import { ComparePanel } from './ComparePanel'
 import { EventInjector } from './EventInjector'
 import { ExportPanel } from './ExportPanel'
 import { HeatmapPanel } from './HeatmapPanel'
@@ -11,10 +12,11 @@ import { ResidentCreationWizard } from './ResidentCreationWizard'
 import { SavesPanel } from './SavesPanel'
 import { SpeedControl } from './SpeedControl'
 import { StatsPanel } from './StatsPanel'
+import { TimelinePanel } from './TimelinePanel'
 import { ReportsPanel } from '../report'
 import { LanguageSwitcher, MessageBar } from '../ui'
 
-type ToolKey = 'event' | 'persona' | 'build' | 'create' | 'report' | 'stats' | 'saves' | 'export' | 'heatmap'
+type ToolKey = 'event' | 'persona' | 'build' | 'create' | 'report' | 'stats' | 'saves' | 'export' | 'heatmap' | 'compare' | 'timeline'
 
 function toneClass(tone: string, active: boolean): string {
   if (!active) return 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
@@ -39,6 +41,8 @@ export function Toolbar() {
     { key: 'saves', label: t('toolbar.saves'), icon: '💾', tone: 'violet' },
     { key: 'export', label: t('toolbar.export'), icon: '📤', tone: 'cyan' },
     { key: 'heatmap', label: t('toolbar.heatmap'), icon: '🟥', tone: 'violet' },
+    { key: 'compare', label: t('toolbar.compare'), icon: '⚖️', tone: 'amber' },
+    { key: 'timeline', label: t('toolbar.timeline'), icon: '📅', tone: 'violet' },
   ]
 
   const panel = useMemo(() => {
@@ -50,6 +54,8 @@ export function Toolbar() {
     if (activeTool === 'create') return <ResidentCreationWizard />
     if (activeTool === 'export') return <ExportPanel />
     if (activeTool === 'heatmap') return <HeatmapPanel />
+    if (activeTool === 'compare') return <ComparePanel />
+    if (activeTool === 'timeline') return <TimelinePanel />
     return <ReportsPanel />
   }, [activeTool])
 

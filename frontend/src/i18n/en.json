@@ -44,7 +44,31 @@
     "saves": "Saves",
     "export": "Export",
     "heatmap": "Heatmap",
+    "compare": "Compare",
+    "timeline": "Timeline",
     "current_tool": "Active Tool: "
+  },
+  "compare": {
+    "badge": "Resident Compare",
+    "title": "Compare Residents",
+    "select_a": "Select Resident A",
+    "select_b": "Select Resident B",
+    "compare": "Compare",
+    "comparing": "Comparing…",
+    "hint": "Select two different residents to compare",
+    "mood": "Mood",
+    "occupation": "Occupation",
+    "coins": "Coins",
+    "relationships": "Relationships",
+    "achievements": "Achievements",
+    "personality": "Personality"
+  },
+  "timeline": {
+    "badge": "World Timeline",
+    "title": "World Timeline",
+    "refresh": "Refresh",
+    "all": "All",
+    "empty": "No world events recorded yet — keep simulating to see relationship milestones, weather changes, and more"
   },
   "create_resident": {
     "badge": "Resident Creator",

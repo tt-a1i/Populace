@@ -280,3 +280,19 @@ class EconomyStatsResponse(BaseModel):
     richest: str | None = None
     poorest: str | None = None
     occupation_distribution: list[OccupationDistEntry] = Field(default_factory=list)
+
+
+class MemoirResponse(BaseModel):
+    resident_id: str
+    resident_name: str
+    content: str
+    generated_at: str
+
+
+class TimelineEventResponse(BaseModel):
+    id: str
+    event_type: str  # relationship_milestone | weather_change | custom_event | preset_event | achievement
+    description: str
+    tick: int
+    time: str
+    metadata: dict = Field(default_factory=dict)

@@ -44,7 +44,31 @@
     "saves": "存档管理",
     "export": "数据导出",
     "heatmap": "关系热力图",
+    "compare": "居民对比",
+    "timeline": "世界时间线",
     "current_tool": "当前工具："
+  },
+  "compare": {
+    "badge": "Resident Compare",
+    "title": "居民对比",
+    "select_a": "选择居民 A",
+    "select_b": "选择居民 B",
+    "compare": "对比",
+    "comparing": "对比中…",
+    "hint": "请先选择两位不同的居民",
+    "mood": "心情",
+    "occupation": "职业",
+    "coins": "金币",
+    "relationships": "关系数",
+    "achievements": "成就数",
+    "personality": "性格"
+  },
+  "timeline": {
+    "badge": "World Timeline",
+    "title": "世界时间线",
+    "refresh": "刷新",
+    "all": "全部",
+    "empty": "暂无世界事件记录，继续模拟后会出现关系里程碑、天气变化等事件"
   },
   "create_resident": {
     "badge": "Resident Creator",

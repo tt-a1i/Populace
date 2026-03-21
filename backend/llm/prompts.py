@@ -429,3 +429,65 @@ def build_experiment_report_prompt(
         {"role": "system", "content": "你是一名研究 AI 社会实验的学术分析员，擅长把模拟数据写成结构化 Markdown 报告。"},
         {"role": "user", "content": content},
     ]
+
+
+def build_memoir_prompt(
+    name: str,
+    personality: str,
+    goals: list[str],
+    diary_entries: list[dict],
+    recent_memories: list[dict],
+    relationships: list[dict],
+) -> list[dict]:
+    """Build a prompt for generating a resident's personal memoir in Markdown."""
+    goal_text = "、".join(goals) or "暂无明确目标"
+
+    diary_text = _truncate(
+        "\n".join(
+            f"[{entry.get('date', '?')}] {entry.get('summary', '')}"
+            for entry in diary_entries[-12:]
+        ) or "（暂无日记记录）",
+        _CHAR_BUDGET // 3,
+    )
+
+    memory_text = _truncate(
+        "\n".join(
+            f"- {mem.get('content', '')} (情绪:{mem.get('emotion', 'neutral')}, 重要度:{mem.get('importance', 0):.1f})"
+            for mem in recent_memories[:15]
+        ) or "（暂无记忆记录）",
+        _CHAR_BUDGET // 3,
+    )
+
+    rel_text = _truncate(
+        "\n".join(
+            f"- 与 {rel.get('counterpart_name', rel.get('to_id', '?'))} 的关系：{rel.get('type', 'knows')}（强度 {rel.get('intensity', 0):.2f}）{' — ' + rel.get('reason', '') if rel.get('reason') else ''}"
+            for rel in relationships[:10]
+        ) or "（暂无人际关系记录）",
+        _CHAR_BUDGET // 4,
+    )
+
+    content = _truncate(
+        f"请为小镇居民「{name}」写一份第一人称回忆录，使用 Markdown 格式，语言温情且有细节感。\n\n"
+        f"性格：{personality}\n"
+        f"目标：{goal_text}\n\n"
+        f"日记摘要（按日期）：\n{diary_text}\n\n"
+        f"重要记忆片段：\n{memory_text}\n\n"
+        f"人际关系：\n{rel_text}\n\n"
+        "请使用以下 Markdown 结构：\n"
+        "# [居民名字]的回忆录\n"
+        "## 关于我自己\n"
+        "## 在这座小镇的日子\n"
+        "## 那些重要的相遇\n"
+        "## 我的心路历程\n\n"
+        "要求：\n"
+        "- 完全第一人称叙述，有情感温度\n"
+        "- 自然融入日记、记忆和关系细节\n"
+        "- 不要列举数字或 JSON，写成散文\n"
+        "- 总长 300-500 字",
+        _CHAR_BUDGET,
+    )
+
+    return [
+        {"role": "system", "content": "你是一名擅长写人物传记的作家，语言细腻、有温度，善于把数据背后的故事变成感人的散文。"},
+        {"role": "user", "content": content},
+    ]

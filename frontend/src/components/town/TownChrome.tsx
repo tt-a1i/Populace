@@ -8,6 +8,7 @@ import {
   type ResidentMemory,
   type ResidentReflection,
   type ResidentRelationship,
+  generateMemoir,
   getResidentAchievements,
   getResidentDiary,
   getResidentMemories,
@@ -161,6 +162,12 @@ export function TownChrome({
   const [injectBusy, setInjectBusy] = useState(false)
   const [injectResult, setInjectResult] = useState<string | null>(null)
 
+  // Memoir state
+  const [memoirOpen, setMemoirOpen] = useState(false)
+  const [memoirContent, setMemoirContent] = useState<string | null>(null)
+  const [memoirName, setMemoirName] = useState('')
+  const [memoirBusy, setMemoirBusy] = useState(false)
+
   const handleOpenEdit = () => {
     if (!selectedResident) return
     setEditMood(selectedResident.mood ?? 'neutral')
@@ -195,6 +202,30 @@ export function TownChrome({
       setInjectContent('')
     } catch { setInjectResult('✗ 注入失败') }
     finally { setInjectBusy(false) }
+  }
+
+  const handleGenerateMemoir = async () => {
+    if (!selectedResidentId) return
+    setMemoirBusy(true)
+    setMemoirContent(null)
+    try {
+      const result = await generateMemoir(selectedResidentId)
+      setMemoirContent(result.content)
+      setMemoirName(result.resident_name)
+      setMemoirOpen(true)
+    } catch { setMemoirContent('生成失败，请稍后重试。') }
+    finally { setMemoirBusy(false) }
+  }
+
+  const handleDownloadMemoir = () => {
+    if (!memoirContent) return
+    const blob = new Blob([memoirContent], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${memoirName || 'memoir'}-memoir.md`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const handleTeleport = async (x: number, y: number, rid?: string) => {
@@ -334,6 +365,14 @@ export function TownChrome({
                   className="rounded-full border border-violet-300/30 bg-violet-300/10 px-2.5 py-1 text-[11px] font-medium text-violet-200 transition hover:bg-violet-300/20"
                 >
                   💉 记忆
+                </button>
+                <button
+                  type="button"
+                  disabled={memoirBusy}
+                  onClick={() => void handleGenerateMemoir()}
+                  className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-2.5 py-1 text-[11px] font-medium text-emerald-200 transition hover:bg-emerald-300/20 disabled:opacity-50"
+                >
+                  {memoirBusy ? '生成中…' : '📖 回忆录'}
                 </button>
               </div>
             </div>
@@ -645,6 +684,47 @@ export function TownChrome({
           </section>
           )}
         </aside>
+      )}
+
+      {/* ── Memoir Modal ── */}
+      {memoirOpen && memoirContent && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          onClick={() => setMemoirOpen(false)}
+        >
+          <div
+            className="relative flex max-h-[80vh] w-full max-w-xl flex-col rounded-[28px] border border-emerald-300/20 bg-slate-950/95 p-6 shadow-[0_40px_120px_rgba(2,6,23,0.7)] backdrop-blur"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.3em] text-emerald-300/60">Memoir</p>
+                <h3 className="mt-1 text-xl font-semibold text-white">{memoirName} 的回忆录</h3>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadMemoir}
+                  className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-xs text-emerald-200 transition hover:bg-emerald-300/20"
+                >
+                  ⬇ 下载 .md
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMemoirOpen(false)}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 transition hover:bg-white/10"
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-white/8 bg-white/[0.03] px-5 py-4 text-slate-200">
+              <div className="prose prose-sm prose-invert max-w-none leading-7 whitespace-pre-wrap text-sm">
+                {memoirContent}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       <section

@@ -7,11 +7,11 @@ from typing import Any
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from backend.api.schemas import ExperimentReportResponse, GeneratedReportResponse, api_error, error_responses
+from backend.api.schemas import ExperimentReportResponse, GeneratedReportResponse, MemoirResponse, api_error, error_responses
 
 from backend.api.simulation import get_simulation_state
 from backend.llm.client import chat_completion
-from backend.llm.prompts import build_experiment_report_prompt, build_report_prompt
+from backend.llm.prompts import build_experiment_report_prompt, build_memoir_prompt, build_report_prompt
 
 
 router = APIRouter(prefix="/api/report", tags=["report"])
@@ -445,3 +445,62 @@ async def get_latest_report(request: Request) -> GeneratedReportResponse:
     if latest_report is None:
         raise api_error(404, "latest report not found", "report_not_found")
     return GeneratedReportResponse(**latest_report)
+
+
+@router.post(
+    "/memoir/{resident_id}",
+    response_model=MemoirResponse,
+    responses=error_responses(404, 503),
+)
+async def generate_memoir(resident_id: str, request: Request) -> MemoirResponse:
+    """Generate a personal memoir for a resident based on their diary, memories, and relationships."""
+    from dataclasses import asdict
+
+    state = get_simulation_state(request)
+
+    agent = None
+    for a in state.world.agents:
+        if a.resident.id == resident_id:
+            agent = a
+            break
+    if agent is None:
+        raise api_error(404, "resident not found", "resident_not_found")
+
+    resident = agent.resident
+    diary_entries = [asdict(e) for e in resident.diary]
+    recent_memories = [asdict(m) for m in agent.memory_stream.all]
+    relationships = []
+    for (from_id, to_id), rel in state.world.relationships.items():
+        if from_id == resident_id or to_id == resident_id:
+            rel_dict = asdict(rel)
+            counterpart_id = to_id if from_id == resident_id else from_id
+            counterpart = next(
+                (a for a in state.world.agents if a.resident.id == counterpart_id), None
+            )
+            rel_dict["counterpart_name"] = counterpart.resident.name if counterpart else counterpart_id
+            relationships.append(rel_dict)
+
+    fallback_content = (
+        f"# {resident.name}的回忆录\n\n"
+        f"## 关于我自己\n\n我叫{resident.name}，{resident.personality}\n\n"
+        f"## 在这座小镇的日子\n\n这里有我许多难忘的记忆。\n\n"
+        f"## 那些重要的相遇\n\n小镇里每个人都给我留下了印记。\n\n"
+        f"## 我的心路历程\n\n每一天都是新的开始。"
+    )
+
+    prompt = build_memoir_prompt(
+        name=resident.name,
+        personality=resident.personality,
+        goals=resident.goals,
+        diary_entries=diary_entries,
+        recent_memories=recent_memories,
+        relationships=relationships,
+    )
+    content = await chat_completion(prompt, max_tokens=700)
+
+    return MemoirResponse(
+        resident_id=resident_id,
+        resident_name=resident.name,
+        content=content or fallback_content,
+        generated_at=datetime.now(timezone.utc).isoformat(),
+    )

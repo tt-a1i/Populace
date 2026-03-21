@@ -476,3 +476,27 @@ export interface EconomyStats {
 export function getEconomyStats() {
   return request<EconomyStats>('/api/simulation/economy-stats')
 }
+
+export interface MemoirPayload {
+  resident_id: string
+  resident_name: string
+  content: string
+  generated_at: string
+}
+
+export function generateMemoir(residentId: string) {
+  return request<MemoirPayload>(`/api/report/memoir/${residentId}`, { method: 'POST' })
+}
+
+export interface TimelineEvent {
+  id: string
+  event_type: string
+  description: string
+  tick: number
+  time: string
+  metadata: Record<string, unknown>
+}
+
+export function getTimeline() {
+  return request<TimelineEvent[]>('/api/simulation/timeline')
+}

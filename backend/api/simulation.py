@@ -13,6 +13,7 @@ from backend.api.schemas import (
     ScenarioDataResponse,
     SimulationStatsResponse,
     SimulationStatusResponse,
+    TimelineEventResponse,
     api_error,
     error_responses,
 )
@@ -77,6 +78,9 @@ class SimulationState:
         self._achievements_store: dict[str, set[str]] = {}
         self._buildings_visited: dict[str, set[str]] = {}
         self._rel_events_fired: set = set()
+        # World timeline: list of timeline event dicts (max 500)
+        self._world_timeline: list[dict[str, Any]] = []
+        self._timeline_id_counter: int = 0
 
     async def restore_from_neo4j(self) -> None:
         """Restore prior session state at startup.
@@ -226,6 +230,8 @@ class SimulationState:
         self._achievements_store = {}
         self._buildings_visited = {}
         self._rel_events_fired = set()
+        self._world_timeline = []
+        self._timeline_id_counter = 0
         self.world = load_scenario(template_path)
         self.loop = SimulationLoop(self.world, tick_handler=self._tick)
         self._task = None
@@ -248,6 +254,8 @@ class SimulationState:
         self._achievements_store = {}
         self._buildings_visited = {}
         self._rel_events_fired = set()
+        self._world_timeline = []
+        self._timeline_id_counter = 0
         self.world = load_scenario_from_dict(scenario_data)
         self.loop = SimulationLoop(self.world, tick_handler=self._tick)
         self._task = None
@@ -318,6 +326,8 @@ class SimulationState:
         self._achievements_store = {}
         self._buildings_visited = {}
         self._rel_events_fired = set()
+        self._world_timeline = []
+        self._timeline_id_counter = 0
 
         # Rebuild config
         cfg_data = data.get("config", {})
@@ -531,8 +541,37 @@ class SimulationState:
             ],
         }
 
+    def _add_timeline_event(
+        self,
+        event_type: str,
+        description: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Append an entry to the world timeline (max 500 entries)."""
+        if not hasattr(self, "_world_timeline"):
+            self._world_timeline = []
+        if not hasattr(self, "_timeline_id_counter"):
+            self._timeline_id_counter = 0
+        self._timeline_id_counter += 1
+        self._world_timeline.append({
+            "id": f"tl-{self._timeline_id_counter}",
+            "event_type": event_type,
+            "description": description,
+            "tick": self.world.current_tick,
+            "time": self.world.simulation_time(),
+            "metadata": metadata or {},
+        })
+        # Keep only the most recent 500 events
+        if len(self._world_timeline) > 500:
+            self._world_timeline = self._world_timeline[-500:]
+
     def enqueue_event(self, event: dict[str, Any]) -> dict[str, Any]:
         self._events.append(event)
+        self._add_timeline_event(
+            "custom_event",
+            event.get("description", "自定义事件"),
+            {"source": event.get("source", "user")},
+        )
         return event
 
     def enqueue_preset_event(self, preset_id: str) -> dict[str, Any] | None:
@@ -562,6 +601,11 @@ class SimulationState:
                 "description": preset["description"],
                 "source": "user",
             })
+        self._add_timeline_event(
+            "preset_event",
+            f"预设事件「{preset.get('name', preset_id)}」：{preset.get('description', '')}",
+            {"preset_id": preset_id, "name": preset.get("name", preset_id)},
+        )
         return preset
 
     def get_active_events(self) -> list[dict[str, Any]]:
@@ -854,6 +898,16 @@ class SimulationState:
         from engine.types import AchievementUnlock
         for unlock in _check_achievements(self, dialogue_resident_ids):
             tick_state.achievement_unlocks.append(AchievementUnlock(**unlock))
+            self._add_timeline_event(
+                "achievement",
+                f"成就解锁：{unlock.get('resident_name', '')} — {unlock.get('achievement_name', '')}",
+                {
+                    "resident_id": unlock.get("resident_id", ""),
+                    "resident_name": unlock.get("resident_name", ""),
+                    "achievement_id": unlock.get("achievement_id", ""),
+                    "achievement_name": unlock.get("achievement_name", ""),
+                },
+            )
 
         # --- Relationship milestone events ---
         if not hasattr(self, "_rel_events_fired"):
@@ -862,6 +916,17 @@ class SimulationState:
         from engine.types import RelationshipEvent
         for ev in _check_rel_events(self.world, self):
             tick_state.relationship_events.append(RelationshipEvent(**ev))
+            self._add_timeline_event(
+                "relationship_milestone",
+                ev.get("dialogue", f"{ev.get('from_name', '')} 与 {ev.get('to_name', '')} 发生了重要事件"),
+                {
+                    "event_type": ev.get("event_type", ""),
+                    "from_id": ev.get("from_id", ""),
+                    "from_name": ev.get("from_name", ""),
+                    "to_id": ev.get("to_id", ""),
+                    "to_name": ev.get("to_name", ""),
+                },
+            )
 
         # --- Neo4j persistence (spec §12) ---
         # Real-time: persist relationship changes that occurred this tick
@@ -1149,3 +1214,12 @@ async def get_economy_stats(request: Request) -> EconomyStatsResponse:
         poorest=poorest,
         occupation_distribution=dist,
     )
+
+
+@router.get("/timeline", response_model=list[TimelineEventResponse], responses=error_responses(503))
+async def get_world_timeline(request: Request) -> list[TimelineEventResponse]:
+    """Return the world event timeline sorted by tick descending (newest first, max 200)."""
+    state = get_simulation_state(request)
+    timeline = getattr(state, "_world_timeline", [])
+    sorted_timeline = sorted(timeline, key=lambda e: e["tick"], reverse=True)[:200]
+    return [TimelineEventResponse(**entry) for entry in sorted_timeline]
