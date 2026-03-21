@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { ResidentAchievement, ResidentRelationship } from '../../services/api'
@@ -85,10 +85,8 @@ export function ComparePanel() {
     setLoading(false)
   }
 
-  useEffect(() => {
-    setDataA(null)
-    setDataB(null)
-  }, [idA, idB])
+  const handleSelectA = (id: string) => { setIdA(id); setDataA(null); setDataB(null) }
+  const handleSelectB = (id: string) => { setIdB(id); setDataA(null); setDataB(null) }
 
   const selectClass =
     'rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-400/50'
@@ -102,14 +100,14 @@ export function ComparePanel() {
 
       {/* Selectors */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <select className={selectClass} value={idA} onChange={(e) => setIdA(e.target.value)}>
+        <select className={selectClass} value={idA} onChange={(e) => handleSelectA(e.target.value)}>
           <option value="">{t('compare.select_a')}</option>
           {residents.map((r) => (
             <option key={r.id} value={r.id}>{r.name}</option>
           ))}
         </select>
         <span className="text-slate-500">vs</span>
-        <select className={selectClass} value={idB} onChange={(e) => setIdB(e.target.value)}>
+        <select className={selectClass} value={idB} onChange={(e) => handleSelectB(e.target.value)}>
           <option value="">{t('compare.select_b')}</option>
           {residents.filter((r) => r.id !== idA).map((r) => (
             <option key={r.id} value={r.id}>{r.name}</option>
