@@ -28,6 +28,18 @@ vi.mock('../components/ui', () => ({
   MessageBar: () => <div data-testid="message-bar">MessageBar</div>,
   LanguageSwitcher: () => <button>EN</button>,
 }))
+vi.mock('../components/toolbar/BuildPanel', () => ({
+  BuildPanel: () => <div data-testid="build-panel">BuildPanel</div>,
+}))
+vi.mock('../components/toolbar/ExportPanel', () => ({
+  ExportPanel: () => <div data-testid="export-panel">ExportPanel</div>,
+}))
+vi.mock('../components/toolbar/HeatmapPanel', () => ({
+  HeatmapPanel: () => <div data-testid="heatmap-panel">HeatmapPanel</div>,
+}))
+vi.mock('../components/toolbar/ResidentCreationWizard', () => ({
+  ResidentCreationWizard: () => <div data-testid="resident-creation-wizard">ResidentCreationWizard</div>,
+}))
 
 import { Toolbar } from '../components/toolbar/Toolbar'
 

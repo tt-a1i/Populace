@@ -2,20 +2,20 @@
  * TutorialOverlay — 5-step guided tour with spotlight highlighting.
  *
  * Usage:
- *   <TutorialOverlay />           renders overlay when tutorial not yet complete
- *   resetTutorial()               clears localStorage and re-shows the overlay
+ *   <TutorialOverlay />    auto-starts on first visit (localStorage)
+ *   resetTutorial()        clears localStorage and re-shows via custom event
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 export const TUTORIAL_STORAGE_KEY = 'populace:tutorial_done'
 
-// Module-level handle so resetTutorial() can re-show without page reload
-let _triggerShow: (() => void) | null = null
+const RESET_EVENT = 'populace:reset-tutorial'
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function resetTutorial(): void {
   localStorage.removeItem(TUTORIAL_STORAGE_KEY)
-  _triggerShow?.()
+  window.dispatchEvent(new CustomEvent(RESET_EVENT))
 }
 
 interface Step {
@@ -73,71 +73,68 @@ interface SpotlightRect {
 }
 
 export function TutorialOverlay() {
-  const [visible, setVisible] = useState(false)
+  // Lazy initializer avoids setState-in-effect anti-pattern for the initial show
+  const [visible, setVisible] = useState(() => !localStorage.getItem(TUTORIAL_STORAGE_KEY))
   const [step, setStep] = useState(0)
   const [spotlight, setSpotlight] = useState<SpotlightRect | null>(null)
-  const mountedRef = useRef(false)
 
+  // Listen for the reset custom event (state updates happen inside event handlers,
+  // not synchronously within the effect body, satisfying the lint rule)
   useEffect(() => {
-    mountedRef.current = true
-    _triggerShow = () => {
-      if (mountedRef.current) {
-        setStep(0)
-        setVisible(true)
-      }
-    }
-    if (!localStorage.getItem(TUTORIAL_STORAGE_KEY)) {
+    const handler = () => {
+      setStep(0)
       setVisible(true)
     }
-    return () => {
-      mountedRef.current = false
-      _triggerShow = null
+    window.addEventListener(RESET_EVENT, handler)
+    return () => window.removeEventListener(RESET_EVENT, handler)
+  }, [])
+
+  // Measure the spotlight target element after each step/visibility change.
+  // useLayoutEffect is appropriate here: DOM measurement must happen before paint
+  // to avoid a one-frame flicker. The single setState call is intentional.
+  useLayoutEffect(() => {
+    let rect: SpotlightRect | null = null
+    if (visible) {
+      const sel = STEPS[step]?.selector
+      if (sel) {
+        const el = document.querySelector(sel)
+        if (el) {
+          const r = el.getBoundingClientRect()
+          rect = { left: r.left - 10, top: r.top - 10, width: r.width + 20, height: r.height + 20 }
+        }
+      }
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSpotlight(rect)
+  }, [visible, step])
 
-  const applySpotlight = useCallback((idx: number) => {
-    const sel = STEPS[idx]?.selector
-    if (!sel) { setSpotlight(null); return }
-    const el = document.querySelector(sel)
-    if (!el) { setSpotlight(null); return }
-    const r = el.getBoundingClientRect()
-    setSpotlight({ left: r.left - 10, top: r.top - 10, width: r.width + 20, height: r.height + 20 })
-  }, [])
-
-  useEffect(() => {
-    if (visible) applySpotlight(step)
-  }, [visible, step, applySpotlight])
-
-  const finish = useCallback(() => {
+  const finish = () => {
     localStorage.setItem(TUTORIAL_STORAGE_KEY, '1')
     setVisible(false)
-    setSpotlight(null)
-  }, [])
+  }
 
-  const goNext = useCallback(() => {
+  const goNext = () => {
     const next = step + 1
-    if (next < STEPS.length) { setStep(next); applySpotlight(next) }
+    if (next < STEPS.length) setStep(next)
     else finish()
-  }, [step, finish, applySpotlight])
+  }
 
-  const goPrev = useCallback(() => {
-    const prev = step - 1
-    if (prev >= 0) { setStep(prev); applySpotlight(prev) }
-  }, [step, applySpotlight])
+  const goPrev = () => {
+    if (step > 0) setStep(step - 1)
+  }
 
   if (!visible) return null
 
   const cur = STEPS[step]
   const isLast = step === STEPS.length - 1
 
-  // ── Tooltip position ─────────────────────────────────────────
+  // ── Tooltip position ──────────────────────────────────────────
   let cardStyle: React.CSSProperties = {}
   if (spotlight && cur.tooltipSide !== 'center') {
     const left = Math.max(16, Math.min(spotlight.left, window.innerWidth - 380))
     if (cur.tooltipSide === 'below') {
       cardStyle = { left, top: spotlight.top + spotlight.height + 18 }
     } else {
-      // above — approximate height 200px
       cardStyle = { left, top: Math.max(16, spotlight.top - 218) }
     }
   } else {
@@ -146,7 +143,7 @@ export function TutorialOverlay() {
 
   return createPortal(
     <>
-      {/* ── Dimming backdrop / spotlight cutout ── */}
+      {/* Spotlight dim / cutout */}
       {spotlight ? (
         <div
           className="pointer-events-none fixed z-[9001] rounded-2xl ring-2 ring-cyan-400/50"
@@ -155,7 +152,6 @@ export function TutorialOverlay() {
             top: spotlight.top,
             width: spotlight.width,
             height: spotlight.height,
-            // Giant box-shadow creates the dim overlay everywhere outside this rect
             boxShadow: '0 0 0 9999px rgba(2,6,23,0.78)',
           }}
         />
@@ -163,12 +159,12 @@ export function TutorialOverlay() {
         <div className="pointer-events-none fixed inset-0 z-[9001] bg-slate-950/78" />
       )}
 
-      {/* ── Tooltip card ── */}
+      {/* Tooltip card */}
       <div
         className="pointer-events-auto fixed z-[9002] w-[min(23rem,calc(100vw-2rem))] rounded-[24px] border border-cyan-300/25 bg-slate-950/96 p-5 shadow-[0_28px_80px_rgba(2,6,23,0.70)] backdrop-blur"
         style={cardStyle}
       >
-        {/* Progress bar */}
+        {/* Progress pills */}
         <div className="mb-4 flex items-center gap-1.5">
           {STEPS.map((_, i) => (
             <div
@@ -194,7 +190,7 @@ export function TutorialOverlay() {
           </div>
         </div>
 
-        {/* Controls */}
+        {/* Navigation */}
         <div className="mt-5 flex items-center gap-2">
           <button
             type="button"

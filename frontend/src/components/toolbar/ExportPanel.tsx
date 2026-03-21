@@ -8,6 +8,7 @@ import {
 } from '../../services/api'
 import { useRelationshipsStore } from '../../stores/relationships'
 import { useSimulationStore } from '../../stores/simulation'
+import { resetTutorial } from '../ui/TutorialOverlay'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -247,6 +248,18 @@ export function ExportPanel() {
       <p className="mt-4 text-[11px] text-slate-600">
         当前 Tick: {tick} · 居民 {residents.length} 人 · 关系 {relationships.length} 条
       </p>
+
+      {/* ── Tutorial reset ── */}
+      <div className="mt-5 border-t border-white/8 pt-4">
+        <p className="mb-2 text-[11px] uppercase tracking-[0.28em] text-slate-600">设置</p>
+        <button
+          type="button"
+          onClick={resetTutorial}
+          className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-slate-400 transition hover:bg-white/10"
+        >
+          🎓 重置新手教程
+        </button>
+      </div>
     </div>
   )
 }

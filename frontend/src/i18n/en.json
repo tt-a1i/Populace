@@ -43,6 +43,7 @@
     "stats": "Stats",
     "saves": "Saves",
     "export": "Export",
+    "heatmap": "Heatmap",
     "current_tool": "Active Tool: "
   },
   "create_resident": {

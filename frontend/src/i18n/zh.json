@@ -43,6 +43,7 @@
     "stats": "数据统计",
     "saves": "存档管理",
     "export": "数据导出",
+    "heatmap": "关系热力图",
     "current_tool": "当前工具："
   },
   "create_resident": {
