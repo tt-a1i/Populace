@@ -52,16 +52,16 @@ export function SavesPanel() {
       pushToast({
         type: 'success',
         title: t('saves.success'),
-        description: saveName.trim() || '已保存当前模拟状态。',
+        description: saveName.trim() || t('saves.save_desc'),
       })
       playConfirmationSound()
       await fetchSaves()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '存档失败')
+      setError(e instanceof Error ? e.message : t('saves.save_failed'))
       pushToast({
         type: 'error',
-        title: '存档失败',
-        description: e instanceof Error ? e.message : '请稍后重试。',
+        title: t('saves.save_failed'),
+        description: e instanceof Error ? e.message : t('saves.retry_hint'),
       })
     } finally {
       setSaving(false)
@@ -80,11 +80,11 @@ export function SavesPanel() {
       })
       playConfirmationSound()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败')
+      setError(e instanceof Error ? e.message : t('saves.load_failed'))
       pushToast({
         type: 'error',
-        title: '加载失败',
-        description: e instanceof Error ? e.message : '请稍后重试。',
+        title: t('saves.load_failed'),
+        description: e instanceof Error ? e.message : t('saves.retry_hint'),
       })
     } finally {
       setLoading(null)
@@ -99,15 +99,15 @@ export function SavesPanel() {
       setSaves((prev) => prev.filter((s) => s.id !== id))
       pushToast({
         type: 'warning',
-        title: '存档已删除',
+        title: t('saves.delete_success'),
       })
       playConfirmationSound()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '删除失败')
+      setError(e instanceof Error ? e.message : t('saves.delete_failed'))
       pushToast({
         type: 'error',
-        title: '删除失败',
-        description: e instanceof Error ? e.message : '请稍后重试。',
+        title: t('saves.delete_failed'),
+        description: e instanceof Error ? e.message : t('saves.retry_hint'),
       })
     } finally {
       setDeleting(null)

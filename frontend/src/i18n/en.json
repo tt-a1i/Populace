@@ -206,7 +206,13 @@
     "deleting": "…",
     "empty": "No saves yet",
     "success": "Saved successfully",
-    "load_success": "Loaded \"{{name}}\""
+    "save_desc": "Current simulation state saved.",
+    "save_failed": "Save failed",
+    "load_success": "Loaded \"{{name}}\"",
+    "load_failed": "Load failed",
+    "delete_success": "Save deleted",
+    "delete_failed": "Delete failed",
+    "retry_hint": "Please try again later."
   },
   "lang": {
     "switch": "中文"

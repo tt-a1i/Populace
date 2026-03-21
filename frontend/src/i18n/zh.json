@@ -206,7 +206,13 @@
     "deleting": "…",
     "empty": "暂无存档",
     "success": "存档成功",
-    "load_success": "已加载「{{name}}」"
+    "save_desc": "已保存当前模拟状态。",
+    "save_failed": "存档失败",
+    "load_success": "已加载「{{name}}」",
+    "load_failed": "加载失败",
+    "delete_success": "存档已删除",
+    "delete_failed": "删除失败",
+    "retry_hint": "请稍后重试。"
   },
   "lang": {
     "switch": "EN"
