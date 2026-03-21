@@ -195,7 +195,7 @@ export function TutorialOverlay() {
           <button
             type="button"
             onClick={finish}
-            className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition hover:bg-white/8"
+            className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition duration-200 hover:bg-white/8 active:scale-95"
           >
             跳过
           </button>
@@ -204,7 +204,7 @@ export function TutorialOverlay() {
               <button
                 type="button"
                 onClick={goPrev}
-                className="rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm text-slate-200 transition hover:bg-white/10"
+                className="rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm text-slate-200 transition duration-200 hover:bg-white/10 active:scale-95"
               >
                 ← 上一步
               </button>
@@ -212,7 +212,7 @@ export function TutorialOverlay() {
             <button
               type="button"
               onClick={goNext}
-              className="rounded-full bg-cyan-500/90 px-5 py-1.5 text-sm font-semibold text-white transition hover:bg-cyan-400"
+              className="rounded-full bg-cyan-500/90 px-5 py-1.5 text-sm font-semibold text-white transition duration-200 hover:bg-cyan-400 active:scale-95"
             >
               {isLast ? '开始探索 ✓' : '下一步 →'}
             </button>

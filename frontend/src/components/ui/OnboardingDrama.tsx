@@ -234,7 +234,7 @@ export function OnboardingDrama({ onComplete }: OnboardingDramaProps) {
       <button
         type="button"
         onClick={finish}
-        className="fixed right-6 top-6 z-[60] rounded-full border border-white/20 bg-slate-900/80 px-4 py-2 text-sm text-slate-300 backdrop-blur transition hover:bg-slate-800/90 hover:text-white"
+        className="fixed right-6 top-6 z-[60] rounded-full border border-white/20 bg-slate-900/80 px-4 py-2 text-sm text-slate-300 backdrop-blur transition duration-200 hover:bg-slate-800/90 hover:text-white active:scale-95"
       >
         {t('onboarding.skip', '跳过 →')}
       </button>
@@ -317,7 +317,7 @@ export function OnboardingDrama({ onComplete }: OnboardingDramaProps) {
             <button
               type="button"
               onClick={handleRomance}
-              className="group flex flex-col items-center gap-3 rounded-2xl border border-pink-400/25 bg-pink-400/10 px-6 py-6 text-center transition hover:border-pink-400/50 hover:bg-pink-400/20 hover:shadow-[0_0_30px_rgba(244,114,182,0.2)]"
+              className="group flex flex-col items-center gap-3 rounded-2xl border border-pink-400/25 bg-pink-400/10 px-6 py-6 text-center transition duration-200 hover:border-pink-400/50 hover:bg-pink-400/20 hover:shadow-[0_0_30px_rgba(244,114,182,0.2)] active:scale-95"
             >
               <span className="text-4xl">💕</span>
               <span className="text-lg font-bold text-white">{t('onboarding.romance')}</span>
@@ -327,7 +327,7 @@ export function OnboardingDrama({ onComplete }: OnboardingDramaProps) {
             <button
               type="button"
               onClick={handleConflict}
-              className="group flex flex-col items-center gap-3 rounded-2xl border border-amber-400/25 bg-amber-400/10 px-6 py-6 text-center transition hover:border-amber-400/50 hover:bg-amber-400/20 hover:shadow-[0_0_30px_rgba(251,191,36,0.2)]"
+              className="group flex flex-col items-center gap-3 rounded-2xl border border-amber-400/25 bg-amber-400/10 px-6 py-6 text-center transition duration-200 hover:border-amber-400/50 hover:bg-amber-400/20 hover:shadow-[0_0_30px_rgba(251,191,36,0.2)] active:scale-95"
             >
               <span className="text-4xl">⚡</span>
               <span className="text-lg font-bold text-white">{t('onboarding.conflict')}</span>
@@ -337,7 +337,7 @@ export function OnboardingDrama({ onComplete }: OnboardingDramaProps) {
             <button
               type="button"
               onClick={handleWatch}
-              className="group flex flex-col items-center gap-3 rounded-2xl border border-slate-400/25 bg-slate-400/10 px-6 py-6 text-center transition hover:border-slate-400/50 hover:bg-slate-400/20 hover:shadow-[0_0_30px_rgba(148,163,184,0.2)]"
+              className="group flex flex-col items-center gap-3 rounded-2xl border border-slate-400/25 bg-slate-400/10 px-6 py-6 text-center transition duration-200 hover:border-slate-400/50 hover:bg-slate-400/20 hover:shadow-[0_0_30px_rgba(148,163,184,0.2)] active:scale-95"
             >
               <span className="text-4xl">👀</span>
               <span className="text-lg font-bold text-white">{t('onboarding.watch')}</span>

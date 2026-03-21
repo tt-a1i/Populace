@@ -135,7 +135,8 @@ export function ResidentStoryPanel({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 transition hover:bg-white/10"
+          aria-label={t('resident_panel.close')}
+          className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 transition duration-200 hover:bg-white/10 active:scale-95"
         >
           {t('resident_panel.close')}
         </button>

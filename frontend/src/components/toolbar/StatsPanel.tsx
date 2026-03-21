@@ -192,7 +192,7 @@ export function StatsPanel() {
           type="button"
           onClick={() => void loadStats('refresh')}
           disabled={loading || refreshing}
-          className="rounded-xl border border-cyan-300/30 bg-cyan-300/12 px-4 py-2 text-sm font-medium text-cyan-50 transition hover:bg-cyan-300/20 disabled:opacity-50"
+          className="rounded-xl border border-cyan-300/30 bg-cyan-300/12 px-4 py-2 text-sm font-medium text-cyan-50 transition duration-200 hover:bg-cyan-300/20 active:scale-95 disabled:opacity-50"
         >
           {refreshing ? t('stats.refreshing') : t('stats.refresh')}
         </button>

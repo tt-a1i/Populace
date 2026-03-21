@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Toolbar } from './components/toolbar/Toolbar'
@@ -71,6 +71,26 @@ function SimulationView() {
 
   // Hide graph when sidebar is open (they share the right side)
   const graphVisible = showGraph && !selectedResidentId
+
+  // Escape closes drawers in priority order: toolbar → graph → (resident handled by useKeyboardShortcuts)
+  const handleEscape = useCallback((e: KeyboardEvent) => {
+    if (e.code !== 'Escape') return
+    const tag = (e.target as HTMLElement).tagName
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return
+    if (showToolbar) {
+      setShowToolbar(false)
+      setActiveQuickTool(null)
+      e.stopPropagation()
+    } else if (showGraph) {
+      setShowGraph(false)
+      e.stopPropagation()
+    }
+  }, [showToolbar, showGraph])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleEscape, true)
+    return () => window.removeEventListener('keydown', handleEscape, true)
+  }, [handleEscape])
 
   const toggleTool = (tool: string, eventName?: string) => {
     if (showToolbar && activeQuickTool === tool) {

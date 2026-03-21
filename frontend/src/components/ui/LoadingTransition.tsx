@@ -34,7 +34,7 @@ export function LoadingTransition({ onRetry, timedOut }: LoadingTransitionProps)
             <button
               type="button"
               onClick={onRetry}
-              className="rounded-full border border-amber-200/30 bg-amber-200/12 px-6 py-2.5 text-sm font-medium text-amber-50 transition hover:bg-amber-200/20"
+              className="rounded-full border border-amber-200/30 bg-amber-200/12 px-6 py-2.5 text-sm font-medium text-amber-50 transition duration-200 hover:bg-amber-200/20 active:scale-95"
             >
               {t('loading.retry')}
             </button>

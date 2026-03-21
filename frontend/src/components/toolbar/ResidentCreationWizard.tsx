@@ -95,7 +95,7 @@ export function ResidentCreationWizard() {
         <button
           type="button"
           onClick={handleReset}
-          className="rounded-2xl border border-emerald-300/30 bg-emerald-300/15 px-5 py-3 text-sm font-medium text-emerald-50 transition hover:bg-emerald-300/25"
+          className="rounded-2xl border border-emerald-300/30 bg-emerald-300/15 px-5 py-3 text-sm font-medium text-emerald-50 transition duration-200 hover:bg-emerald-300/25 active:scale-95"
         >
           {t('create_resident.add_another')}
         </button>
@@ -114,7 +114,7 @@ export function ResidentCreationWizard() {
         {[0, 1, 2].map((s) => (
           <div
             key={s}
-            className={`h-1.5 flex-1 rounded-full transition ${s <= step ? 'bg-emerald-400/70' : 'bg-white/10'}`}
+            className={`h-1.5 flex-1 rounded-full transition duration-200 ${s <= step ? 'bg-emerald-400/70' : 'bg-white/10'}`}
           />
         ))}
       </div>
@@ -162,7 +162,7 @@ export function ResidentCreationWizard() {
             type="button"
             onClick={() => setStep(1)}
             disabled={!name.trim()}
-            className="rounded-2xl border border-emerald-300/30 bg-emerald-300/15 px-5 py-3 text-sm font-medium text-emerald-50 transition hover:bg-emerald-300/25 disabled:opacity-40"
+            className="rounded-2xl border border-emerald-300/30 bg-emerald-300/15 px-5 py-3 text-sm font-medium text-emerald-50 transition duration-200 hover:bg-emerald-300/25 active:scale-95 disabled:opacity-40"
           >
             {t('create_resident.next')}
           </button>
@@ -180,7 +180,7 @@ export function ResidentCreationWizard() {
                   key={key}
                   type="button"
                   onClick={() => setPersonality(label)}
-                  className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                  className={`rounded-full border px-3 py-1.5 text-xs transition duration-200 active:scale-95 ${
                     personality === label
                       ? 'border-emerald-300/45 bg-emerald-300/16 text-emerald-50'
                       : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
@@ -207,7 +207,7 @@ export function ResidentCreationWizard() {
             <button
               type="button"
               onClick={() => setStep(0)}
-              className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300 transition hover:bg-white/10"
+              className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300 transition duration-200 hover:bg-white/10 active:scale-95"
             >
               {t('create_resident.back')}
             </button>
@@ -215,7 +215,7 @@ export function ResidentCreationWizard() {
               type="button"
               onClick={() => setStep(2)}
               disabled={!personality.trim()}
-              className="flex-1 rounded-2xl border border-emerald-300/30 bg-emerald-300/15 px-4 py-3 text-sm font-medium text-emerald-50 transition hover:bg-emerald-300/25 disabled:opacity-40"
+              className="flex-1 rounded-2xl border border-emerald-300/30 bg-emerald-300/15 px-4 py-3 text-sm font-medium text-emerald-50 transition duration-200 hover:bg-emerald-300/25 active:scale-95 disabled:opacity-40"
             >
               {t('create_resident.next')}
             </button>
@@ -284,7 +284,7 @@ export function ResidentCreationWizard() {
               type="button"
               onClick={() => setStep(1)}
               disabled={busy}
-              className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300 transition hover:bg-white/10 disabled:opacity-40"
+              className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300 transition duration-200 hover:bg-white/10 active:scale-95 disabled:opacity-40"
             >
               {t('create_resident.back')}
             </button>
@@ -292,7 +292,7 @@ export function ResidentCreationWizard() {
               type="button"
               onClick={() => void handleCreate()}
               disabled={busy}
-              className="flex-1 rounded-2xl border border-emerald-300/30 bg-emerald-300/15 px-4 py-3 text-sm font-medium text-emerald-50 transition hover:bg-emerald-300/25 disabled:opacity-40"
+              className="flex-1 rounded-2xl border border-emerald-300/30 bg-emerald-300/15 px-4 py-3 text-sm font-medium text-emerald-50 transition duration-200 hover:bg-emerald-300/25 active:scale-95 disabled:opacity-40"
             >
               {busy ? t('create_resident.creating') : t('create_resident.confirm')}
             </button>

@@ -226,7 +226,7 @@ export function ExportPanel() {
             type="button"
             disabled={busy !== null}
             onClick={btn.onClick}
-            className={`flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-left transition disabled:opacity-50 ${toneClasses[btn.tone]}`}
+            className={`flex items-start gap-3 rounded-2xl border px-4 py-3.5 text-left transition duration-200 active:scale-95 disabled:opacity-50 ${toneClasses[btn.tone]}`}
           >
             <span className="mt-0.5 text-lg leading-none">
               {busy === btn.key ? '⏳' : '⬇'}
@@ -257,7 +257,7 @@ export function ExportPanel() {
         <button
           type="button"
           onClick={resetTutorial}
-          className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-slate-400 transition hover:bg-white/10"
+          className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-slate-400 transition duration-200 hover:bg-white/10 active:scale-95"
         >
           {t('export_panel.reset_tutorial')}
         </button>

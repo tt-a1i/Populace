@@ -142,7 +142,7 @@ export function SavesPanel() {
         <button
           onClick={() => void handleSave()}
           disabled={saving}
-          className="flex items-center gap-1.5 rounded-xl bg-violet-500/20 border border-violet-400/30 px-4 py-2 text-sm font-semibold text-violet-300 transition hover:bg-violet-500/30 disabled:opacity-40"
+          className="flex items-center gap-1.5 rounded-xl bg-violet-500/20 border border-violet-400/30 px-4 py-2 text-sm font-semibold text-violet-300 transition duration-200 hover:bg-violet-500/30 active:scale-95 disabled:opacity-40"
         >
           {saving ? (
             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-transparent" />
@@ -179,14 +179,14 @@ export function SavesPanel() {
                 <button
                   onClick={() => void handleLoad(save.id, save.name)}
                   disabled={loading === save.id}
-                  className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-400/20 disabled:opacity-40"
+                  className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-300 transition duration-200 hover:bg-cyan-400/20 active:scale-95 disabled:opacity-40"
                 >
                   {loading === save.id ? t('saves.loading') : t('saves.load')}
                 </button>
                 <button
                   onClick={() => void handleDelete(save.id)}
                   disabled={deleting === save.id}
-                  className="rounded-lg border border-red-400/20 bg-red-400/8 px-3 py-1 text-xs font-semibold text-red-400 transition hover:bg-red-400/15 disabled:opacity-40"
+                  className="rounded-lg border border-red-400/20 bg-red-400/8 px-3 py-1 text-xs font-semibold text-red-400 transition duration-200 hover:bg-red-400/15 active:scale-95 disabled:opacity-40"
                 >
                   {deleting === save.id ? t('saves.deleting') : t('saves.delete')}
                 </button>

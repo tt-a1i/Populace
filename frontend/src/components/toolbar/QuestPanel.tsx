@@ -229,7 +229,7 @@ export function QuestPanel() {
                     type="button"
                     onClick={() => handleQuestClick(q)}
                     disabled={startingQuest === q.id}
-                    className={`rounded-xl border px-4 py-3 text-left text-sm transition ${
+                    className={`rounded-xl border px-4 py-3 text-left text-sm transition duration-200 active:scale-95 ${
                       selectingQuest === q.id
                         ? 'border-emerald-300/40 bg-emerald-300/15 text-emerald-50'
                         : 'border-white/10 bg-white/[0.03] text-slate-200 hover:bg-white/[0.06]'
@@ -288,7 +288,7 @@ function ActiveQuestCard({ quest, onAbandon }: ActiveQuestCardProps) {
         <button
           type="button"
           onClick={() => onAbandon(quest.quest_id)}
-          className="rounded-lg border border-red-400/20 bg-red-400/8 px-2 py-1 text-xs text-red-200 transition hover:bg-red-400/15"
+          className="rounded-lg border border-red-400/20 bg-red-400/8 px-2 py-1 text-xs text-red-200 transition duration-200 hover:bg-red-400/15 active:scale-95"
         >
           {t('quest.abandon')}
         </button>
@@ -401,7 +401,7 @@ function ParamSelector({
         type="button"
         onClick={() => onSubmit(questId)}
         disabled={submitting}
-        className="mt-3 rounded-xl border border-emerald-300/30 bg-emerald-300/12 px-4 py-2 text-sm font-medium text-emerald-50 transition hover:bg-emerald-300/20 disabled:opacity-50"
+        className="mt-3 rounded-xl border border-emerald-300/30 bg-emerald-300/12 px-4 py-2 text-sm font-medium text-emerald-50 transition duration-200 hover:bg-emerald-300/20 active:scale-95 disabled:opacity-50"
       >
         {submitting ? '...' : t('quest.start')}
       </button>

@@ -32,7 +32,7 @@ function ToggleBtn({
       type="button"
       onClick={onClick}
       className={[
-        'rounded-full border px-3 py-1 text-xs font-medium transition',
+        'rounded-full border px-3 py-1 text-xs font-medium transition duration-200 active:scale-95',
         active
           ? 'border-cyan-300/40 bg-cyan-300/15 text-cyan-50'
           : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10',
@@ -120,7 +120,7 @@ export function SettingsPanel() {
               type="button"
               onClick={handleSaveKey}
               disabled={saveState === 'saving'}
-              className="rounded-full border border-cyan-300/30 bg-cyan-300/12 px-4 py-1.5 text-sm text-cyan-50 transition hover:bg-cyan-300/20 disabled:opacity-40"
+              className="rounded-full border border-cyan-300/30 bg-cyan-300/12 px-4 py-1.5 text-sm text-cyan-50 transition duration-200 hover:bg-cyan-300/20 active:scale-95 disabled:opacity-40"
             >
               {saveState === 'saving'
                 ? t('settings.llm_key_saving')
@@ -163,7 +163,7 @@ export function SettingsPanel() {
           <button
             type="button"
             onClick={handleResetTutorial}
-            className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-sm text-slate-200 transition hover:bg-white/10"
+            className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-sm text-slate-200 transition duration-200 hover:bg-white/10 active:scale-95"
           >
             {tutorialReset ? t('settings.tutorial_reset_done') : '↺'}
           </button>

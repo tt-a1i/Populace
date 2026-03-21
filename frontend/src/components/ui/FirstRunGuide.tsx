@@ -44,7 +44,7 @@ export function FirstRunGuide({ enabled }: FirstRunGuideProps) {
         <button
           type="button"
           onClick={dismiss}
-          className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300 transition hover:bg-white/10"
+          className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300 transition duration-200 hover:bg-white/10 active:scale-95"
         >
           {t('guide.close')}
         </button>

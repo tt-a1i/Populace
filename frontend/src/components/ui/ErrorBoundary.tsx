@@ -56,14 +56,14 @@ export class ErrorBoundary extends Component<Props, State> {
             <button
               type="button"
               onClick={this.handleRetry}
-              className="rounded-full border border-cyan-300/35 bg-cyan-300/14 px-5 py-2 text-sm font-medium text-cyan-50 transition hover:bg-cyan-300/22"
+              className="rounded-full border border-cyan-300/35 bg-cyan-300/14 px-5 py-2 text-sm font-medium text-cyan-50 transition duration-200 hover:bg-cyan-300/22 active:scale-95"
             >
               {t('error.retry')}
             </button>
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+              className="rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-medium text-slate-200 transition duration-200 hover:bg-white/10 active:scale-95"
             >
               {t('error.reload')}
             </button>
@@ -73,7 +73,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <button
               type="button"
               onClick={this.toggleDetails}
-              className="flex items-center gap-2 text-xs text-slate-400 transition hover:text-slate-200"
+              className="flex items-center gap-2 text-xs text-slate-400 transition duration-200 hover:text-slate-200 active:scale-95"
             >
               <span
                 className="inline-block transition-transform"
