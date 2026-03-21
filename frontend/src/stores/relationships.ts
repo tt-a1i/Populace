@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 
+import i18n from '../i18n/config'
 import type { RelationshipDelta } from '../types'
 
 export type ResidentMood = 'happy' | 'sad' | 'angry' | 'neutral'
@@ -138,7 +139,7 @@ export const useRelationshipsStore = create<RelationshipsState>((set) => ({
           reason:
             update.reason ??
             current?.reason ??
-            (current ? '关系仍在波动' : '新的互动正在形成'),
+            (current ? i18n.t('graph.reason_ongoing', 'Relationship still evolving') : i18n.t('graph.reason_new', 'New interaction forming')),
         })
       }
 

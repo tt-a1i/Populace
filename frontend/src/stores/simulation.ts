@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 
+import i18n from '../i18n/config'
 import type { Building, DialogueUpdate, EnergyUpdate, MovementUpdate, Resident, TickState } from '../types'
 
 export type SimulationSpeed = 0 | 1 | 2 | 5 | 10 | 50
@@ -219,8 +220,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   buildings: [],
   replayFrozenFrame: null,
   messageFeed: [
-    { id: 'init-1', kind: 'system' as FeedMessageKind, text: '等待居民进入场景...' },
-    { id: 'init-2', kind: 'system' as FeedMessageKind, text: '连接建立后，这里会滚动显示最新事件与对话。' },
+    { id: 'init-1', kind: 'system' as FeedMessageKind, text: i18n.t('message_bar.init_1') },
+    { id: 'init-2', kind: 'system' as FeedMessageKind, text: i18n.t('message_bar.init_2') },
   ],
   selectedResidentId: null,
   hoveredPairIds: null,
@@ -258,17 +259,17 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         dialogueByResident.set(dialogue.from_id, { text: dialogue.text, kind: dialogue.kind ?? 'dialogue' })
         const fromName = residentMap.get(dialogue.from_id)?.name ?? dialogue.from_id
         const toName = residentMap.get(dialogue.to_id)?.name ?? dialogue.to_id
-        freshMessages.push({ id: _feedId(), kind: 'dialogue', text: `${fromName} 对 ${toName} 说：${dialogue.text}` })
+        freshMessages.push({ id: _feedId(), kind: 'dialogue', text: i18n.t('message_bar.dialogue', { from: fromName, to: toName, text: dialogue.text }) })
       }
 
       for (const g of tickState.gossips ?? []) {
         dialogueByResident.set(g.listener_id, { text: g.content, kind: 'gossip' })
         const speakerName = residentMap.get(g.speaker_id)?.name ?? g.speaker_id
-        freshMessages.push({ id: _feedId(), kind: 'event', text: `👂 ${speakerName} 传播了关于 ${g.target_name} 的八卦` })
+        freshMessages.push({ id: _feedId(), kind: 'event', text: i18n.t('message_bar.gossip', { speaker: speakerName, target: g.target_name }) })
       }
 
       for (const event of tickState.events ?? []) {
-        freshMessages.push({ id: _feedId(), kind: 'event', text: `事件：${event.description}` })
+        freshMessages.push({ id: _feedId(), kind: 'event', text: i18n.t('message_bar.event', { desc: event.description }) })
       }
 
       for (const movement of tickState.movements) {
@@ -433,8 +434,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         replayFrozenFrame: state.replayFrozenFrame,
         messageFeed:
           residents.length > 0
-            ? appendRecentMessages(state.messageFeed, [{ id: _feedId(), kind: 'system', text: '首帧快照已到达，居民开始进入小镇。' }])
-            : appendRecentMessages(state.messageFeed, [{ id: _feedId(), kind: 'system', text: '首帧快照为空，等待居民加载...' }]),
+            ? appendRecentMessages(state.messageFeed, [{ id: _feedId(), kind: 'system', text: i18n.t('message_bar.snapshot_arrived') }])
+            : appendRecentMessages(state.messageFeed, [{ id: _feedId(), kind: 'system', text: i18n.t('message_bar.snapshot_empty') }]),
         residents,
       }
     })

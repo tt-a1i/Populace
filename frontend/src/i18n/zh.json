@@ -138,7 +138,14 @@
   },
   "message_bar": {
     "label": "消息流",
-    "empty": "等待事件与对话流入消息栏..."
+    "empty": "等待事件与对话流入消息栏...",
+    "init_1": "等待居民进入场景...",
+    "init_2": "连接建立后，这里会滚动显示最新事件与对话。",
+    "dialogue": "{{from}} 对 {{to}} 说：{{text}}",
+    "gossip": "\uD83D\uDC42 {{speaker}} 传播了关于 {{target}} 的八卦",
+    "event": "事件：{{desc}}",
+    "snapshot_arrived": "首帧快照已到达，居民开始进入小镇。",
+    "snapshot_empty": "首帧快照为空，等待居民加载..."
   },
   "guide": {
     "badge": "Quick Guide",
@@ -202,6 +209,7 @@
     "generate": "生成日报",
     "generating": "生成中…",
     "latest": "查看最近一份",
+    "experiment_tab": "实验报告",
     "share": "截图分享",
     "generated_toast": "日报已生成",
     "generate_failed_toast": "日报生成失败",
@@ -512,7 +520,9 @@
     "rel_fear": "畏惧",
     "rel_dislike": "反感",
     "rel_knows": "认识",
-    "rel_default": "认识"
+    "rel_default": "认识",
+    "reason_ongoing": "关系仍在波动",
+    "reason_new": "新的互动正在形成"
   },
   "canvas": {
     "placeholder_label": "预留地块",

@@ -138,7 +138,14 @@
   },
   "message_bar": {
     "label": "Feed",
-    "empty": "Waiting for events and dialogue to stream in…"
+    "empty": "Waiting for events and dialogue to stream in…",
+    "init_1": "Waiting for residents to enter the scene…",
+    "init_2": "Once connected, the latest events and dialogues will scroll here.",
+    "dialogue": "{{from}} to {{to}}: {{text}}",
+    "gossip": "\uD83D\uDC42 {{speaker}} spread gossip about {{target}}",
+    "event": "Event: {{desc}}",
+    "snapshot_arrived": "First snapshot arrived — residents entering town.",
+    "snapshot_empty": "First snapshot is empty, waiting for residents…"
   },
   "guide": {
     "badge": "Quick Guide",
@@ -202,6 +209,7 @@
     "generate": "Generate Report",
     "generating": "Generating…",
     "latest": "Load Latest",
+    "experiment_tab": "Experiment Report",
     "share": "Screenshot & Share",
     "generated_toast": "Report generated",
     "generate_failed_toast": "Report generation failed",
@@ -512,7 +520,9 @@
     "rel_fear": "Fear",
     "rel_dislike": "Dislike",
     "rel_knows": "Acquaintance",
-    "rel_default": "Acquaintance"
+    "rel_default": "Acquaintance",
+    "reason_ongoing": "Relationship still evolving",
+    "reason_new": "New interaction forming"
   },
   "canvas": {
     "placeholder_label": "Reserved Plot",
