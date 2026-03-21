@@ -410,6 +410,7 @@ async def initiate_dialogue(
             timestamp=tick_time,
             importance=0.8,
             emotion="happy" if delta > 0 else "sad",
+            source="dialogue",
         )
         agent_a.memory_stream.add(mem_a)
         mem_b = Memory(
@@ -418,6 +419,7 @@ async def initiate_dialogue(
             timestamp=tick_time,
             importance=0.8,
             emotion="happy" if delta > 0 else "sad",
+            source="dialogue",
         )
         agent_b.memory_stream.add(mem_b)
 

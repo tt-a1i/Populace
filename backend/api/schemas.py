@@ -143,6 +143,7 @@ class ResidentMemoryResponse(BaseModel):
     timestamp: str
     importance: float
     emotion: str
+    source: str = "system"
 
 
 class ResidentRelationshipResponse(BaseModel):

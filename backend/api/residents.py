@@ -202,6 +202,7 @@ async def inject_resident_memory(
         timestamp=state.world.simulation_time(),
         importance=max(0.0, min(1.0, payload.importance)),
         emotion=payload.emotion,
+        source="injected",
     )
     agent.memory_stream.add(mem)
     return ResidentMemoryResponse(**asdict(mem))

@@ -124,6 +124,7 @@ class GenerativeAgent(Agent):
             timestamp=event.timestamp,
             importance=0.5,
             emotion="neutral",
+            source=event.source,
         )
         self.memory_stream.add(mem)
         # Non-blocking write to Redis short-term memory cache (spec §4.1)

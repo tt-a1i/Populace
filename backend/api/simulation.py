@@ -164,6 +164,7 @@ class SimulationState:
                             timestamp=row["timestamp"],
                             importance=float(row["importance"]),
                             emotion=row["emotion"],
+                            source=row.get("source", "system"),
                         )
                         agent.memory_stream.add(mem)
                     except Exception as exc:
@@ -727,7 +728,7 @@ class SimulationState:
                 description=f"Tick {self.world.current_tick} at {tick_time}: "
                             f"at {agent.resident.location or 'map'}, mood={agent.resident.mood}",
                 timestamp=tick_time,
-                source="system",
+                source="heartbeat",
             )
             agent.memorize(heartbeat)
             for event in events:

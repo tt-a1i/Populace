@@ -110,5 +110,6 @@ def spread_gossip(listener: "Agent", gossip: dict, world: "World") -> None:
         timestamp=world.simulation_time(),
         importance=0.3,
         emotion="curious",
+        source="gossip",
     )
     listener.memory_stream.add(mem)

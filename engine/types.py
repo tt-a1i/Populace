@@ -106,6 +106,7 @@ else:
         timestamp: str
         importance: float
         emotion: str
+        source: str = "system"  # 'system' | 'heartbeat' | 'dialogue' | 'event' | 'gossip' | 'injected'
 
 
     @dataclass

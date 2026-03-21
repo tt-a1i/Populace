@@ -136,7 +136,8 @@ async def save_memory(agent_id: str, memory: Any) -> None:
             SET m.content    = $content,
                 m.timestamp  = $timestamp,
                 m.importance = $importance,
-                m.emotion    = $emotion
+                m.emotion    = $emotion,
+                m.source     = $source
             WITH m
             MATCH (r:Resident {id: $agent_id})
             MERGE (r)-[:REMEMBERS]->(m)
@@ -147,6 +148,7 @@ async def save_memory(agent_id: str, memory: Any) -> None:
                 "timestamp":  memory.timestamp,
                 "importance": memory.importance,
                 "emotion":    memory.emotion,
+                "source":     memory.source,
                 "agent_id":   agent_id,
             },
         )
@@ -333,6 +335,7 @@ async def restore_world_memories(world: Any, *, skip_position_reset: bool = Fals
                         timestamp=row["timestamp"],
                         importance=float(row["importance"]),
                         emotion=row["emotion"],
+                        source=row.get("source", "system"),
                     )
                     agent.memory_stream.add(mem)
                 except Exception as exc:
