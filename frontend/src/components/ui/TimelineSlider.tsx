@@ -44,7 +44,7 @@ export function TimelineSlider({
           type="button"
           onClick={() => onReplayTickChange(null)}
           disabled={replayTick === null}
-          className="rounded-full border border-amber-200/20 bg-amber-200/10 px-3 py-1 text-xs font-medium text-amber-50 transition hover:bg-amber-200/18 disabled:cursor-default disabled:opacity-45"
+          className="rounded-full border border-amber-200/20 bg-amber-200/10 px-3 py-1 text-xs font-medium text-amber-50 transition duration-200 hover:bg-amber-200/18 active:scale-95 disabled:cursor-default disabled:opacity-45"
         >
           {t('timeline.back_to_live')}
         </button>
@@ -56,6 +56,7 @@ export function TimelineSlider({
           min={0}
           max={maxIndex}
           value={selectedIndex}
+          aria-label={t('timeline.replay_badge')}
           onChange={(event) => {
             const index = Number(event.target.value)
             onReplayTickChange(history[index]?.tick ?? null)

@@ -258,6 +258,8 @@
     "theme_dark": "暗色",
     "theme_light": "亮色",
     "sound": "音效",
+    "sound_on": "开",
+    "sound_off": "关",
     "tutorial_reset": "重置引导教程",
     "tutorial_reset_done": "已重置 ✓"
   },

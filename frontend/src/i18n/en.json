@@ -258,6 +258,8 @@
     "theme_dark": "Dark",
     "theme_light": "Light",
     "sound": "Sound",
+    "sound_on": "ON",
+    "sound_off": "OFF",
     "tutorial_reset": "Reset Tutorial",
     "tutorial_reset_done": "Reset ✓"
   },

@@ -35,7 +35,6 @@ const SEASON_EMOJI: Record<string, string> = {
   winter: '\u2744\uFE0F',
 }
 
-
 const TownCanvas = lazy(() =>
   import('./components/town/TownCanvas').then((module) => ({ default: module.TownCanvas })),
 )
@@ -85,7 +84,6 @@ function SimulationView() {
       }
     }
   }
-
 
   const weatherEmoji = WEATHER_EMOJI[weather] ?? WEATHER_EMOJI.sunny
   const seasonEmoji = SEASON_EMOJI[season] ?? SEASON_EMOJI.spring

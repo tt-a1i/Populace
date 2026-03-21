@@ -21,7 +21,7 @@ export function ThemeToggle({ className = '' }: ThemeToggleProps) {
       aria-label={label}
       className={[
         'flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-sm text-slate-300',
-        'transition hover:bg-white/10 hover:text-white',
+        'transition duration-200 hover:bg-white/10 hover:text-white active:scale-95',
         className,
       ].join(' ')}
     >

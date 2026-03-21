@@ -75,7 +75,7 @@ export function TownChrome({
       {inspection && (
         <section
           data-testid="town-inspection"
-          className="absolute left-3 top-12 z-20 w-[15rem] rounded-xl border border-white/10 bg-slate-950/80 px-3 py-3 text-slate-100 shadow-lg backdrop-blur-sm"
+          className="absolute left-3 top-12 z-20 w-[min(15rem,calc(100vw-2rem))] rounded-xl border border-white/10 bg-slate-950/80 px-3 py-3 text-slate-100 shadow-lg backdrop-blur-sm"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -85,7 +85,8 @@ export function TownChrome({
             <button
               type="button"
               onClick={onDismissInspection}
-              className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-300 transition hover:bg-white/10"
+              aria-label={t('chrome.close')}
+              className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-300 transition duration-200 hover:bg-white/10 active:scale-95"
             >
               {t('chrome.close')}
             </button>
@@ -195,21 +196,21 @@ export function TownChrome({
             <button
               type="button"
               onClick={onInjectEvent}
-              className="rounded-2xl px-3 py-2 text-left text-sm text-slate-100 transition hover:bg-cyan-300/14"
+              className="rounded-2xl px-3 py-2 text-left text-sm text-slate-100 transition duration-200 hover:bg-cyan-300/14 active:scale-[0.97]"
             >
               {t('chrome.ctx_inject_event')}
             </button>
             <button
               type="button"
               onClick={onInspectTile}
-              className="rounded-2xl px-3 py-2 text-left text-sm text-slate-100 transition hover:bg-cyan-300/14"
+              className="rounded-2xl px-3 py-2 text-left text-sm text-slate-100 transition duration-200 hover:bg-cyan-300/14 active:scale-[0.97]"
             >
               {t('chrome.ctx_inspect_tile')}
             </button>
             <button
               type="button"
               onClick={onPlacePlaceholder}
-              className="rounded-2xl px-3 py-2 text-left text-sm text-slate-100 transition hover:bg-amber-300/14"
+              className="rounded-2xl px-3 py-2 text-left text-sm text-slate-100 transition duration-200 hover:bg-amber-300/14 active:scale-[0.97]"
             >
               {t('chrome.ctx_place_placeholder')}
             </button>
@@ -221,7 +222,7 @@ export function TownChrome({
                   void handleTeleport(contextMenu.tileX, contextMenu.tileY, contextMenu.nearbyResidentId)
                   onCloseContextMenu()
                 }}
-                className="rounded-2xl px-3 py-2 text-left text-sm text-violet-200 transition hover:bg-violet-300/14"
+                className="rounded-2xl px-3 py-2 text-left text-sm text-violet-200 transition duration-200 hover:bg-violet-300/14 active:scale-[0.97]"
               >
                 {t('chrome.ctx_teleport')}
               </button>
@@ -230,7 +231,7 @@ export function TownChrome({
           <button
             type="button"
             onClick={onCloseContextMenu}
-            className="w-full rounded-2xl border border-white/8 px-3 py-2 text-xs text-slate-400 transition hover:bg-white/5"
+            className="w-full rounded-2xl border border-white/8 px-3 py-2 text-xs text-slate-400 transition duration-200 hover:bg-white/5 active:scale-[0.97]"
           >
             {t('chrome.ctx_dismiss')}
           </button>
