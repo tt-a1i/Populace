@@ -120,6 +120,21 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
         simInitFromSnapshot(snapshot)
         // Rebuild graph store from backend residents, clearing mock data
         relInitFromSnapshot(snapshot.residents ?? [])
+        // Seed initial relationships from snapshot (populated from template)
+        if (Array.isArray(snapshot.relationships) && snapshot.relationships.length > 0) {
+          // Inject as a synthetic tick with full relationship list as absolute deltas
+          relUpdateFromTick({
+            tick: snapshot.tick,
+            relationships: snapshot.relationships.map((r: Record<string, unknown>) => ({
+              from_id: r.from_id as string,
+              to_id: r.to_id as string,
+              type: r.type as string,
+              // Initial snapshot uses absolute intensity, not delta — send as positive delta
+              delta: r.intensity as number,
+              reason: r.reason as string | undefined,
+            })),
+          })
+        }
         if (snapshot.last_tick) {
           commitTick(snapshot.last_tick as Record<string, unknown>, false)
         }

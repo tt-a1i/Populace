@@ -171,5 +171,19 @@
       "x": 11,
       "y": 11
     }
+  ],
+  "initial_relationships": [
+    { "from_id": "r_xiaoming", "to_id": "r_xiaohong", "type": "friendship", "intensity": 0.7, "familiarity": 0.6, "reason": "同住阳光公寓A栋的邻居，偶尔一起买菜" },
+    { "from_id": "r_xiaohong", "to_id": "r_xiaoming", "type": "friendship", "intensity": 0.6, "familiarity": 0.5, "reason": "热心邻居，总是帮忙搬东西" },
+    { "from_id": "r_daqiang", "to_id": "r_lili",     "type": "rivalry",    "intensity": 0.5, "familiarity": 0.4, "reason": "都想主导社区花园改造项目" },
+    { "from_id": "r_lili",    "to_id": "r_daqiang",  "type": "rivalry",    "intensity": 0.4, "familiarity": 0.4, "reason": "大强总抢在她之前发言" },
+    { "from_id": "r_awei",    "to_id": "r_xiuxiu",   "type": "love",       "intensity": 0.8, "familiarity": 0.9, "reason": "相濡以沫的夫妻" },
+    { "from_id": "r_xiuxiu",  "to_id": "r_awei",     "type": "love",       "intensity": 0.9, "familiarity": 0.9, "reason": "最懂她的人" },
+    { "from_id": "r_laowang", "to_id": "r_jianguo",  "type": "friendship", "intensity": 0.6, "familiarity": 0.7, "reason": "每周在公园下棋的老棋友" },
+    { "from_id": "r_jianguo", "to_id": "r_laowang",  "type": "friendship", "intensity": 0.5, "familiarity": 0.7, "reason": "老王棋艺比我高，向他学了不少" },
+    { "from_id": "r_xiaohua", "to_id": "r_xiaotong", "type": "friendship", "intensity": 0.4, "familiarity": 0.4, "reason": "曾是同班同学，偶尔聚餐" },
+    { "from_id": "r_xiaotong","to_id": "r_xiaohua",  "type": "friendship", "intensity": 0.4, "familiarity": 0.3, "reason": "小花喜欢画画，挺有意思的人" },
+    { "from_id": "r_xiaoming", "to_id": "r_daqiang", "type": "knows",      "intensity": 0.2, "familiarity": 0.2, "reason": "见过几次，互相点头" },
+    { "from_id": "r_lili",    "to_id": "r_xiuxiu",   "type": "knows",      "intensity": 0.2, "familiarity": 0.3, "reason": "常在电梯里碰到" }
   ]
 }

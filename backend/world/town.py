@@ -155,7 +155,34 @@ def load_scenario(
             if home is not None:
                 world.enter_building(agent, home)
 
+    # -------------------------------------------------------------------------
+    # Initial relationships from template (spec §3: 预设初始社交网络)
+    # -------------------------------------------------------------------------
+    _load_initial_relationships(world, data)
+
     return world
+
+
+def _load_initial_relationships(world: World, data: dict[str, Any]) -> None:
+    """Seed world.relationships from the template's initial_relationships list."""
+    from engine.types import RelationType, Relationship
+
+    sim_time = world.simulation_time()
+    for rel_data in data.get("initial_relationships", []):
+        try:
+            rel_type = RelationType(rel_data["type"])
+            rel = Relationship(
+                from_id=rel_data["from_id"],
+                to_id=rel_data["to_id"],
+                type=rel_type,
+                intensity=float(rel_data.get("intensity", 0.3)),
+                since=sim_time,
+                familiarity=float(rel_data.get("familiarity", 0.2)),
+                reason=rel_data.get("reason", ""),
+            )
+            world.set_relationship(rel)
+        except (KeyError, ValueError):
+            pass  # skip malformed entries silently
 
 
 def load_scenario_from_dict(
@@ -231,6 +258,8 @@ def load_scenario_from_dict(
             home = world.get_building(home_id)
             if home is not None:
                 world.enter_building(agent, home)
+
+    _load_initial_relationships(world, data)
 
     return world
 

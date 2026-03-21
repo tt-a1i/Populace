@@ -69,6 +69,8 @@ class SimulationState:
         self._active_events: list[dict[str, Any]] = []
         self._total_dialogue_count = 0
         self._total_relationship_change_count = 0
+        # Mood history: list of {tick, resident_id, resident_name, mood} (max 100 ticks)
+        self._mood_history: list[dict[str, Any]] = []
 
     async def restore_from_neo4j(self) -> None:
         """Restore prior session state at startup.
@@ -497,6 +499,18 @@ class SimulationState:
             ],
             "pending_events": list(self._events),
             "last_tick": _serialize(tick_state) if tick_state is not None else None,
+            # Initial relationship graph — lets the frontend graph populate immediately
+            "relationships": [
+                {
+                    "from_id": rel.from_id,
+                    "to_id": rel.to_id,
+                    "type": rel.type.value if hasattr(rel.type, "value") else str(rel.type),
+                    "intensity": rel.intensity,
+                    "familiarity": rel.familiarity,
+                    "reason": rel.reason,
+                }
+                for rel in self.world.relationships.values()
+            ],
         }
 
     def enqueue_event(self, event: dict[str, Any]) -> dict[str, Any]:
@@ -773,6 +787,21 @@ class SimulationState:
         self._total_dialogue_count += len(tick_state.dialogues)
         self._total_relationship_change_count += len(tick_state.relationships)
 
+        # Record mood snapshot every tick (keep last 100 ticks × N agents)
+        current_tick = self.world.current_tick
+        if not hasattr(self, "_mood_history"):
+            self._mood_history = []
+        for agent in self.world.agents:
+            self._mood_history.append({
+                "tick": current_tick,
+                "resident_id": agent.resident.id,
+                "resident_name": agent.resident.name,
+                "mood": agent.resident.mood,
+            })
+        # Trim to last 100 ticks
+        max_agents = max(1, len(self.world.agents))
+        self._mood_history = self._mood_history[-(100 * max_agents):]
+
         # Collect current goals and include in tick diff
         from engine.types import GoalUpdate
         for agent in self.world.agents:
@@ -1010,3 +1039,39 @@ async def get_simulation_stats(request: Request) -> SimulationStatsResponse:
     """Return aggregate counters for ticks, dialogues, relationship changes, and active events."""
     state = get_simulation_state(request)
     return SimulationStatsResponse(**state.get_stats())
+
+
+@router.get("/mood-history", responses=error_responses(503))
+async def get_mood_history(request: Request) -> list[dict[str, Any]]:
+    """Return mood snapshots for the last 100 ticks across all residents."""
+    state = get_simulation_state(request)
+    return getattr(state, "_mood_history", [])
+
+
+@router.get("/network-analysis", responses=error_responses(503))
+async def get_network_analysis(request: Request) -> list[dict[str, Any]]:
+    """Return per-resident centrality metrics from the current relationship graph."""
+    state = get_simulation_state(request)
+    agent_map = {a.resident.id: a for a in state.world.agents}
+    result = []
+    for agent in state.world.agents:
+        rid = agent.resident.id
+        # Outgoing + incoming edges
+        outgoing = [r for (f, _), r in state.world.relationships.items() if f == rid]
+        incoming = [r for (_, t), r in state.world.relationships.items() if t == rid]
+        all_rels = outgoing + incoming
+        total = len(all_rels)
+        avg_intensity = round(sum(r.intensity for r in all_rels) / total, 3) if total else 0.0
+        influence = round(sum(r.intensity for r in outgoing), 3)
+        result.append({
+            "resident_id": rid,
+            "name": agent.resident.name,
+            "relationship_count": total,
+            "outgoing_count": len(outgoing),
+            "incoming_count": len(incoming),
+            "avg_intensity": avg_intensity,
+            "influence_score": influence,
+        })
+    # Sort by influence descending
+    result.sort(key=lambda x: x["influence_score"], reverse=True)
+    return result

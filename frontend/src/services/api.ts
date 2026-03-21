@@ -227,6 +227,31 @@ export function getSimulationStats() {
   return request<SimulationStats>('/api/simulation/stats')
 }
 
+export interface MoodHistoryEntry {
+  tick: number
+  resident_id: string
+  resident_name: string
+  mood: string
+}
+
+export interface NetworkAnalysisEntry {
+  resident_id: string
+  name: string
+  relationship_count: number
+  outgoing_count: number
+  incoming_count: number
+  avg_intensity: number
+  influence_score: number
+}
+
+export function getMoodHistory() {
+  return request<MoodHistoryEntry[]>('/api/simulation/mood-history')
+}
+
+export function getNetworkAnalysis() {
+  return request<NetworkAnalysisEntry[]>('/api/simulation/network-analysis')
+}
+
 export function generateReport() {
   return request<ReportPayload>('/api/report/generate', { method: 'POST' })
 }

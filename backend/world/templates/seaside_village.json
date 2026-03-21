@@ -117,5 +117,15 @@
       "x": 26,
       "y": 22
     }
+  ],
+  "initial_relationships": [
+    { "from_id": "r_laohai",    "to_id": "r_xiaolan",   "type": "friendship", "intensity": 0.7, "familiarity": 0.8, "reason": "老海把打鱼技术都教给了小岚" },
+    { "from_id": "r_xiaolan",   "to_id": "r_laohai",    "type": "friendship", "intensity": 0.6, "familiarity": 0.7, "reason": "老海像父亲一样照顾她" },
+    { "from_id": "r_shang_ren", "to_id": "r_yuer",      "type": "love",       "intensity": 0.7, "familiarity": 0.8, "reason": "鱼儿腌的咸鱼只送给他一个人" },
+    { "from_id": "r_yuer",      "to_id": "r_shang_ren", "type": "love",       "intensity": 0.8, "familiarity": 0.8, "reason": "她在等他回来" },
+    { "from_id": "r_ah_gui",    "to_id": "r_laohai",    "type": "friendship", "intensity": 0.5, "familiarity": 0.6, "reason": "一起喝酒听故事的老朋友" },
+    { "from_id": "r_laohai",    "to_id": "r_ah_gui",    "type": "friendship", "intensity": 0.4, "familiarity": 0.5, "reason": "阿贵话多但心好" },
+    { "from_id": "r_deng_shou", "to_id": "r_xiaolan",   "type": "knows",      "intensity": 0.3, "familiarity": 0.3, "reason": "灯守见过她在灯塔附近散步" },
+    { "from_id": "r_shang_ren", "to_id": "r_laohai",    "type": "knows",      "intensity": 0.2, "familiarity": 0.4, "reason": "买卖往来，信任老海的鱼" }
   ]
 }

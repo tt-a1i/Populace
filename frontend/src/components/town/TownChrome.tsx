@@ -136,9 +136,12 @@ export function TownChrome({
 
   useLayoutEffect(() => {
     requestSequenceRef.current += 1
-    setLiveMemories(null)
-    setLiveRelationships(null)
-    setLiveReflections(null)
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    window.queueMicrotask(() => {
+      setLiveMemories(null)
+      setLiveRelationships(null)
+      setLiveReflections(null)
+    })
   }, [selectedResidentId])
 
   useEffect(() => {
