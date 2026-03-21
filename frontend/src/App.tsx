@@ -380,8 +380,6 @@ function SimulationView() {
           </footer>
         )}
       </div>
-      <FirstRunGuide enabled={hasInitialSnapshot} />
-      {hasInitialSnapshot && <TutorialOverlay />}
       {hasInitialSnapshot && showOnboarding && (
         <OnboardingDrama
           onComplete={() => {
@@ -390,6 +388,9 @@ function SimulationView() {
           }}
         />
       )}
+      {/* Only show tutorial/guide AFTER onboarding is done */}
+      {!showOnboarding && <FirstRunGuide enabled={hasInitialSnapshot} />}
+      {!showOnboarding && hasInitialSnapshot && <TutorialOverlay />}
     </main>
   )
 }

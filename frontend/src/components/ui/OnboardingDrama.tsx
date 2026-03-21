@@ -224,12 +224,20 @@ export function OnboardingDrama({ onComplete }: OnboardingDramaProps) {
   // ---------------------------------------------------------------------------
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70"
       style={{
         transition: 'opacity 500ms ease',
         opacity,
       }}
     >
+      {/* Skip button — always visible */}
+      <button
+        type="button"
+        onClick={finish}
+        className="fixed right-6 top-6 z-[60] rounded-full border border-white/20 bg-slate-900/80 px-4 py-2 text-sm text-slate-300 backdrop-blur transition hover:bg-slate-800/90 hover:text-white"
+      >
+        {t('onboarding.skip', '跳过 →')}
+      </button>
       {/* ── INTRO phase ── */}
       {phase === 'intro' && (
         <div className="flex max-w-2xl flex-col items-center gap-6 px-6 text-center">

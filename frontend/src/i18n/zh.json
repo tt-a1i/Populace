@@ -253,6 +253,7 @@
     "at_work": "在工作中"
   },
   "onboarding": {
+    "skip": "跳过 →",
     "line1": "这是一个由 AI 驱动的小镇...",
     "line2": "每个居民都有自己的性格、记忆和目标",
     "meet_resident": "这是 {{name}}",
