@@ -7,6 +7,7 @@ import { ResidentSpritePool } from './ResidentSpritePool'
 import { RainEffect } from './effects/RainEffect'
 import { SnowEffect } from './effects/SnowEffect'
 import { StormEffect } from './effects/StormEffect'
+import { createWeatherFilter } from './effects/WeatherFilter'
 import {
   MAP_HEIGHT,
   MAP_WIDTH,
@@ -365,6 +366,10 @@ export class TownRenderer {
       this.weatherContainer.addChild(effect.container)
       this.currentWeatherEffect = effect
     }
+
+    // Apply color tint filter for the weather
+    const weatherFilter = createWeatherFilter(weather)
+    this.world.filters = weatherFilter ? [weatherFilter] : []
   }
 
   tickWeatherEffect(deltaMs: number): void {
