@@ -160,11 +160,11 @@ export function GraphPanel() {
   return (
     <div
       id="graph-panel"
-      className="relative mt-5 flex min-h-[30rem] flex-1 overflow-hidden rounded-[24px] border border-amber-200/25 bg-[radial-gradient(circle_at_top,_rgba(250,204,21,0.14),_rgba(15,23,42,0.4)_32%,_rgba(2,6,23,0.98)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+      className="relative flex h-full w-full flex-1 overflow-hidden bg-slate-950"
     >
-      <div ref={hostRef} className="h-full min-h-[30rem] w-full" />
+      <div ref={hostRef} className="h-full w-full" />
       <div className="absolute left-4 right-4 top-4 z-10 flex flex-col gap-3">
-        <div className="pointer-events-auto flex flex-col gap-3 rounded-[24px] border border-white/10 bg-slate-950/72 px-4 py-4 shadow-[0_18px_44px_rgba(8,15,31,0.35)] backdrop-blur md:flex-row md:items-end md:justify-between">
+        <div className="pointer-events-auto flex flex-col gap-3 rounded-xl border border-white/8 bg-slate-950/80 px-3 py-3 backdrop-blur-sm md:flex-row md:items-end md:justify-between">
           <div className="flex flex-col gap-2">
             <p className="text-[11px] uppercase tracking-[0.28em] text-amber-100/70">关系过滤</p>
             <div className="flex flex-wrap gap-2">
@@ -227,12 +227,9 @@ export function GraphPanel() {
       </div>
       {filteredRelationships.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/45 backdrop-blur-[2px]">
-          <div className="max-w-sm rounded-[22px] border border-amber-200/15 bg-slate-950/84 px-6 py-5 text-center shadow-[0_18px_44px_rgba(8,15,31,0.45)]">
-            <p className="text-[11px] uppercase tracking-[0.32em] text-amber-100/70">Graph Filtered</p>
-            <p className="mt-3 font-display text-2xl text-white">当前筛选下暂无关系</p>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
-              调整关系类型或强度阈值后会立即刷新图谱。
-            </p>
+          <div className="max-w-xs rounded-xl border border-white/10 bg-slate-950/80 px-5 py-4 text-center backdrop-blur-sm">
+            <p className="text-sm text-slate-400">当前筛选下暂无关系</p>
+            <p className="mt-1 text-xs text-slate-500">调整类型或强度阈值试试</p>
           </div>
         </div>
       )}
