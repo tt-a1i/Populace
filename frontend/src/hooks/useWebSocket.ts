@@ -96,6 +96,9 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
           for (const queuedTick of queuedTicks) {
             const dialogues = Array.isArray(queuedTick.dialogues) ? queuedTick.dialogues : []
             const relationships = Array.isArray(queuedTick.relationships) ? queuedTick.relationships : []
+            const achievementUnlocks = Array.isArray(queuedTick.achievement_unlocks)
+              ? (queuedTick.achievement_unlocks as Array<{ resident_id: string; achievement_name: string; icon: string }>)
+              : []
             sawDialogue = sawDialogue || dialogues.length > 0
             sawRelationshipDelta = sawRelationshipDelta || relationships.length > 0
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,6 +108,12 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               relationships: relationships as any,
             })
+            if (playSounds) {
+              for (const unlock of achievementUnlocks) {
+                pushToast(`${unlock.icon} ${unlock.achievement_name}`)
+                play('achievement')
+              }
+            }
           }
 
           if (playSounds) {
@@ -145,7 +154,7 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
         commitTick(data as Record<string, unknown>)
       }
     },
-    [play, relInitFromSnapshot, relSetAbsolute, relUpdateFromTick, simInitFromSnapshot, simUpdateFromTick],
+    [play, pushToast, relInitFromSnapshot, relSetAbsolute, relUpdateFromTick, simInitFromSnapshot, simUpdateFromTick],
   )
 
   // -------------------------------------------------------------------------

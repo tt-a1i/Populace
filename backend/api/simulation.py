@@ -71,6 +71,9 @@ class SimulationState:
         self._total_relationship_change_count = 0
         # Mood history: list of {tick, resident_id, resident_name, mood} (max 100 ticks)
         self._mood_history: list[dict[str, Any]] = []
+        # Achievement tracking
+        self._achievements_store: dict[str, set[str]] = {}
+        self._buildings_visited: dict[str, set[str]] = {}
 
     async def restore_from_neo4j(self) -> None:
         """Restore prior session state at startup.
@@ -217,6 +220,8 @@ class SimulationState:
         self._total_dialogue_count = 0
         self._total_relationship_change_count = 0
 
+        self._achievements_store = {}
+        self._buildings_visited = {}
         self.world = load_scenario(template_path)
         self.loop = SimulationLoop(self.world, tick_handler=self._tick)
         self._task = None
@@ -236,6 +241,8 @@ class SimulationState:
         self._total_dialogue_count = 0
         self._total_relationship_change_count = 0
 
+        self._achievements_store = {}
+        self._buildings_visited = {}
         self.world = load_scenario_from_dict(scenario_data)
         self.loop = SimulationLoop(self.world, tick_handler=self._tick)
         self._task = None
@@ -303,6 +310,8 @@ class SimulationState:
         self._mood_history = []
         self._total_dialogue_count = 0
         self._total_relationship_change_count = 0
+        self._achievements_store = {}
+        self._buildings_visited = {}
 
         # Rebuild config
         cfg_data = data.get("config", {})
@@ -819,6 +828,26 @@ class SimulationState:
             )
             self._events.clear()
             self.world.pending_events.clear()
+
+        # --- Achievement checks ---
+        # Ensure tracking dicts exist (guard for test environments)
+        if not hasattr(self, "_achievements_store"):
+            self._achievements_store = {}
+        if not hasattr(self, "_buildings_visited"):
+            self._buildings_visited = {}
+        # Track buildings entered this tick for the explorer achievement
+        for agent in self.world.agents:
+            if agent.resident.location is not None:
+                self._buildings_visited.setdefault(agent.resident.id, set()).add(
+                    agent.resident.location
+                )
+        dialogue_resident_ids = {d.from_id for d in tick_state.dialogues} | {
+            d.to_id for d in tick_state.dialogues
+        }
+        from backend.api.achievements import check_and_unlock as _check_achievements
+        from engine.types import AchievementUnlock
+        for unlock in _check_achievements(self, dialogue_resident_ids):
+            tick_state.achievement_unlocks.append(AchievementUnlock(**unlock))
 
         # --- Neo4j persistence (spec §12) ---
         # Real-time: persist relationship changes that occurred this tick

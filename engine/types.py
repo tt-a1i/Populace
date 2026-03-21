@@ -83,6 +83,7 @@ else:
         outfit_color: Optional[str] = None
         current_goal: Optional[str] = None   # active short-term goal text
         coins: int = 100
+        occupation: str = "unemployed"
         diary: List["DiaryEntry"] = field(default_factory=list)
 
 

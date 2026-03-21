@@ -1,4 +1,4 @@
-export type SoundCue = 'event' | 'dialogue' | 'relationship' | 'report'
+export type SoundCue = 'event' | 'dialogue' | 'relationship' | 'report' | 'achievement'
 
 interface AudioEngine {
   context: AudioContext
@@ -91,6 +91,22 @@ function createNoiseBuffer(context: AudioContext, durationSeconds: number): Audi
   return buffer
 }
 
+function playAchievementFanfare(engine: AudioEngine): void {
+  const notes = [523, 659, 784, 1047] // C5, E5, G5, C6
+  const now = engine.context.currentTime
+  notes.forEach((freq, i) => {
+    const { oscillator, gain } = createVoice(engine, 'triangle', freq)
+    const start = now + i * 0.1
+    oscillator.frequency.setValueAtTime(freq, start)
+    gain.gain.cancelScheduledValues(start)
+    gain.gain.setValueAtTime(0.0001, start)
+    gain.gain.exponentialRampToValueAtTime(0.22, start + 0.03)
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.32)
+    oscillator.start(start)
+    oscillator.stop(start + 0.36)
+  })
+}
+
 function playReportRustle(engine: AudioEngine): void {
   const source = engine.context.createBufferSource()
   source.buffer = createNoiseBuffer(engine.context, 0.22)
@@ -123,6 +139,9 @@ export function playSoundCue(engine: AudioEngine, cue: SoundCue): void {
       return
     case 'report':
       playReportRustle(engine)
+      return
+    case 'achievement':
+      playAchievementFanfare(engine)
       return
     default:
       return

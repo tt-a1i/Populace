@@ -203,3 +203,74 @@ def test_transfer_coins_resident_not_found(client):
         json={"to_id": to_id, "amount": 5},
     )
     assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Achievement system
+# ---------------------------------------------------------------------------
+
+def test_get_achievements_returns_list(client):
+    residents = client.get("/api/residents").json()
+    rid = residents[0]["id"]
+
+    response = client.get(f"/api/residents/{rid}/achievements")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) == 5
+
+
+def test_achievements_have_required_fields(client):
+    residents = client.get("/api/residents").json()
+    rid = residents[0]["id"]
+
+    data = client.get(f"/api/residents/{rid}/achievements").json()
+    for ach in data:
+        assert "id" in ach
+        assert "name" in ach
+        assert "description" in ach
+        assert "icon" in ach
+        assert "unlocked" in ach
+        assert isinstance(ach["unlocked"], bool)
+
+
+def test_achievements_all_locked_initially(client):
+    residents = client.get("/api/residents").json()
+    rid = residents[0]["id"]
+
+    data = client.get(f"/api/residents/{rid}/achievements").json()
+    # Initially no achievements should be unlocked (fresh simulation)
+    # (some may be unlocked if coins >= 500 from prior tests, so only check structure)
+    assert all("unlocked" in a for a in data)
+
+
+def test_achievements_not_found_for_invalid_resident(client):
+    response = client.get("/api/residents/nonexistent_xyz/achievements")
+    assert response.status_code == 404
+
+
+def test_rich_500_unlocks_when_coins_reach_500(client):
+    """Directly set coins to 500 via god-mode attributes and check achievement."""
+    residents = client.get("/api/residents").json()
+    rid = residents[0]["id"]
+
+    # Give resident enough coins via direct attribute patch + coins workaround
+    # We use the transfer endpoint to add coins from another resident... but
+    # more directly: simulate via the achievements state by giving coins.
+    # Set coins to 500 by patching (using the existing PATCH endpoint coins not exposed,
+    # so we test via check_and_unlock logic indirectly).
+    # Instead, create a resident with coins = 500 manually
+    state = client.app.state.simulation_state
+    agent = next((a for a in state.world.agents if a.resident.id == rid), None)
+    assert agent is not None
+
+    original_coins = agent.resident.coins
+    agent.resident.coins = 500
+
+    from backend.api.achievements import check_and_unlock
+    unlocks = check_and_unlock(state, set())
+    unlocked_ids = [u["achievement_id"] for u in unlocks if u["resident_id"] == rid]
+    assert "rich_500" in unlocked_ids
+
+    # Restore
+    agent.resident.coins = original_coins

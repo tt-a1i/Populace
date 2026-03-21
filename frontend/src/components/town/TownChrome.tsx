@@ -3,10 +3,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { GraphRelationship } from '../../stores/relationships'
 import type { ResidentPosition } from '../../stores/simulation'
 import {
+  type ResidentAchievement,
   type ResidentDiaryEntry,
   type ResidentMemory,
   type ResidentReflection,
   type ResidentRelationship,
+  getResidentAchievements,
   getResidentDiary,
   getResidentMemories,
   getResidentReflections,
@@ -134,14 +136,15 @@ export function TownChrome({
     [residents, selectedResidentId],
   )
 
-  // Sidebar tabs: memories | diary | relationships
-  const [sidebarTab, setSidebarTab] = useState<'memories' | 'diary' | 'relationships'>('memories')
+  // Sidebar tabs: memories | diary | relationships | achievements
+  const [sidebarTab, setSidebarTab] = useState<'memories' | 'diary' | 'relationships' | 'achievements'>('memories')
 
   // Real data from API (fetched when a resident is selected)
   const [liveMemories, setLiveMemories] = useState<ResidentMemory[] | null>(null)
   const [liveRelationships, setLiveRelationships] = useState<ResidentRelationship[] | null>(null)
   const [liveReflections, setLiveReflections] = useState<ResidentReflection[] | null>(null)
   const [liveDiary, setLiveDiary] = useState<ResidentDiaryEntry[] | null>(null)
+  const [liveAchievements, setLiveAchievements] = useState<ResidentAchievement[] | null>(null)
   const requestSequenceRef = useRef(0)
 
   // God-mode: edit panel state
@@ -207,6 +210,7 @@ export function TownChrome({
     setLiveRelationships(null)
     setLiveReflections(null)
     setLiveDiary(null)
+    setLiveAchievements(null)
   }, [selectedResidentId])
 
   useEffect(() => {
@@ -227,6 +231,7 @@ export function TownChrome({
 
     const setMemories = applyIfCurrent(setLiveMemories)
     const setRelationships = applyIfCurrent(setLiveRelationships)
+    const setAchievements = applyIfCurrent(setLiveAchievements)
     const setReflections = applyIfCurrent(setLiveReflections)
     const setDiary = applyIfCurrent(setLiveDiary)
 
@@ -238,6 +243,9 @@ export function TownChrome({
       .then(setReflections)
       .catch(() => setReflections(null))
     void getResidentDiary(selectedResidentId).then(setDiary).catch(() => setDiary(null))
+    void getResidentAchievements(selectedResidentId)
+      .then(setAchievements)
+      .catch(() => setAchievements(null))
 
     return () => {
       disposed = true
@@ -434,9 +442,9 @@ export function TownChrome({
             </div>
           </div>
 
-          {/* ── Tab switcher: memories / diary / relationships ── */}
-          <div className="mt-5 inline-flex rounded-full border border-white/10 bg-white/5 p-1">
-            {(['memories', 'diary', 'relationships'] as const).map((tab) => (
+          {/* ── Tab switcher: memories / diary / relationships / achievements ── */}
+          <div className="mt-5 inline-flex flex-wrap gap-1 rounded-full border border-white/10 bg-white/5 p-1">
+            {(['memories', 'diary', 'relationships', 'achievements'] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -446,7 +454,7 @@ export function TownChrome({
                   sidebarTab === tab ? 'bg-cyan-300/16 text-cyan-50' : 'text-slate-400',
                 ].join(' ')}
               >
-                {tab === 'memories' ? '记忆' : tab === 'diary' ? '日记' : '关系'}
+                {tab === 'memories' ? '记忆' : tab === 'diary' ? '日记' : tab === 'relationships' ? '关系' : '成就'}
               </button>
             ))}
           </div>
@@ -532,6 +540,47 @@ export function TownChrome({
                 ) : (
                   <p className="rounded-2xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-400">
                     日记尚未生成，每天 22:00 自动写入。
+                  </p>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* ── Achievements ── */}
+          {sidebarTab === 'achievements' && (
+            <section className="mt-3 flex-1 rounded-[22px] border border-yellow-400/15 bg-yellow-400/[0.04] p-4">
+              <p className="text-[11px] uppercase tracking-[0.28em] text-yellow-300/70">
+                成就
+                {liveAchievements && (
+                  <span className="ml-2 rounded-full border border-yellow-400/20 bg-yellow-400/10 px-1.5 py-0.5 text-[9px] text-yellow-300/70">
+                    {liveAchievements.filter((a) => a.unlocked).length}/{liveAchievements.length}
+                  </span>
+                )}
+              </p>
+              <div className="mt-3 grid grid-cols-1 gap-2">
+                {liveAchievements ? (
+                  liveAchievements.map((ach) => (
+                    <div
+                      key={ach.id}
+                      className={[
+                        'flex items-center gap-3 rounded-2xl border px-3 py-2.5',
+                        ach.unlocked
+                          ? 'border-yellow-400/25 bg-yellow-400/10'
+                          : 'border-white/6 bg-slate-900/40 opacity-50',
+                      ].join(' ')}
+                    >
+                      <span className="text-2xl">{ach.unlocked ? ach.icon : '🔒'}</span>
+                      <div>
+                        <p className={['text-sm font-medium', ach.unlocked ? 'text-yellow-100' : 'text-slate-400'].join(' ')}>
+                          {ach.name}
+                        </p>
+                        <p className="text-[11px] text-slate-500">{ach.description}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="rounded-2xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-400">
+                    加载中…
                   </p>
                 )}
               </div>

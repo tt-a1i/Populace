@@ -7,11 +7,13 @@ const {
   mockGetResidentRelationships,
   mockGetResidentReflections,
   mockGetResidentDiary,
+  mockGetResidentAchievements,
 } = vi.hoisted(() => ({
   mockGetResidentMemories: vi.fn(),
   mockGetResidentRelationships: vi.fn(),
   mockGetResidentReflections: vi.fn(),
   mockGetResidentDiary: vi.fn(),
+  mockGetResidentAchievements: vi.fn(),
 }))
 
 vi.mock('../services/api', () => ({
@@ -19,6 +21,7 @@ vi.mock('../services/api', () => ({
   getResidentRelationships: mockGetResidentRelationships,
   getResidentReflections: mockGetResidentReflections,
   getResidentDiary: mockGetResidentDiary,
+  getResidentAchievements: mockGetResidentAchievements,
 }))
 
 import { TownChrome, type TownContextMenuState, type TownInspectionState, type TownPlaceholder } from '../components/town/TownChrome'
@@ -134,11 +137,13 @@ describe('TownChrome', () => {
     mockGetResidentRelationships.mockReset()
     mockGetResidentReflections.mockReset()
     mockGetResidentDiary.mockReset()
+    mockGetResidentAchievements.mockReset()
 
     mockGetResidentMemories.mockResolvedValue([])
     mockGetResidentRelationships.mockResolvedValue([])
     mockGetResidentReflections.mockResolvedValue([])
     mockGetResidentDiary.mockResolvedValue([])
+    mockGetResidentAchievements.mockResolvedValue([])
   })
 
   it('shows the tile context menu and dispatches actions', async () => {

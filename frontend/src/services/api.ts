@@ -440,6 +440,18 @@ export function createResident(payload: ResidentCreatePayload) {
   })
 }
 
+export interface ResidentAchievement {
+  id: string
+  name: string
+  description: string
+  icon: string
+  unlocked: boolean
+}
+
+export function getResidentAchievements(id: string) {
+  return request<ResidentAchievement[]>(`/api/residents/${id}/achievements`)
+}
+
 export function transferCoins(fromId: string, toId: string, amount: number) {
   return request<ApiResident>(`/api/residents/${fromId}/transfer`, {
     method: 'POST',
