@@ -6,6 +6,24 @@ const TILE_SIZE = 32
 const HALF_TILE = TILE_SIZE / 2
 const DOUBLE_TAP_MS = 280
 const DIALOGUE_DURATION_MS = 3000
+
+type DialogueKind = 'dialogue' | 'gossip' | 'monologue'
+
+const BUBBLE_STYLE: Record<DialogueKind, { fill: number; textFill: number; prefix: string }> = {
+  dialogue: { fill: 0xffffff, textFill: 0x0f172a, prefix: '' },
+  gossip: { fill: 0xf3e8ff, textFill: 0x7c3aed, prefix: '\u{1F442} ' },
+  monologue: { fill: 0xeff6ff, textFill: 0x6b7280, prefix: '\u{1F4AD} ' },
+}
+
+const MOOD_EMOJI: Record<string, string> = {
+  happy: '\u{1F60A}', excited: '\u{1F60A}', ecstatic: '\u{1F929}',
+  sad: '\u{1F622}', angry: '\u{1F620}', fearful: '\u{1F628}', tired: '\u{1F634}',
+  calm: '', content: '', neutral: '',
+}
+
+const OCCUPATION_ICON: Record<string, string> = {
+  barista: '\u2615', teacher: '\u{1F4DA}', shopkeeper: '\u{1F6D2}', unemployed: '',
+}
 const FALLBACK_SKIN_COLORS = [0xf2d3b1, 0xe5b887, 0xd39a6a, 0xb97c52, 0x8a5a3c, 0x5c3a27]
 const FALLBACK_HAIR_COLORS = [0x1f2937, 0x5b4636, 0x8b5a2b, 0xd4a373, 0xc084fc, 0xf8fafc]
 const FALLBACK_OUTFIT_COLORS = [0x2563eb, 0x059669, 0xdc2626, 0xd97706, 0x7c3aed, 0xdb2777, 0x0f766e, 0x4b5563]
@@ -120,6 +138,12 @@ export class ResidentSprite extends Container {
   // Low-energy warning icon — shown when energy < 0.2
   private readonly energyWarning = new Container()
   private readonly energyWarningLabel: Text
+  // Mood emoji — displayed above the sprite head
+  private readonly moodEmoji: Text
+  // Occupation badge — small icon at bottom-right of sprite
+  private readonly occupationBadge: Text
+  // Energy bar — horizontal bar below the sprite body
+  private readonly energyBar = new Graphics()
 
   private readonly nameLabel: Text
   private onFocusRequest?: (residentId: string) => void
@@ -140,6 +164,7 @@ export class ResidentSprite extends Container {
   private dialogueUntil = 0
   private externalHighlight = false
   private highlightPulse = 0
+  private currentBubbleKind: DialogueKind = 'dialogue'
 
   constructor(resident: ResidentPosition, options: ResidentSpriteOptions = {}) {
     super()
@@ -222,7 +247,38 @@ export class ResidentSprite extends Container {
     this.energyWarning.zIndex = 6
     this.energyWarning.visible = false
 
-    this.addChild(this.shadow, this.highlightGlow, this.body, this.emotionAccent, this.thoughtBubble, this.bubble, this.energyWarning, this.nameLabel)
+    // Mood emoji — above the sprite head
+    this.moodEmoji = new Text({
+      text: '',
+      anchor: { x: 0.5, y: 0.5 },
+      style: {
+        fontSize: 10,
+        fontFamily: 'Avenir Next, Helvetica Neue, sans-serif',
+      },
+    })
+    this.moodEmoji.y = -34
+    this.moodEmoji.zIndex = 5
+    this.moodEmoji.visible = false
+
+    // Occupation badge — bottom-right of sprite
+    this.occupationBadge = new Text({
+      text: '',
+      anchor: { x: 0.5, y: 0.5 },
+      style: {
+        fontSize: 8,
+        fontFamily: 'Avenir Next, Helvetica Neue, sans-serif',
+      },
+    })
+    this.occupationBadge.position.set(8, 8)
+    this.occupationBadge.zIndex = 5
+    this.occupationBadge.visible = false
+
+    // Energy bar — below the sprite body
+    this.energyBar.zIndex = 4
+    this.energyBar.y = 14
+    this.energyBar.visible = false
+
+    this.addChild(this.shadow, this.highlightGlow, this.body, this.emotionAccent, this.thoughtBubble, this.bubble, this.energyWarning, this.moodEmoji, this.occupationBadge, this.energyBar, this.nameLabel)
     this.on('pointertap', this.handlePointerTap)
 
     this.applyResident(resident, true)
@@ -272,9 +328,19 @@ export class ResidentSprite extends Container {
     }
     this.nameLabel.text = resident.name
     this.moveTo(resident.targetX, resident.targetY, immediate)
-    this.updateStatus(resident.status, resident.dialogueText)
+    this.updateStatus(resident.status, resident.dialogueText, resident.dialogueKind)
     this.updateGoal(resident.currentGoal)
     this.updateEnergy(resident.energy)
+
+    // Mood emoji
+    const moodText = MOOD_EMOJI[resident.mood ?? ''] ?? ''
+    this.moodEmoji.text = moodText
+    this.moodEmoji.visible = moodText.length > 0
+
+    // Occupation badge
+    const occIcon = OCCUPATION_ICON[resident.occupation ?? ''] ?? ''
+    this.occupationBadge.text = occIcon
+    this.occupationBadge.visible = occIcon.length > 0
   }
 
   setSimulationSpeed(speed: SimulationSpeed): void {
@@ -318,14 +384,35 @@ export class ResidentSprite extends Container {
     )
   }
 
-  showDialogue(text: string): void {
+  showDialogue(text: string, kind: DialogueKind = 'dialogue'): void {
+    this.currentBubbleKind = kind
     this.dialogueUntil = performance.now() + DIALOGUE_DURATION_MS
     this.renderBubble(text)
   }
 
-  /** Show or hide the low-energy warning icon based on energy level. */
+  /** Show or hide the low-energy warning icon and energy bar based on energy level. */
   updateEnergy(energy: number | null | undefined): void {
     this.energyWarning.visible = energy != null && energy < 0.2
+
+    if (energy == null) {
+      this.energyBar.visible = false
+      return
+    }
+
+    this.energyBar.visible = true
+    const clamped = clamp(energy, 0, 1)
+    const barWidth = 20
+    const barHeight = 3
+    const fillWidth = clamped * barWidth
+    const fillColor = clamped > 0.5 ? 0x22c55e : clamped > 0.2 ? 0xeab308 : 0xef4444
+
+    this.energyBar.clear()
+    // Background
+    this.energyBar.roundRect(-barWidth / 2, 0, barWidth, barHeight, 1).fill({ color: 0x374151, alpha: 0.5 })
+    // Fill
+    if (fillWidth > 0) {
+      this.energyBar.roundRect(-barWidth / 2, 0, fillWidth, barHeight, 1).fill({ color: fillColor })
+    }
   }
 
   /** Update the thought bubble with the agent's current short-term goal. */
@@ -334,11 +421,11 @@ export class ResidentSprite extends Container {
     this._renderThoughtBubble(text)
   }
 
-  updateStatus(status: ResidentStatus, dialogueText?: string | null): void {
+  updateStatus(status: ResidentStatus, dialogueText?: string | null, dialogueKind?: DialogueKind): void {
     this.currentStatus = status
 
     if (dialogueText) {
-      this.showDialogue(dialogueText)
+      this.showDialogue(dialogueText, dialogueKind ?? 'dialogue')
       return
     }
 
@@ -346,6 +433,7 @@ export class ResidentSprite extends Container {
       return
     }
 
+    this.currentBubbleKind = 'dialogue'
     const icon = statusIconFor(status)
     this.renderBubble(icon)
   }
@@ -365,6 +453,7 @@ export class ResidentSprite extends Container {
 
     if (this.dialogueUntil > 0 && performance.now() >= this.dialogueUntil) {
       this.dialogueUntil = 0
+      this.currentBubbleKind = 'dialogue'
       this.renderBubble(statusIconFor(this.currentStatus))
     }
 
@@ -409,22 +498,26 @@ export class ResidentSprite extends Container {
       return
     }
 
+    const style = BUBBLE_STYLE[this.currentBubbleKind] ?? BUBBLE_STYLE.dialogue
+    const displayText = style.prefix + content
+
     this.bubble.visible = true
-    this.bubbleLabel.text = content
+    this.bubbleLabel.text = displayText
+    this.bubbleLabel.style.fill = style.textFill
 
     const width = Math.max(28, Math.min(142, this.bubbleLabel.width + 20))
     const height = Math.max(22, this.bubbleLabel.height + 12)
 
     this.bubbleBackground.clear()
     this.bubbleBackground.roundRect(-width / 2, -height / 2, width, height, 10).fill({
-      color: 0xf8fafc,
+      color: style.fill,
       alpha: 0.94,
     })
     this.bubbleBackground.stroke({ color: 0x0f172a, alpha: 0.18, width: 1 })
     this.bubbleBackground.moveTo(-4, height / 2 - 1)
     this.bubbleBackground.lineTo(0, height / 2 + 7)
     this.bubbleBackground.lineTo(5, height / 2 - 1)
-    this.bubbleBackground.fill({ color: 0xf8fafc, alpha: 0.94 })
+    this.bubbleBackground.fill({ color: style.fill, alpha: 0.94 })
   }
 
   /** Render the thought bubble (violet tint) with a small cloud-style pointer. */
