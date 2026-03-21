@@ -162,14 +162,14 @@ function SimulationView() {
         <ThemeToggle />
       </div>
 
-      {/* -- BOTTOM-LEFT: Message Feed -- */}
-      <div className="fixed bottom-14 left-3 z-20 w-72 pointer-events-none">
+      {/* -- BOTTOM-LEFT: Message Feed (hidden on small screens) -- */}
+      <div className="fixed bottom-14 left-3 z-20 hidden w-72 pointer-events-none sm:block">
         <MessageBar />
       </div>
 
       {/* -- BOTTOM-CENTER: Quick Action Bar -- */}
-      <div className="fixed inset-x-0 bottom-4 z-30 flex justify-center pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-950/80 px-2 py-2 shadow-xl backdrop-blur-sm">
+      <div className="fixed inset-x-0 bottom-3 z-30 flex justify-center pointer-events-none px-3">
+        <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-950/80 px-1.5 py-1.5 shadow-xl backdrop-blur-sm">
           {[
             { key: 'director', icon: '\u26A1', event: 'populace:open-director' },
             { key: 'persona', icon: '\uD83D\uDC64', event: 'populace:open-persona' },
@@ -180,13 +180,14 @@ function SimulationView() {
               key={tool.key}
               type="button"
               onClick={() => toggleTool(tool.key, tool.event)}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              title={t(`toolbar.${tool.key}`)}
+              className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
                 showToolbar && activeQuickTool === tool.key
                   ? 'border-cyan-300/40 bg-cyan-300/15 text-cyan-50'
                   : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
               }`}
             >
-              {tool.icon} {t(`toolbar.${tool.key}`)}
+              {tool.icon}<span className="ml-1 hidden sm:inline">{t(`toolbar.${tool.key}`)}</span>
             </button>
           ))}
 
@@ -195,23 +196,25 @@ function SimulationView() {
           <button
             type="button"
             onClick={() => setShowGraph((v) => !v)}
-            className={`rounded-lg border px-2.5 py-1.5 text-xs transition ${showGraph ? 'border-amber-300/40 bg-amber-300/15 text-amber-50' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+            className={`rounded-lg border px-2 py-1.5 text-xs transition ${showGraph ? 'border-amber-300/40 bg-amber-300/15 text-amber-50' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
             title={t('app.relationship_graph')}
           >
             {'\uD83D\uDD78\uFE0F'}
           </button>
 
-          <div className="mx-0.5 h-5 w-px bg-white/10" />
+          <div className="mx-0.5 h-5 w-px bg-white/10 hidden sm:block" />
 
-          <SpeedControl />
+          <div className="hidden sm:flex">
+            <SpeedControl />
+          </div>
         </div>
       </div>
 
       {/* -- RIGHT DRAWER: Graph Panel -- */}
       <div
-        className={`fixed right-0 top-0 bottom-0 z-30 w-96 transform transition-transform duration-300 ${showGraph ? 'translate-x-0' : 'translate-x-full'} pointer-events-auto`}
+        className={`fixed right-0 top-0 bottom-0 z-30 w-full transform transition-transform duration-300 sm:w-96 ${showGraph ? 'translate-x-0' : 'translate-x-full'} pointer-events-auto`}
       >
-        <div className="h-full border-l border-white/10 bg-slate-950/90 p-4 backdrop-blur-md">
+        <div className="h-full border-l border-white/10 bg-slate-950/92 p-3 backdrop-blur-md sm:p-4">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white">{t('app.relationship_graph')}</h3>
             <button
@@ -237,8 +240,8 @@ function SimulationView() {
             className="fixed inset-0 z-30 bg-black/20"
             aria-label={t('app.close')}
           />
-          <div className="fixed inset-x-0 bottom-14 z-40 flex justify-center pointer-events-none animate-[slideUp_200ms_ease-out]">
-            <div className="pointer-events-auto w-full max-w-2xl rounded-xl border border-white/10 bg-slate-950/92 p-3 shadow-2xl backdrop-blur-md mx-3">
+          <div className="fixed inset-x-0 bottom-12 z-40 flex justify-center pointer-events-none animate-[slideUp_200ms_ease-out] sm:bottom-14">
+            <div className="pointer-events-auto w-full max-w-2xl rounded-xl border border-white/10 bg-slate-950/92 p-2 shadow-2xl backdrop-blur-md mx-2 sm:mx-3 sm:p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-400">{activeQuickTool ? t(`toolbar.${activeQuickTool}`) : t('app.open_tools')}</span>
                 <button
