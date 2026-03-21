@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 // Mock all sub-components and APIs to keep tests focused on Toolbar logic
-vi.mock('../components/toolbar/EventInjector', () => ({
-  EventInjector: () => <div data-testid="event-injector">EventInjector</div>,
+vi.mock('../components/toolbar/DirectorConsole', () => ({
+  DirectorConsole: () => <div data-testid="director-console">DirectorConsole</div>,
 }))
 vi.mock('../components/toolbar/PersonaEditor', () => ({
   PersonaEditor: () => <div data-testid="persona-editor">PersonaEditor</div>,
@@ -48,6 +48,9 @@ vi.mock('../components/toolbar/TimelinePanel', () => ({
 }))
 vi.mock('../components/toolbar/SettingsPanel', () => ({
   SettingsPanel: () => <div data-testid="settings-panel">SettingsPanel</div>,
+}))
+vi.mock('../components/toolbar/QuestPanel', () => ({
+  QuestPanel: () => <div data-testid="quest-panel">QuestPanel</div>,
 }))
 
 import { Toolbar } from '../components/toolbar/Toolbar'
@@ -110,9 +113,9 @@ describe('Toolbar', () => {
   })
 
   // --- Default panel and active state ---
-  it('shows EventInjector panel by default (director tool)', () => {
+  it('shows DirectorConsole panel by default (director tool)', () => {
     render(<Toolbar />)
-    expect(screen.getByTestId('event-injector')).toBeInTheDocument()
+    expect(screen.getByTestId('director-console')).toBeInTheDocument()
   })
 
   it('marks the default director tool button as active', () => {
@@ -126,7 +129,7 @@ describe('Toolbar', () => {
     render(<Toolbar />)
     await userEvent.click(screen.getByRole('button', { name: /人设编辑/ }))
     expect(screen.getByTestId('persona-editor')).toBeInTheDocument()
-    expect(screen.queryByTestId('event-injector')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('director-console')).not.toBeInTheDocument()
   })
 
   it('switches to ReportsPanel when 今日日报 is clicked', async () => {
@@ -135,10 +138,10 @@ describe('Toolbar', () => {
     expect(screen.getByTestId('reports-panel')).toBeInTheDocument()
   })
 
-  it('shows quest placeholder when 剧情任务 is clicked', async () => {
+  it('shows QuestPanel when 剧情任务 is clicked', async () => {
     render(<Toolbar />)
     await userEvent.click(screen.getByRole('button', { name: /剧情任务/ }))
-    expect(screen.getByText(/剧情任务即将上线/)).toBeInTheDocument()
+    expect(screen.getByTestId('quest-panel')).toBeInTheDocument()
   })
 
   // --- Selecting a secondary tool auto-expands the secondary row ---

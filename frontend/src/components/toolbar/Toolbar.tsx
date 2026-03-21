@@ -4,10 +4,11 @@ import { useTranslation } from 'react-i18next'
 import { SoundToggleButton } from './SoundToggleButton'
 import { BuildPanel } from './BuildPanel'
 import { ComparePanel } from './ComparePanel'
-import { EventInjector } from './EventInjector'
+import { DirectorConsole } from './DirectorConsole'
 import { ExportPanel } from './ExportPanel'
 import { HeatmapPanel } from './HeatmapPanel'
 import { PersonaEditor } from './PersonaEditor'
+import { QuestPanel } from './QuestPanel'
 import { ResidentCreationWizard } from './ResidentCreationWizard'
 import { SavesPanel } from './SavesPanel'
 import { SettingsPanel } from './SettingsPanel'
@@ -118,14 +119,9 @@ export function Toolbar() {
   }
 
   const panel = useMemo(() => {
-    if (activeTool === 'director') return <EventInjector />
+    if (activeTool === 'director') return <DirectorConsole />
     if (activeTool === 'persona') return <PersonaEditor />
-    if (activeTool === 'quest') return (
-      <div className="flex flex-col items-center justify-center gap-2 py-12 text-slate-400">
-        <span className="text-3xl">{'\uD83C\uDFAF'}</span>
-        <p className="text-sm">{t('toolbar.quest_coming_soon')}</p>
-      </div>
-    )
+    if (activeTool === 'quest') return <QuestPanel />
     if (activeTool === 'saves') return <SavesPanel />
     if (activeTool === 'stats') return <StatsPanel />
     if (activeTool === 'build') return <BuildPanel />

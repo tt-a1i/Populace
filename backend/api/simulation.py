@@ -95,6 +95,9 @@ class SimulationState:
         # World timeline: list of timeline event dicts (max 500)
         self._world_timeline: list[dict[str, Any]] = []
         self._timeline_id_counter: int = 0
+        # Quest system
+        self._active_quests: list[dict[str, Any]] = []
+        self._completed_quests: list[str] = []
         self._state_lock: asyncio.Lock = asyncio.Lock()
 
     async def restore_from_neo4j(self) -> None:
@@ -236,6 +239,8 @@ class SimulationState:
         self._rel_events_fired = set()
         self._world_timeline = []
         self._timeline_id_counter = 0
+        self._active_quests = []
+        self._completed_quests = []
 
     async def reset_with_scene(self, scene_slug: str) -> None:
         """Stop simulation and reload a named preset template.
@@ -325,6 +330,8 @@ class SimulationState:
             "timeline_id_counter": getattr(self, "_timeline_id_counter", 0),
             "rel_events_fired": [list(x) for x in getattr(self, "_rel_events_fired", set())],
             "buildings_visited": {k: list(v) for k, v in getattr(self, "_buildings_visited", {}).items()},
+            "active_quests": list(getattr(self, "_active_quests", [])),
+            "completed_quests": list(getattr(self, "_completed_quests", [])),
         }
 
     async def load_state(self, data: dict[str, Any]) -> None:
@@ -353,6 +360,8 @@ class SimulationState:
         self._rel_events_fired = set()
         self._world_timeline = []
         self._timeline_id_counter = 0
+        self._active_quests = []
+        self._completed_quests = []
 
         # Rebuild config
         cfg_data = data.get("config", {})
@@ -447,6 +456,8 @@ class SimulationState:
         self._timeline_id_counter = data.get("timeline_id_counter", 0)
         self._rel_events_fired = {tuple(x) for x in data.get("rel_events_fired", [])}
         self._buildings_visited = {k: set(v) for k, v in data.get("buildings_visited", {}).items()}
+        self._active_quests = list(data.get("active_quests", []))
+        self._completed_quests = list(data.get("completed_quests", []))
 
         # Restore loop with saved speed/running state
         saved_speed = float(data.get("clock_speed", 1.0))
@@ -989,6 +1000,24 @@ class SimulationState:
                     "to_name": ev.get("to_name", ""),
                 },
             )
+
+        # --- Quest progress checks ---
+        from backend.api.quests import check_quest_progress as _check_quest_progress
+        for quest_ev in _check_quest_progress(self):
+            event_type = quest_ev.get("event", "")
+            qid = quest_ev.get("quest_id", "")
+            if event_type == "completed":
+                self._add_timeline_event(
+                    "quest_completed",
+                    f"任务完成：{qid}",
+                    {"quest_id": qid},
+                )
+            elif event_type == "failed":
+                self._add_timeline_event(
+                    "quest_failed",
+                    f"任务失败：{qid}",
+                    {"quest_id": qid},
+                )
 
         # --- Neo4j persistence (spec §12) ---
         # Real-time: persist relationship changes that occurred this tick

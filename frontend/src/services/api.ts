@@ -515,3 +515,96 @@ export function setLlmKey(api_key: string) {
     body: JSON.stringify({ api_key }),
   })
 }
+
+// ---------------------------------------------------------------------------
+// Director's Console
+// ---------------------------------------------------------------------------
+
+export function injectEmotion(residentId: string, emotion: string, reason?: string) {
+  return request<ApiResident>('/api/director/inject-emotion', {
+    method: 'POST',
+    body: JSON.stringify({ resident_id: residentId, emotion, reason: reason ?? '' }),
+  })
+}
+
+export interface ForceEncounterResult {
+  event_description: string
+  location: string
+}
+
+export function forceEncounter(aId: string, bId: string, buildingId?: string) {
+  return request<ForceEncounterResult>('/api/director/force-encounter', {
+    method: 'POST',
+    body: JSON.stringify({ resident_a_id: aId, resident_b_id: bId, location_building_id: buildingId ?? '' }),
+  })
+}
+
+export interface SpreadRumorResult {
+  ok: boolean
+  effect: string
+}
+
+export function spreadRumor(targetId: string, listenerId: string, content: string, isPositive: boolean) {
+  return request<SpreadRumorResult>('/api/director/spread-rumor', {
+    method: 'POST',
+    body: JSON.stringify({ target_id: targetId, listener_id: listenerId, content, is_positive: isPositive }),
+  })
+}
+
+export function triggerJealousy(residentId: string, rivalId: string) {
+  return request<ApiResident>('/api/director/trigger-jealousy', {
+    method: 'POST',
+    body: JSON.stringify({ resident_id: residentId, rival_id: rivalId }),
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Quest system
+// ---------------------------------------------------------------------------
+
+export interface QuestInfo {
+  id: string
+  name: string
+  description: string
+  icon: string
+  status: 'available' | 'active' | 'completed'
+  requires_params: boolean
+}
+
+export interface ActiveQuest {
+  quest_id: string
+  name: string
+  icon: string
+  description: string
+  progress: number
+  progress_text: string
+  remaining_ticks: number
+  status: string
+}
+
+export interface QuestStartResponse {
+  ok: boolean
+  quest_id: string
+  message: string
+}
+
+export function listQuests() {
+  return request<QuestInfo[]>('/api/quests')
+}
+
+export function startQuest(questId: string, params?: Record<string, string>) {
+  return request<QuestStartResponse>(`/api/quests/${questId}/start`, {
+    method: 'POST',
+    body: JSON.stringify({ params: params ?? {} }),
+  })
+}
+
+export function getActiveQuests() {
+  return request<ActiveQuest[]>('/api/quests/active')
+}
+
+export function abandonQuest(questId: string) {
+  return request<{ ok: boolean; quest_id: string; message: string }>(`/api/quests/${questId}/abandon`, {
+    method: 'POST',
+  })
+}
