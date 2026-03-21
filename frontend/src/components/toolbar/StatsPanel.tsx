@@ -199,11 +199,11 @@ export function StatsPanel() {
       </div>
 
       {loading ? (
-        <div className="rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-slate-300">
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-slate-300">
           {t('stats.loading')}
         </div>
       ) : error && !stats ? (
-        <div className="rounded-[20px] border border-red-400/20 bg-red-400/8 px-4 py-6 text-sm text-red-200">
+        <div className="rounded-xl border border-red-400/20 bg-red-400/8 px-4 py-6 text-sm text-red-200">
           {error}
         </div>
       ) : stats ? (
@@ -212,7 +212,7 @@ export function StatsPanel() {
             {metricCards.map((card) => (
               <article
                 key={card.label}
-                className="rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-4"
+                className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4"
               >
                 <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">{card.label}</p>
                 <p className="mt-3 font-display text-3xl text-white">{card.value}</p>
@@ -221,7 +221,7 @@ export function StatsPanel() {
           </div>
 
           <div className="grid gap-3 lg:grid-cols-3">
-            <article className="rounded-[20px] border border-emerald-300/16 bg-emerald-300/8 px-4 py-4">
+            <article className="rounded-xl border border-emerald-300/16 bg-emerald-300/8 px-4 py-4">
               <p className="text-[11px] uppercase tracking-[0.28em] text-emerald-100/70">{t('stats.most_social_resident')}</p>
               <p className="mt-3 text-xl font-semibold text-white">
                 {stats.most_social_resident?.name ?? t('stats.empty_value')}
@@ -236,7 +236,7 @@ export function StatsPanel() {
               </p>
             </article>
 
-            <article className="rounded-[20px] border border-amber-300/16 bg-amber-300/8 px-4 py-4">
+            <article className="rounded-xl border border-amber-300/16 bg-amber-300/8 px-4 py-4">
               <p className="text-[11px] uppercase tracking-[0.28em] text-amber-100/70">{t('stats.loneliest_resident')}</p>
               <p className="mt-3 text-xl font-semibold text-white">
                 {stats.loneliest_resident?.name ?? t('stats.empty_value')}
@@ -251,7 +251,7 @@ export function StatsPanel() {
               </p>
             </article>
 
-            <article className="rounded-[20px] border border-violet-300/16 bg-violet-300/8 px-4 py-4">
+            <article className="rounded-xl border border-violet-300/16 bg-violet-300/8 px-4 py-4">
               <p className="text-[11px] uppercase tracking-[0.28em] text-violet-100/70">{t('stats.strongest_relationship')}</p>
               <p className="mt-3 text-xl font-semibold text-white">
                 {stats.strongest_relationship
@@ -268,7 +268,7 @@ export function StatsPanel() {
 
           {/* ── Mood Trend Chart ── */}
           {moodHistory.length > 0 && (
-            <div className="rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-4">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
               <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500 mb-3">{t('stats.mood_trend_title')}</p>
               <MoodTrendChart history={moodHistory} waitingLabel={t('stats.waiting_ticks')} />
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
@@ -284,7 +284,7 @@ export function StatsPanel() {
 
           {/* ── Network Influence Ranking ── */}
           {networkData.length > 0 && (
-            <div className="rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-4">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
               <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500 mb-3">{t('stats.network_rank_title')}</p>
               <NetworkRankChart data={networkData} relationshipsSuffix={t('stats.relationships_suffix')} />
             </div>

@@ -191,7 +191,7 @@ export function QuestPanel() {
       )}
 
       {loading ? (
-        <div className="rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-slate-300">
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-slate-300">
           {t('stats.loading')}
         </div>
       ) : (
@@ -276,7 +276,7 @@ function ActiveQuestCard({ quest, onAbandon }: ActiveQuestCardProps) {
   const pct = Math.round(quest.progress * 100)
 
   return (
-    <article className="rounded-[20px] border border-emerald-300/16 bg-emerald-300/8 px-4 py-4">
+    <article className="rounded-xl border border-emerald-300/16 bg-emerald-300/8 px-4 py-4">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm font-semibold text-white">

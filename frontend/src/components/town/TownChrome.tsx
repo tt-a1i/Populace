@@ -136,7 +136,7 @@ export function TownChrome({
               <span
                 key={building.id}
                 data-testid="minimap-building-footprint"
-                className="absolute block rounded-[4px] border border-cyan-200/20 bg-cyan-200/15"
+                className="absolute block rounded border border-cyan-200/20 bg-cyan-200/15"
                 style={{
                   left: `${(building.position[0] / MAP_WIDTH) * 100}%`,
                   top: `${(building.position[1] / MAP_HEIGHT) * 100}%`,
@@ -150,7 +150,7 @@ export function TownChrome({
             <span
               key={placeholder.id}
               data-testid="minimap-placeholder-dot"
-              className="absolute block rounded-[4px] border border-amber-200/40 bg-amber-200/35"
+              className="absolute block rounded border border-amber-200/40 bg-amber-200/35"
               style={{
                 left: `${(placeholder.tileX / MAP_WIDTH) * 100}%`,
                 top: `${(placeholder.tileY / MAP_HEIGHT) * 100}%`,

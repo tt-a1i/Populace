@@ -293,8 +293,9 @@ function SimulationView() {
           'fixed left-3 top-11 z-20 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors pointer-events-none',
           connected
             ? 'text-emerald-400/60'
-            : 'text-amber-400/70',
+            : 'text-amber-400/70 animate-pulse',
         ].join(' ')}
+        title={connected ? t('ws.reconnected') : t('ws.connection_lost')}
       >
         {connected ? '\u25CF' : '\u25CB'}
       </div>

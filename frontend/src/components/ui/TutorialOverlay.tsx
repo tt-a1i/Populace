@@ -132,7 +132,7 @@ export function TutorialOverlay() {
 
       {/* Tooltip card */}
       <div
-        className="pointer-events-auto fixed z-[9002] w-[min(23rem,calc(100vw-2rem))] rounded-[24px] border border-cyan-300/25 bg-slate-950/96 p-5 shadow-[0_28px_80px_rgba(2,6,23,0.70)] backdrop-blur"
+        className="pointer-events-auto fixed z-[9002] w-[min(23rem,calc(100vw-2rem))] rounded-xl border border-cyan-300/25 bg-slate-950/96 p-5 shadow-[0_28px_80px_rgba(2,6,23,0.70)] backdrop-blur"
         style={cardStyle}
       >
         {/* Progress pills */}
