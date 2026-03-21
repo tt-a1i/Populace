@@ -117,7 +117,7 @@ function SimulationView() {
                   <button
                     type="button"
                     onClick={retry}
-                    className="mt-4 rounded-full border border-amber-400/30 bg-amber-400/10 px-5 py-2 text-sm font-medium text-amber-200 transition hover:bg-amber-400/20"
+                    className="mt-4 rounded-full border border-amber-400/30 bg-amber-400/10 px-5 py-2 text-sm font-medium text-amber-200 transition duration-200 hover:bg-amber-400/20 active:scale-95"
                   >
                     {t('app.reconnect')}
                   </button>
@@ -160,8 +160,9 @@ function SimulationView() {
         <button
           type="button"
           onClick={() => { setShowToolbar(true); setActiveQuickTool('settings'); window.dispatchEvent(new CustomEvent('populace:open-settings')) }}
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-sm text-slate-300 transition hover:bg-white/10 hover:text-white"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-sm text-slate-300 transition duration-200 hover:bg-white/10 hover:text-white active:scale-95"
           title={t('toolbar.settings')}
+          aria-label={t('toolbar.settings')}
         >
           {'\u2699\uFE0F'}
         </button>
@@ -185,14 +186,16 @@ function SimulationView() {
               key={tool.key}
               type="button"
               onClick={() => toggleTool(tool.key, tool.event)}
+              aria-pressed={showToolbar && activeQuickTool === tool.key}
+              aria-label={t(`toolbar.${tool.key}`)}
               title={t(`toolbar.${tool.key}`)}
-              className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+              className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition duration-200 active:scale-95 ${
                 showToolbar && activeQuickTool === tool.key
                   ? 'border-cyan-300/40 bg-cyan-300/15 text-cyan-50'
                   : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
               }`}
             >
-              {tool.icon}<span className="ml-1 hidden sm:inline">{t(`toolbar.${tool.key}`)}</span>
+              <span aria-hidden="true">{tool.icon}</span><span className="ml-1 hidden sm:inline">{t(`toolbar.${tool.key}`)}</span>
             </button>
           ))}
 
@@ -201,17 +204,17 @@ function SimulationView() {
           <button
             type="button"
             onClick={() => setShowGraph((v) => !v)}
-            className={`rounded-lg border px-2 py-1.5 text-xs transition ${graphVisible ? 'border-amber-300/40 bg-amber-300/15 text-amber-50' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+            aria-pressed={graphVisible}
+            aria-label={t('app.relationship_graph')}
             title={t('app.relationship_graph')}
+            className={`rounded-lg border px-2 py-1.5 text-xs transition duration-200 active:scale-95 ${graphVisible ? 'border-amber-300/40 bg-amber-300/15 text-amber-50' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
           >
-            {'\uD83D\uDD78\uFE0F'}
+            <span aria-hidden="true">{'\uD83D\uDD78\uFE0F'}</span>
           </button>
 
-          <div className="mx-0.5 h-5 w-px bg-white/10 hidden sm:block" />
+          <div className="mx-0.5 h-5 w-px bg-white/10" />
 
-          <div className="hidden sm:flex">
-            <SpeedControl />
-          </div>
+          <SpeedControl />
         </div>
       </div>
 
@@ -225,7 +228,8 @@ function SimulationView() {
             <button
               type="button"
               onClick={() => setShowGraph(false)}
-              className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-400 transition hover:bg-white/10 hover:text-white"
+              aria-label={t('app.close')}
+              className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-400 transition duration-200 hover:bg-white/10 hover:text-white active:scale-95"
             >
               {'\u2715'}
             </button>
@@ -252,7 +256,7 @@ function SimulationView() {
                 <button
                   type="button"
                   onClick={() => { setShowToolbar(false); setActiveQuickTool(null) }}
-                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400 transition hover:bg-white/10 hover:text-white"
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400 transition duration-200 hover:bg-white/10 hover:text-white active:scale-95"
                 >
                   {'\u2715'} {t('app.close')}
                 </button>

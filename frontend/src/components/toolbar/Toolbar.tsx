@@ -152,18 +152,20 @@ export function Toolbar() {
               key={tool.key}
               type="button"
               data-active={activeTool === tool.key}
+              aria-pressed={activeTool === tool.key}
               onClick={() => handleToolClick(tool.key)}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${toneClass(tool.tone, activeTool === tool.key)}`}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition duration-200 active:scale-95 ${toneClass(tool.tone, activeTool === tool.key)}`}
             >
-              <span className="mr-1.5">{tool.icon}</span>
+              <span className="mr-1.5" aria-hidden="true">{tool.icon}</span>
               {tool.label}
             </button>
           ))}
           <button
             type="button"
             data-testid="more-toggle"
+            aria-expanded={showSecondary}
             onClick={() => setShowSecondary((v) => !v)}
-            className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] text-slate-400 transition hover:bg-white/10"
+            className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] text-slate-400 transition duration-200 hover:bg-white/10 active:scale-95"
           >
             {showSecondary ? t('toolbar.less') : t('toolbar.more')} {showSecondary ? '\u25B4' : '\u25BE'}
           </button>
@@ -175,10 +177,11 @@ export function Toolbar() {
                 key={tool.key}
                 type="button"
                 data-active={activeTool === tool.key}
+                aria-pressed={activeTool === tool.key}
                 onClick={() => handleToolClick(tool.key)}
-                className={`rounded-lg border px-2.5 py-1 text-[11px] transition ${toneClass(tool.tone, activeTool === tool.key)}`}
+                className={`rounded-lg border px-2.5 py-1 text-[11px] transition duration-200 active:scale-95 ${toneClass(tool.tone, activeTool === tool.key)}`}
               >
-                <span className="mr-1">{tool.icon}</span>
+                <span className="mr-1" aria-hidden="true">{tool.icon}</span>
                 {tool.label}
               </button>
             ))}
