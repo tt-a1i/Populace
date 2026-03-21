@@ -23,11 +23,8 @@ function moodEmoji(mood: string): string {
 }
 
 function occupationLabel(occ: string): string {
-  const map: Record<string, string> = {
-    unemployed: '无业', barista: '咖啡师', teacher: '教师', shopkeeper: '店主',
-    fisherman: '渔夫', chef: '厨师', doctor: '医生',
-  }
-  return map[occ] ?? occ
+  // Capitalize the occupation name (already English from backend)
+  return occ.charAt(0).toUpperCase() + occ.slice(1)
 }
 
 interface RowProps {

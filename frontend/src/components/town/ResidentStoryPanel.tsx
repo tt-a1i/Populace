@@ -266,7 +266,7 @@ export function ResidentStoryPanel({
             onClick={async () => {
               try {
                 await injectResidentMemory(residentId, { content: `${resident.name}有了一段新的深刻记忆`, importance: 0.8, emotion: 'happy' })
-                pushToast({ type: 'success', title: '记忆已注入' })
+                pushToast({ type: 'success', title: t('resident_panel.inject_memory') + ' \u2713' })
               } catch { pushToast({ type: 'error', title: 'Failed' }) }
             }}
             className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-2.5 py-1 text-[11px] font-medium text-cyan-200 transition hover:bg-cyan-300/20"
@@ -280,8 +280,8 @@ export function ResidentStoryPanel({
               setMemoirBusy(true)
               try {
                 const result = await generateMemoir(residentId)
-                pushToast({ type: 'success', title: `${resident.name} 的回忆录`, description: result.content.slice(0, 80) + '…' })
-              } catch { pushToast({ type: 'error', title: '生成失败' }) }
+                pushToast({ type: 'success', title: `${resident.name} — ${t('resident_panel.generate_memoir')}`, description: result.content.slice(0, 80) + '…' })
+              } catch { pushToast({ type: 'error', title: t('resident_panel.generate_memoir') + ' \u2717' }) }
               finally { setMemoirBusy(false) }
             }}
             className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-2.5 py-1 text-[11px] font-medium text-emerald-200 transition hover:bg-emerald-300/20 disabled:opacity-40"

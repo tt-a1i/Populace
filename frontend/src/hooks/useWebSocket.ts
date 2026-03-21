@@ -227,8 +227,8 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
       if (shouldAnnounceReconnectRef.current) {
         pushToast({
           type: 'success',
-          title: '重新连接成功',
-          description: '实时同步已恢复。',
+          title: 'Reconnected',
+          description: 'Live sync restored.',
         })
         shouldAnnounceReconnectRef.current = false
       }
@@ -253,8 +253,8 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
         shouldAnnounceReconnectRef.current = true
         pushToast({
           type: 'warning',
-          title: '连接中断',
-          description: '正在尝试重新连接 WebSocket。',
+          title: 'Connection lost',
+          description: 'Attempting to reconnect…',
         })
       }
 

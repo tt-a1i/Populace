@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import type { RelationshipSnapshot } from '../../stores/relationships'
 
 interface TimelineSliderProps {
@@ -13,10 +15,11 @@ export function TimelineSlider({
   liveTick,
   onReplayTickChange,
 }: TimelineSliderProps) {
+  const { t } = useTranslation()
   if (history.length === 0) {
     return (
-      <div className="rounded-[18px] border border-white/10 bg-slate-950/78 px-4 py-3 text-sm text-slate-400">
-        关系时间轴准备中，等待 tick 数据累计...
+      <div className="rounded-xl border border-white/10 bg-slate-950/78 px-4 py-3 text-sm text-slate-400">
+        {t('timeline.preparing', 'Timeline preparing, waiting for tick data…')}
       </div>
     )
   }
@@ -34,7 +37,7 @@ export function TimelineSlider({
         <div>
           <p className="text-[10px] uppercase tracking-[0.32em] text-amber-100/70">Timeline Replay</p>
           <p className="mt-1 text-sm text-slate-200">
-            {replayTick === null ? `实时 Tick ${liveTick}` : `回放 Tick ${selectedTick}`}
+            {replayTick === null ? `Live Tick ${liveTick}` : `Replay Tick ${selectedTick}`}
           </p>
         </div>
         <button
@@ -43,7 +46,7 @@ export function TimelineSlider({
           disabled={replayTick === null}
           className="rounded-full border border-amber-200/20 bg-amber-200/10 px-3 py-1 text-xs font-medium text-amber-50 transition hover:bg-amber-200/18 disabled:cursor-default disabled:opacity-45"
         >
-          返回实时
+          {t('timeline.back_to_live', 'Back to Live')}
         </button>
       </div>
 
