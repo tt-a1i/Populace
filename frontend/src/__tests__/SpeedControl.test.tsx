@@ -55,7 +55,7 @@ describe('SpeedControl', () => {
 
   it('clicking pause calls stopSimulation', async () => {
     render(<SpeedControl />)
-    await userEvent.click(screen.getByRole('button', { name: /暂停/ }))
+    await userEvent.click(screen.getByRole('button', { name: /⏸/ }))
     expect(api.stopSimulation).toHaveBeenCalled()
   })
 
