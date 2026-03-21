@@ -71,7 +71,7 @@ export function TownChrome({
       {inspection && (
         <section
           data-testid="town-inspection"
-          className="absolute left-4 top-4 z-20 w-[16rem] rounded-[22px] border border-cyan-200/20 bg-slate-950/88 px-4 py-4 text-slate-100 shadow-[0_18px_44px_rgba(8,15,31,0.38)] backdrop-blur"
+          className="absolute left-3 top-12 z-20 w-[15rem] rounded-xl border border-white/10 bg-slate-950/80 px-3 py-3 text-slate-100 shadow-lg backdrop-blur-sm"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -106,7 +106,7 @@ export function TownChrome({
       {selectedResidentId && (
         <aside
           data-testid="resident-sidebar"
-          className="absolute bottom-4 right-4 top-4 z-30 flex w-[min(22rem,calc(100%-2rem))] flex-col rounded-[26px] border border-cyan-300/18 bg-slate-950/92 p-5 text-slate-100 shadow-[0_28px_80px_rgba(8,15,31,0.44)] backdrop-blur"
+          className="absolute bottom-14 right-3 top-3 z-30 flex w-[min(20rem,calc(100%-2rem))] flex-col rounded-xl border border-white/10 bg-slate-950/85 p-4 text-slate-100 shadow-xl backdrop-blur-sm"
         >
           <ResidentStoryPanel
             key={selectedResidentId}
@@ -123,7 +123,7 @@ export function TownChrome({
         className="absolute bottom-14 right-3 z-10 overflow-hidden rounded-xl border border-white/8 bg-slate-950/70 p-2 text-slate-100 shadow-lg backdrop-blur-sm"
       >
 
-        <div className="relative mt-3 h-32 w-40 rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(2,6,23,0.94))]">
+        <div className="relative h-28 w-36 rounded-lg border border-white/8 bg-slate-950/60">
           {buildings.map((building) => {
             const footprint = getBuildingFootprint(building)
 
@@ -180,7 +180,7 @@ export function TownChrome({
         <section
           data-testid="town-context-menu"
           data-town-context-menu="true"
-          className="absolute z-30 w-48 rounded-[20px] border border-white/10 bg-slate-950/94 p-2 text-slate-100 shadow-[0_22px_55px_rgba(8,15,31,0.46)] backdrop-blur"
+          className="absolute z-30 w-44 rounded-xl border border-white/10 bg-slate-950/90 p-1.5 text-slate-100 shadow-xl backdrop-blur-sm"
           style={{ left: contextMenu.screenX, top: contextMenu.screenY }}
         >
           <div className="border-b border-white/8 px-3 py-2">

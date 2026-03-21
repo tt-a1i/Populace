@@ -4,9 +4,13 @@ import { useTranslation } from 'react-i18next'
 import {
   type ResidentMemory,
   type ResidentRelationship,
+  generateMemoir,
   getResidentMemories,
   getResidentRelationships,
+  injectResidentMemory,
+  patchResidentAttributes,
 } from '../../services/api'
+import { useToast } from '../ui/ToastProvider'
 
 const MOOD_EMOJI: Record<string, string> = {
   happy: '\u{1F60A}',
@@ -68,9 +72,11 @@ export function ResidentStoryPanel({
   onClose,
 }: ResidentStoryPanelProps) {
   const { t } = useTranslation()
+  const { pushToast } = useToast()
 
   const [memories, setMemories] = useState<ResidentMemory[]>([])
   const [relationships, setRelationships] = useState<ResidentRelationship[]>([])
+  const [memoirBusy, setMemoirBusy] = useState(false)
 
   const resident = residents.find((r) => r.id === residentId)
 
@@ -242,31 +248,45 @@ export function ResidentStoryPanel({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => console.log('edit mood', residentId)}
+            onClick={async () => {
+              const moods = ['happy', 'sad', 'angry', 'excited', 'calm']
+              const current = resident.mood ?? 'neutral'
+              const next = moods[(moods.indexOf(current) + 1) % moods.length]
+              try {
+                await patchResidentAttributes(residentId, { mood: next })
+                pushToast({ type: 'success', title: `${resident.name} → ${next}` })
+              } catch { pushToast({ type: 'error', title: 'Failed' }) }
+            }}
             className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2.5 py-1 text-[11px] font-medium text-amber-200 transition hover:bg-amber-300/20"
           >
             {t('resident_panel.edit_mood')}
           </button>
           <button
             type="button"
-            onClick={() => console.log('teleport', residentId)}
-            className="rounded-full border border-violet-300/30 bg-violet-300/10 px-2.5 py-1 text-[11px] font-medium text-violet-200 transition hover:bg-violet-300/20"
-          >
-            {t('resident_panel.teleport')}
-          </button>
-          <button
-            type="button"
-            onClick={() => console.log('inject memory', residentId)}
+            onClick={async () => {
+              try {
+                await injectResidentMemory(residentId, { content: `${resident.name}有了一段新的深刻记忆`, importance: 0.8, emotion: 'happy' })
+                pushToast({ type: 'success', title: '记忆已注入' })
+              } catch { pushToast({ type: 'error', title: 'Failed' }) }
+            }}
             className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-2.5 py-1 text-[11px] font-medium text-cyan-200 transition hover:bg-cyan-300/20"
           >
             {t('resident_panel.inject_memory')}
           </button>
           <button
             type="button"
-            onClick={() => console.log('generate memoir', residentId)}
-            className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-2.5 py-1 text-[11px] font-medium text-emerald-200 transition hover:bg-emerald-300/20"
+            disabled={memoirBusy}
+            onClick={async () => {
+              setMemoirBusy(true)
+              try {
+                const result = await generateMemoir(residentId)
+                pushToast({ type: 'success', title: `${resident.name} 的回忆录`, description: result.content.slice(0, 80) + '…' })
+              } catch { pushToast({ type: 'error', title: '生成失败' }) }
+              finally { setMemoirBusy(false) }
+            }}
+            className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-2.5 py-1 text-[11px] font-medium text-emerald-200 transition hover:bg-emerald-300/20 disabled:opacity-40"
           >
-            {t('resident_panel.generate_memoir')}
+            {memoirBusy ? '...' : t('resident_panel.generate_memoir')}
           </button>
         </div>
       </div>
