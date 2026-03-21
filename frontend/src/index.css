@@ -32,7 +32,11 @@
   /* Keyboard focus ring — only visible when navigating with keyboard */
   button:focus-visible,
   [role="button"]:focus-visible,
-  input[type="range"]:focus-visible {
+  input[type="range"]:focus-visible,
+  select:focus-visible,
+  input[type="text"]:focus-visible,
+  input:not([type]):focus-visible,
+  textarea:focus-visible {
     outline: 2px solid rgba(6, 182, 212, 0.5);
     outline-offset: 2px;
     border-radius: inherit;
@@ -130,18 +134,68 @@ html.theme-light body {
   color: #1e293b !important;
 }
 
-html.theme-light .bg-slate-950 {
-  background-color: #f1f5f9 !important;
+/* Background surfaces */
+html.theme-light .bg-slate-950 { background-color: #f1f5f9 !important; }
+html.theme-light .bg-slate-900\/90 { background-color: rgba(241, 245, 249, 0.95) !important; }
+
+/* HUD panels — semi-transparent dark panels become semi-transparent light */
+html.theme-light [class*="bg-slate-950/"] {
+  --tw-bg-opacity: 1;
+  background-color: rgba(241, 245, 249, 0.88) !important;
 }
 
+/* Text */
 html.theme-light .text-slate-100 { color: #1e293b !important; }
 html.theme-light .text-white     { color: #0f172a !important; }
+html.theme-light .text-slate-200 { color: #1e293b !important; }
 html.theme-light .text-slate-300 { color: #334155 !important; }
 html.theme-light .text-slate-400 { color: #475569 !important; }
 html.theme-light .text-slate-500,
 html.theme-light .text-slate-600 { color: #64748b !important; }
 
+/* Colored label text — brighten for light backgrounds */
+html.theme-light .text-cyan-50    { color: #0e7490 !important; }
+html.theme-light .text-cyan-100\/70,
+html.theme-light .text-cyan-100\/90 { color: rgba(14, 116, 144, 0.85) !important; }
+html.theme-light .text-cyan-200   { color: #0891b2 !important; }
+html.theme-light .text-cyan-300\/80 { color: rgba(6, 182, 212, 0.9) !important; }
+html.theme-light .text-amber-50   { color: #92400e !important; }
+html.theme-light .text-amber-100\/70,
+html.theme-light .text-amber-100\/90 { color: rgba(146, 64, 14, 0.85) !important; }
+html.theme-light .text-amber-200  { color: #b45309 !important; }
+html.theme-light .text-emerald-50 { color: #065f46 !important; }
+html.theme-light .text-emerald-200 { color: #059669 !important; }
+html.theme-light .text-rose-50    { color: #9f1239 !important; }
+html.theme-light .text-rose-200   { color: #e11d48 !important; }
+html.theme-light .text-violet-200 { color: #7c3aed !important; }
+html.theme-light .text-pink-50    { color: #9d174d !important; }
+
+/* Borders */
 html.theme-light .border-white\/10  { border-color: rgba(15, 23, 42, 0.12) !important; }
+html.theme-light .border-white\/8   { border-color: rgba(15, 23, 42, 0.08) !important; }
 html.theme-light .border-white\/6   { border-color: rgba(15, 23, 42, 0.07) !important; }
+html.theme-light .border-white\/15  { border-color: rgba(15, 23, 42, 0.15) !important; }
+html.theme-light .border-white\/20  { border-color: rgba(15, 23, 42, 0.18) !important; }
+
+/* Backgrounds */
 html.theme-light .bg-white\/5       { background-color: rgba(15, 23, 42, 0.05) !important; }
+html.theme-light .bg-white\/10      { background-color: rgba(15, 23, 42, 0.08) !important; }
 html.theme-light .bg-white\/\[0\.03\] { background-color: rgba(15, 23, 42, 0.03) !important; }
+html.theme-light .bg-black\/20      { background-color: rgba(15, 23, 42, 0.12) !important; }
+
+/* Scrollbar */
+html.theme-light * {
+  scrollbar-color: rgba(71, 85, 105, 0.2) transparent;
+}
+html.theme-light *::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.22); }
+html.theme-light *::-webkit-scrollbar-thumb:hover { background: rgba(71, 85, 105, 0.35); }
+
+/* Selection */
+html.theme-light ::selection { background: rgba(6, 182, 212, 0.2); color: #0f172a; }
+
+/* Focus ring */
+html.theme-light button:focus-visible,
+html.theme-light [role="button"]:focus-visible,
+html.theme-light input[type="range"]:focus-visible {
+  outline-color: rgba(14, 116, 144, 0.6);
+}

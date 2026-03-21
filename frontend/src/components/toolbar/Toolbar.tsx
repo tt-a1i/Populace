@@ -189,7 +189,7 @@ export function Toolbar() {
         )}
         {indicator.visible && (
           <div
-            className={`absolute -bottom-0.5 h-0.5 rounded-full transition-all duration-300 ease-out ${TONE_GLOW[activeTone] ?? TONE_GLOW.cyan}`}
+            className={`absolute -bottom-0.5 h-0.5 rounded-full transition-all duration-300 ease-out will-change-[left,width] ${TONE_GLOW[activeTone] ?? TONE_GLOW.cyan}`}
             style={{ left: indicator.left, width: indicator.width }}
           />
         )}
