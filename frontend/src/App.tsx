@@ -99,7 +99,7 @@ function SimulationView() {
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-950">
+    <div className="fixed inset-0 bg-slate-950 animate-[fadeIn_600ms_ease-out]">
       {/* -- FULLSCREEN MAP -- */}
       <div className="absolute inset-0">
         <Suspense fallback={null}>
@@ -160,6 +160,14 @@ function SimulationView() {
         <SoundToggleButton />
         <LanguageSwitcher />
         <ThemeToggle />
+        <button
+          type="button"
+          onClick={() => { setShowToolbar(true); setActiveQuickTool('settings'); window.dispatchEvent(new CustomEvent('populace:open-settings')) }}
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-sm text-slate-300 transition hover:bg-white/10 hover:text-white"
+          title={t('toolbar.settings')}
+        >
+          {'\u2699\uFE0F'}
+        </button>
       </div>
 
       {/* -- BOTTOM-LEFT: Message Feed (hidden on small screens) -- */}
