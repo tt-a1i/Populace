@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { FeedMessage } from '../../stores/simulation'
@@ -24,15 +25,22 @@ const KIND_STYLES: Record<FeedMessage['kind'], { dot: string; bg: string; textCl
 export function MessageBar() {
   const { t } = useTranslation()
   const messages = useSimulationStore((state) => state.messageFeed)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const isEmpty = messages.length === 0
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [messages])
 
   return (
     <div className="overflow-hidden rounded-2xl border border-white/8 bg-slate-950/70 px-4 py-2.5 backdrop-blur-sm">
       <div className="mb-1.5 flex items-center gap-2 text-[10px] uppercase tracking-[0.26em] text-slate-500">
         <span>{t('message_bar.label')}</span>
       </div>
-      <div className="flex flex-col gap-1" style={{ minHeight: '3.5rem' }}>
+      <div ref={scrollRef} className="flex max-h-32 flex-col gap-1 overflow-y-auto" style={{ minHeight: '3.5rem' }}>
         {isEmpty ? (
           <p className="py-2 text-xs text-slate-500">{t('message_bar.empty')}</p>
         ) : (

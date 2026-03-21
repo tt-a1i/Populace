@@ -76,7 +76,7 @@ export function DailyReport() {
   }
 
   return (
-    <div className="grid gap-4 rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(68,32,17,0.92),rgba(21,16,13,0.96))] p-4 text-amber-50 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
+    <div className="grid gap-4 rounded-xl border border-white/10 bg-[linear-gradient(180deg,rgba(68,32,17,0.92),rgba(21,16,13,0.96))] p-4 text-amber-50 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-[11px] uppercase tracking-[0.3em] text-amber-200/70">{t('report.badge')}</p>
@@ -108,7 +108,7 @@ export function DailyReport() {
 
       <article
         ref={reportRef}
-        className="relative overflow-hidden rounded-[26px] border border-amber-100/20 bg-[linear-gradient(180deg,#f6e7c8_0%,#ecd4a4_47%,#e4c58e_100%)] p-5 text-slate-900 shadow-[0_30px_70px_rgba(15,23,42,0.3),inset_0_1px_0_rgba(255,255,255,0.42)]"
+        className="relative overflow-hidden rounded-xl border border-amber-100/20 bg-[linear-gradient(180deg,#f6e7c8_0%,#ecd4a4_47%,#e4c58e_100%)] p-5 text-slate-900 shadow-[0_30px_70px_rgba(15,23,42,0.3),inset_0_1px_0_rgba(255,255,255,0.42)]"
       >
         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.06)_0,rgba(255,255,255,0.06)_2px,transparent_2px,transparent_18px)] opacity-70" />
         <div className="relative border-b border-slate-900/12 pb-4">
@@ -117,7 +117,7 @@ export function DailyReport() {
               <p className="text-[10px] uppercase tracking-[0.4em] text-slate-500">Populace Daily</p>
               <h4 className="mt-3 font-display text-4xl leading-tight text-slate-900">{report.title}</h4>
             </div>
-            <div className="rounded-[18px] border border-slate-900/10 bg-white/35 px-4 py-2 text-right">
+            <div className="rounded-xl border border-slate-900/10 bg-white/35 px-4 py-2 text-right">
               <p className="text-[10px] uppercase tracking-[0.26em] text-slate-500">Edition</p>
               <p className="mt-1 text-sm font-medium text-slate-700">Tick {report.tick || '--'}</p>
             </div>
@@ -129,7 +129,7 @@ export function DailyReport() {
           {report.sections.map((section, index) => (
             <section
               key={section.heading}
-              className={`rounded-[18px] border border-slate-900/10 p-4 ${
+              className={`rounded-xl border border-slate-900/10 p-4 ${
                 index === 0
                   ? 'bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(255,255,255,0.2))] lg:col-span-2'
                   : 'bg-white/28'

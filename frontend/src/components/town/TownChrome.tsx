@@ -75,7 +75,7 @@ export function TownChrome({
       {inspection && (
         <section
           data-testid="town-inspection"
-          className="absolute left-3 top-12 z-20 w-[min(15rem,calc(100vw-2rem))] rounded-xl border border-white/10 bg-slate-950/80 px-3 py-3 text-slate-100 shadow-lg backdrop-blur-sm"
+          className="absolute left-3 top-12 z-20 w-[min(15rem,calc(100vw-2rem))] rounded-xl border border-white/10 bg-slate-950/80 px-3 py-3 text-slate-100 shadow-lg backdrop-blur-sm animate-[fadeIn_200ms_ease-out]"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -185,7 +185,7 @@ export function TownChrome({
         <section
           data-testid="town-context-menu"
           data-town-context-menu="true"
-          className="absolute z-30 w-44 rounded-xl border border-white/10 bg-slate-950/90 p-1.5 text-slate-100 shadow-xl backdrop-blur-sm"
+          className="absolute z-30 w-44 rounded-xl border border-white/10 bg-slate-950/90 p-1.5 text-slate-100 shadow-xl backdrop-blur-sm animate-[scaleIn_150ms_ease-out]"
           style={{ left: contextMenu.screenX, top: contextMenu.screenY }}
         >
           <div className="border-b border-white/8 px-3 py-2">
