@@ -40,6 +40,7 @@ class DialogueResult:
     messages: list[dict] = field(default_factory=list)
     relationship_delta: int = 0
     is_important: bool = False
+    gossip: dict | None = None
 
     @classmethod
     def empty(cls) -> "DialogueResult":
@@ -434,4 +435,5 @@ async def initiate_dialogue(
         messages=messages,
         relationship_delta=delta,
         is_important=is_important,
+        gossip=gossip,
     )

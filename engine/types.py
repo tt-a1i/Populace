@@ -209,6 +209,17 @@ else:
 
 
     @dataclass
+    class GossipUpdate:
+        """A gossip event surfaced to the frontend for bubble rendering."""
+        speaker_id: str
+        listener_id: str
+        target_id: str
+        target_name: str
+        content: str
+        is_positive: bool
+
+
+    @dataclass
     class TickState:
         """Complete diff pushed to the frontend each tick."""
 
@@ -224,6 +235,7 @@ else:
         relationship_events: List["RelationshipEvent"] = field(default_factory=list)
         season: str = "spring"
         energy_updates: List["EnergyUpdate"] = field(default_factory=list)
+        gossips: List["GossipUpdate"] = field(default_factory=list)
 
 
     # ---------------------------------------------------------------------------

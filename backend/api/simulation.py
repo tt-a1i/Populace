@@ -799,13 +799,14 @@ class SimulationState:
             initiate_dialogue,
             update_relationships_from_dialogue,
         )
-        from engine.types import DialogueUpdate
+        from engine.types import DialogueUpdate, GossipUpdate
 
         agents_by_id = {agent.resident.id: agent for agent in self.world.agents}
 
         # --- Harvest completed dialogue tasks from previous tick(s) ---
         dialogue_updates: list = []
         relationship_deltas: list = []
+        gossip_updates: list = []
         still_pending: list = []
 
         for task in self._pending_dialogues:
@@ -837,6 +838,17 @@ class SimulationState:
                                         float(result.relationship_delta),
                                     )
                                 )
+                        if result.gossip is not None:
+                            gossip_updates.append(
+                                GossipUpdate(
+                                    speaker_id=a_id,
+                                    listener_id=b_id,
+                                    target_id=result.gossip["target_id"],
+                                    target_name=result.gossip["target_name"],
+                                    content=result.gossip["content"],
+                                    is_positive=result.gossip["is_positive"],
+                                )
+                            )
                 except Exception:
                     _log.warning("Dialogue task failed: %s", task.get_name(), exc_info=True)
                 finally:
@@ -893,6 +905,7 @@ class SimulationState:
         tick_state = self.world.tick()
         tick_state.dialogues.extend(dialogue_updates)
         tick_state.relationships.extend(relationship_deltas)
+        tick_state.gossips.extend(gossip_updates)
         self._ensure_stats_counters()
         self._total_dialogue_count += len(tick_state.dialogues)
         self._total_relationship_change_count += len(tick_state.relationships)
