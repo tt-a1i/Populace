@@ -82,7 +82,7 @@ export function BuildPanel() {
   }
 
   return (
-    <div className="rounded-[24px] border border-emerald-300/20 bg-slate-950/70 p-5 text-slate-100 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
+    <div className="rounded-xl border border-emerald-300/20 bg-slate-950/70 p-5 text-slate-100 ">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] uppercase tracking-[0.3em] text-emerald-200/70">Build Mode</p>

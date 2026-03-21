@@ -100,7 +100,7 @@ export function PersonaEditor() {
 
   if (loading) {
     return (
-      <div className="grid gap-4 rounded-[24px] border border-white/10 bg-slate-950/70 p-4 text-slate-100 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
+      <div className="grid gap-4 rounded-xl border border-white/10 bg-slate-950/70 p-4 text-slate-100 ">
         <p className="text-[11px] uppercase tracking-[0.3em] text-amber-100/70">{t('persona.badge')}</p>
         <p className="text-sm text-slate-300">{t('persona.loading')}</p>
       </div>
@@ -109,7 +109,7 @@ export function PersonaEditor() {
 
   if (!residents.length) {
     return (
-      <div className="grid gap-4 rounded-[24px] border border-white/10 bg-slate-950/70 p-4 text-slate-100 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
+      <div className="grid gap-4 rounded-xl border border-white/10 bg-slate-950/70 p-4 text-slate-100 ">
         <div>
           <p className="text-[11px] uppercase tracking-[0.3em] text-amber-100/70">{t('persona.badge')}</p>
           <h3 className="mt-2 font-display text-2xl text-white">{t('persona.title')}</h3>
@@ -122,7 +122,7 @@ export function PersonaEditor() {
   }
 
   return (
-    <div className="grid gap-4 rounded-[24px] border border-white/10 bg-slate-950/70 p-4 text-slate-100 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
+    <div className="grid gap-4 rounded-xl border border-white/10 bg-slate-950/70 p-4 text-slate-100 ">
       <div>
         <p className="text-[11px] uppercase tracking-[0.3em] text-amber-100/70">{t('persona.badge')}</p>
         <h3 className="mt-2 font-display text-2xl text-white">{t('persona.title')}</h3>

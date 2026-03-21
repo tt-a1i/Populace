@@ -29,7 +29,7 @@ export function TimelineSlider({
   const selectedTick = history[selectedIndex]?.tick ?? liveTick
 
   return (
-    <div className="rounded-[20px] border border-white/10 bg-slate-950/82 px-4 py-3 shadow-[0_18px_44px_rgba(8,15,31,0.42)] backdrop-blur">
+    <div className="rounded-xl border border-white/10 bg-slate-950/82 px-4 py-3 shadow-lg backdrop-blur">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[10px] uppercase tracking-[0.32em] text-amber-100/70">Timeline Replay</p>

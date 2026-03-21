@@ -249,10 +249,10 @@ export function DirectorConsole() {
   return (
     <div
       className={[
-        'grid gap-4 rounded-[24px] border p-4 text-slate-100 transition-all duration-300',
+        'grid gap-4 rounded-xl border p-4 text-slate-100 transition-all duration-300',
         flashBorder
           ? 'border-cyan-400/50 bg-slate-950/70 shadow-[0_0_24px_rgba(34,211,238,0.12),0_18px_44px_rgba(15,23,42,0.35)]'
-          : 'border-white/10 bg-slate-950/70 shadow-[0_18px_44px_rgba(15,23,42,0.35)]',
+          : 'border-white/10 bg-slate-950/70 ',
       ].join(' ')}
     >
       {/* ── Header ── */}

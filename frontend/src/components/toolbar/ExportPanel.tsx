@@ -210,7 +210,7 @@ export function ExportPanel() {
   }
 
   return (
-    <div className="rounded-[24px] border border-sky-300/20 bg-slate-950/70 p-5 text-slate-100 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
+    <div className="rounded-xl border border-sky-300/20 bg-slate-950/70 p-5 text-slate-100 ">
       <p className="text-[11px] uppercase tracking-[0.3em] text-sky-200/70">Export</p>
       <h3 className="mt-1 font-display text-2xl text-white">数据导出</h3>
       <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">

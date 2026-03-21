@@ -80,7 +80,7 @@ export function HeatmapPanel() {
 
   if (n === 0) {
     return (
-      <div className="rounded-[24px] border border-fuchsia-300/20 bg-slate-950/70 p-5 text-slate-100 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
+      <div className="rounded-xl border border-fuchsia-300/20 bg-slate-950/70 p-5 text-slate-100 ">
         <p className="text-[11px] uppercase tracking-[0.3em] text-fuchsia-200/70">Heatmap</p>
         <h3 className="mt-1 font-display text-2xl text-white">关系热力图</h3>
         <p className="mt-4 text-sm text-slate-500">等待居民数据加载…</p>
@@ -89,7 +89,7 @@ export function HeatmapPanel() {
   }
 
   return (
-    <div className="rounded-[24px] border border-fuchsia-300/20 bg-slate-950/70 p-5 text-slate-100 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
+    <div className="rounded-xl border border-fuchsia-300/20 bg-slate-950/70 p-5 text-slate-100 ">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] uppercase tracking-[0.3em] text-fuchsia-200/70">Heatmap</p>

@@ -126,7 +126,7 @@ export function SavesPanel() {
   }
 
   return (
-    <div className="rounded-[24px] border border-white/10 bg-slate-950/70 p-5 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
+    <div className="rounded-xl border border-white/10 bg-slate-950/70 p-5 ">
       <p className="text-[11px] uppercase tracking-[0.3em] text-violet-200/70">{t('saves.badge')}</p>
       <h3 className="mt-2 font-display text-2xl text-white">{t('saves.title')}</h3>
 

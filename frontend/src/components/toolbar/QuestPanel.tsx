@@ -165,7 +165,7 @@ export function QuestPanel() {
   const availableQuests = quests.filter((q) => q.status === 'available')
 
   return (
-    <div className="grid gap-4 rounded-[24px] border border-white/10 bg-slate-950/70 p-5 text-slate-100 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
+    <div className="grid gap-4 rounded-xl border border-white/10 bg-slate-950/70 p-5 text-slate-100 ">
       {/* Header */}
       <div>
         <p className="text-[11px] uppercase tracking-[0.3em] text-emerald-200/70">

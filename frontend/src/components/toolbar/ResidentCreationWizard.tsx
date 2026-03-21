@@ -88,7 +88,7 @@ export function ResidentCreationWizard() {
 
   if (created) {
     return (
-      <div className="grid gap-4 rounded-[24px] border border-emerald-300/20 bg-slate-950/70 p-4 text-slate-100 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
+      <div className="grid gap-4 rounded-xl border border-emerald-300/20 bg-slate-950/70 p-4 text-slate-100 ">
         <p className="text-[11px] uppercase tracking-[0.3em] text-emerald-100/70">{t('create_resident.badge')}</p>
         <h3 className="font-display text-2xl text-white">{t('create_resident.success_title')}</h3>
         <p className="text-sm text-slate-300">{t('create_resident.success_desc', { name: created.name })}</p>
@@ -104,7 +104,7 @@ export function ResidentCreationWizard() {
   }
 
   return (
-    <div className="grid gap-4 rounded-[24px] border border-white/10 bg-slate-950/70 p-4 text-slate-100 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
+    <div className="grid gap-4 rounded-xl border border-white/10 bg-slate-950/70 p-4 text-slate-100 ">
       <div>
         <p className="text-[11px] uppercase tracking-[0.3em] text-emerald-100/70">{t('create_resident.badge')}</p>
         <h3 className="mt-2 font-display text-2xl text-white">{t('create_resident.title')}</h3>

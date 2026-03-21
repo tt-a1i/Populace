@@ -181,7 +181,7 @@ export function StatsPanel() {
   }, [stats, t])
 
   return (
-    <div className="grid gap-4 rounded-[24px] border border-white/10 bg-slate-950/70 p-5 text-slate-100 shadow-[0_18px_44px_rgba(15,23,42,0.35)]">
+    <div className="grid gap-4 rounded-xl border border-white/10 bg-slate-950/70 p-5 text-slate-100 ">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-[11px] uppercase tracking-[0.3em] text-cyan-200/70">{t('stats.badge')}</p>

@@ -36,7 +36,7 @@ export function RelationCard({ position, relationship, residents }: RelationCard
 
   return (
     <div
-      className="pointer-events-none absolute z-10 w-64 rounded-[20px] border border-amber-100/20 bg-slate-950/92 p-4 shadow-[0_22px_60px_rgba(15,23,42,0.65)] backdrop-blur"
+      className="pointer-events-none absolute z-10 w-64 rounded-xl border border-amber-100/20 bg-slate-950/92 p-4 shadow-lg backdrop-blur"
       style={{ left: position.x, top: position.y, transform: 'translate(-50%, calc(-100% - 16px))' }}
     >
       <p className="text-[10px] uppercase tracking-[0.32em] text-amber-100/70">Relation Detail</p>

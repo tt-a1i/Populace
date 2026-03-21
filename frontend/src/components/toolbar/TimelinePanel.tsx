@@ -53,7 +53,7 @@ export function TimelinePanel() {
   const displayed = filter === 'all' ? events : events.filter((e) => e.event_type === filter)
 
   return (
-    <div className="rounded-[24px] border border-white/10 bg-white/4 p-5">
+    <div className="rounded-xl border border-white/10 bg-white/4 p-5">
       <p className="mb-1 text-[10px] uppercase tracking-[0.3em] text-slate-400">
         {t('timeline.badge')}
       </p>
