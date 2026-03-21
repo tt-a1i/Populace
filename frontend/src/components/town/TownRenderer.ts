@@ -4,6 +4,7 @@ import { useSimulationStore, type ResidentPosition, type SimulationSpeed } from 
 import type { Building } from '../../types'
 import { ResidentSprite } from './ResidentSprite'
 import { ResidentSpritePool } from './ResidentSpritePool'
+import { MilestoneEffect } from './effects/MilestoneEffect'
 import { RainEffect } from './effects/RainEffect'
 import { SnowEffect } from './effects/SnowEffect'
 import { StormEffect } from './effects/StormEffect'
@@ -96,6 +97,7 @@ export class TownRenderer {
   private readonly weatherContainer = new Container()
   private currentWeatherEffect: WeatherEffect | null = null
   private currentWeather = 'sunny'
+  private milestoneEffects: MilestoneEffect[] = []
   private readonly eventRadiusGraphics = new Graphics()
   private readonly hudLabel: Text
   private readonly hintLabel: Text
@@ -402,6 +404,16 @@ export class TownRenderer {
     }
   }
 
+  triggerMilestone(fromId: string, toId: string, eventType: string): void {
+    const fromSprite = this.residents.get(fromId)
+    const toSprite = this.residents.get(toId)
+    if (!fromSprite || !toSprite) return
+
+    const effect = new MilestoneEffect(fromSprite.x, fromSprite.y, toSprite.x, toSprite.y, eventType)
+    this.effectLayer.addChild(effect.container)
+    this.milestoneEffects.push(effect)
+  }
+
   setFollowTarget(residentId: string | null): void {
     this.followedResidentId = residentId
 
@@ -437,6 +449,12 @@ export class TownRenderer {
     window.removeEventListener('pointercancel', this.onPointerUp)
     this.tileLayer.off('pointertap', this.handleBackgroundTap)
 
+    for (const effect of this.milestoneEffects) {
+      this.effectLayer.removeChild(effect.container)
+      effect.destroy()
+    }
+    this.milestoneEffects = []
+
     for (const sprite of this.residents.values()) {
       sprite.destroy({ children: true })
     }
@@ -456,6 +474,17 @@ export class TownRenderer {
 
     // Animate weather particles
     this.tickWeatherEffect(deltaMs)
+
+    // Animate milestone effects
+    for (let i = this.milestoneEffects.length - 1; i >= 0; i--) {
+      const effect = this.milestoneEffects[i]
+      effect.update(deltaMs)
+      if (effect.done) {
+        this.effectLayer.removeChild(effect.container)
+        effect.destroy()
+        this.milestoneEffects.splice(i, 1)
+      }
+    }
 
     if (this.followedResidentId) {
       this.centerOnResident(this.followedResidentId)

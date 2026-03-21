@@ -320,6 +320,15 @@ export function TownCanvas() {
   }, [weather])
 
   useEffect(() => {
+    const handler = (e: Event) => {
+      const { fromId, toId, eventType } = (e as CustomEvent).detail
+      rendererRef.current?.triggerMilestone(fromId, toId, eventType)
+    }
+    window.addEventListener('populace:milestone', handler)
+    return () => window.removeEventListener('populace:milestone', handler)
+  }, [])
+
+  useEffect(() => {
     rendererRef.current?.setPlaceholderBuildings(placeholders)
   }, [placeholders])
 

@@ -97,13 +97,6 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
 
       const { type, data } = msg
 
-      const relEventLabel = (eventType: string): string => {
-        if (eventType === 'best_friends') return '💚 成为挚友'
-        if (eventType === 'confession') return '💖 告白'
-        if (eventType === 'public_argument') return '⚡ 公开争吵'
-        return '🔗 关系事件'
-      }
-
       const commitTick = (tickData: WsTickPayload, playSounds = true) => {
         // Overflow protection: drop oldest ticks when renderer can't keep up
         if (pendingTicksRef.current.length >= MAX_PENDING_TICKS) {
@@ -143,13 +136,22 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
                 play('achievement')
               }
               for (const ev of relationshipEvents) {
+                const EVENT_TOAST: Record<string, { icon: string; label: string }> = {
+                  confession: { icon: '\u{1F495}', label: '\u574E\u5165\u7231\u6CB3' },
+                  best_friends: { icon: '\u{1F91D}', label: '\u6210\u4E3A\u631A\u53CB' },
+                  public_argument: { icon: '\u26A1', label: '\u516C\u5F00\u4E89\u5435' },
+                }
+                const meta = EVENT_TOAST[ev.event_type] ?? { icon: '\u2728', label: ev.event_type }
                 pushToast({
-                  type: 'info',
+                  type: ev.event_type === 'public_argument' ? 'warning' : 'success',
                   category: 'relationship',
-                  title: relEventLabel(ev.event_type),
-                  description: `${ev.from_name} & ${ev.to_name}`,
+                  title: `${meta.icon} ${ev.from_name} \u548C ${ev.to_name} ${meta.label}\uFF01`,
+                  description: ev.dialogue,
                 })
                 play('event')
+                window.dispatchEvent(new CustomEvent('populace:milestone', {
+                  detail: { fromId: ev.from_id, toId: ev.to_id, eventType: ev.event_type },
+                }))
               }
             }
             if (relationshipEvents.length > 0) {
