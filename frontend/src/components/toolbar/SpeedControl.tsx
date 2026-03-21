@@ -34,19 +34,22 @@ export function SpeedControl() {
     }
   }
 
+  // On mobile, show only pause + 1x/5x. On desktop, show all.
+  const mobileValues: Array<Exclude<SimulationSpeed, 0>> = [1, 5]
+
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-0.5 sm:gap-1">
       <button
         type="button"
         onClick={() => void handlePause()}
         disabled={busy}
-        className={`rounded-lg border px-2 py-1.5 text-xs font-medium transition ${
+        className={`min-h-[36px] rounded-lg border px-1.5 py-1.5 text-xs font-medium transition active:scale-95 sm:px-2 ${
           speed === 0
             ? 'border-rose-300/40 bg-rose-400/15 text-rose-200'
             : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
         }`}
       >
-        ⏸
+        {speed === 0 ? '▶' : '⏸'}
       </button>
 
       {speedValues.map((val) => (
@@ -55,11 +58,11 @@ export function SpeedControl() {
           type="button"
           onClick={() => void handleSpeedChange(val)}
           disabled={busy}
-          className={`rounded-lg border px-2 py-1.5 text-xs font-medium tabular-nums transition ${
+          className={`min-h-[36px] rounded-lg border px-1.5 py-1.5 text-[11px] font-medium tabular-nums transition active:scale-95 sm:px-2 ${
             speed === val
               ? 'border-cyan-300/40 bg-cyan-300/15 text-cyan-50'
               : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
-          }`}
+          } ${!mobileValues.includes(val) ? 'hidden sm:block' : ''}`}
         >
           {val}x
         </button>

@@ -79,6 +79,18 @@ function SimulationView() {
   // Hide graph when sidebar is open (they share the right side)
   const graphVisible = showGraph && !selectedResidentId
 
+  // Close drawers with Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showToolbar) { setShowToolbar(false); setActiveQuickTool(null) }
+        else if (showGraph) { setShowGraph(false) }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showToolbar, showGraph])
+
   const toggleTool = (tool: string, eventName?: string) => {
     if (showToolbar && activeQuickTool === tool) {
       setShowToolbar(false)
@@ -147,7 +159,7 @@ function SimulationView() {
 
       {/* -- TOP-LEFT HUD: Status -- */}
       <div className="fixed left-3 top-3 z-20 pointer-events-auto">
-        <div className="rounded-xl border border-white/8 bg-slate-950/65 px-3 py-2 shadow-lg backdrop-blur-sm">
+        <div className="rounded-xl border border-white/8 bg-slate-950/70 px-3 py-2 shadow-lg backdrop-blur-sm transition-colors hover:border-white/15">
           <div className="flex items-center gap-2 text-[11px]">
             <span className="font-mono font-bold uppercase tracking-wider text-cyan-300/80">POPULACE</span>
             <span className="text-slate-600">|</span>
@@ -180,8 +192,8 @@ function SimulationView() {
       </div>
 
       {/* -- BOTTOM-CENTER: Quick Action Bar -- */}
-      <div className="fixed inset-x-0 bottom-3 z-30 flex justify-center pointer-events-none px-3">
-        <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-950/80 px-1.5 py-1.5 shadow-xl backdrop-blur-sm">
+      <div className="fixed inset-x-0 bottom-3 z-30 flex justify-center pointer-events-none px-2 sm:px-3">
+        <div className="pointer-events-auto flex items-center gap-0.5 rounded-2xl border border-white/10 bg-slate-950/80 px-1 py-1 shadow-xl backdrop-blur-sm sm:gap-1 sm:px-1.5 sm:py-1.5">
           {[
             { key: 'director', icon: '\u26A1', event: 'populace:open-director' },
             { key: 'persona', icon: '\uD83D\uDC64', event: 'populace:open-persona' },
@@ -193,7 +205,7 @@ function SimulationView() {
               type="button"
               onClick={() => toggleTool(tool.key, tool.event)}
               title={t(`toolbar.${tool.key}`)}
-              className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+              className={`min-h-[36px] rounded-lg border px-2.5 py-2 text-xs font-medium transition active:scale-95 sm:px-3 ${
                 showToolbar && activeQuickTool === tool.key
                   ? 'border-cyan-300/40 bg-cyan-300/15 text-cyan-50'
                   : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
@@ -208,17 +220,15 @@ function SimulationView() {
           <button
             type="button"
             onClick={() => setShowGraph((v) => !v)}
-            className={`rounded-lg border px-2 py-1.5 text-xs transition ${graphVisible ? 'border-amber-300/40 bg-amber-300/15 text-amber-50' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+            className={`min-h-[36px] rounded-lg border px-2 py-2 text-xs transition active:scale-95 ${graphVisible ? 'border-amber-300/40 bg-amber-300/15 text-amber-50' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
             title={t('app.relationship_graph')}
           >
             {'\uD83D\uDD78\uFE0F'}
           </button>
 
-          <div className="mx-0.5 h-5 w-px bg-white/10 hidden sm:block" />
+          <div className="mx-0.5 h-5 w-px bg-white/10" />
 
-          <div className="hidden sm:flex">
-            <SpeedControl />
-          </div>
+          <SpeedControl />
         </div>
       </div>
 
@@ -226,13 +236,13 @@ function SimulationView() {
       <div
         className={`fixed right-0 top-0 bottom-0 z-30 w-full transform transition-transform duration-300 sm:w-96 ${graphVisible ? 'translate-x-0' : 'translate-x-full'} pointer-events-auto`}
       >
-        <div className="h-full border-l border-white/10 bg-slate-950/92 p-3 backdrop-blur-md sm:p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white">{t('app.relationship_graph')}</h3>
+        <div className="h-full border-l border-amber-400/15 bg-slate-950/92 p-3 backdrop-blur-md sm:p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-xs font-medium uppercase tracking-wider text-amber-200/70">{t('app.relationship_graph')}</h3>
             <button
               type="button"
               onClick={() => setShowGraph(false)}
-              className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-400 transition hover:bg-white/10 hover:text-white"
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xs text-slate-400 transition hover:bg-white/10 hover:text-white active:scale-95"
             >
               {'\u2715'}
             </button>
