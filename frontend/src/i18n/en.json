@@ -46,6 +46,7 @@
     "heatmap": "Heatmap",
     "compare": "Compare",
     "timeline": "Timeline",
+    "settings": "Settings",
     "current_tool": "Active Tool: "
   },
   "compare": {
@@ -196,5 +197,27 @@
   },
   "lang": {
     "switch": "中文"
+  },
+  "settings": {
+    "badge": "Settings",
+    "title": "Settings",
+    "llm_key_label": "LLM API Key",
+    "llm_key_placeholder": "sk-...",
+    "llm_key_save": "Save",
+    "llm_key_saving": "Saving…",
+    "llm_key_status_ok": "✓ API key configured",
+    "llm_key_status_missing": "No API key set",
+    "llm_key_hint": "Key is stored in memory only and cleared on page reload.",
+    "language": "Language",
+    "theme": "Theme",
+    "theme_dark": "Dark",
+    "theme_light": "Light",
+    "sound": "Sound",
+    "tutorial_reset": "Reset Tutorial",
+    "tutorial_reset_done": "Reset ✓"
+  },
+  "api_key_banner": {
+    "message": "No LLM API key configured — AI dialogue will be unavailable.",
+    "action": "Go to Settings"
   }
 }

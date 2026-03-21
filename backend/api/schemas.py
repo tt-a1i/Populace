@@ -38,6 +38,8 @@ def error_responses(*status_codes: int) -> dict[int, dict[str, Any]]:
 
 class HealthResponse(BaseModel):
     status: str = "ok"
+    redis: str = "disconnected"
+    neo4j: str = "disconnected"
 
 
 class SimulationStatusResponse(BaseModel):

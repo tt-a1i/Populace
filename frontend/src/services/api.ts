@@ -500,3 +500,18 @@ export interface TimelineEvent {
 export function getTimeline() {
   return request<TimelineEvent[]>('/api/simulation/timeline')
 }
+
+export interface LlmKeyStatus {
+  configured: boolean
+}
+
+export function getLlmKeyStatus() {
+  return request<LlmKeyStatus>('/api/settings/llm-key')
+}
+
+export function setLlmKey(api_key: string) {
+  return request<LlmKeyStatus>('/api/settings/llm-key', {
+    method: 'POST',
+    body: JSON.stringify({ api_key }),
+  })
+}

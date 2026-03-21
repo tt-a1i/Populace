@@ -1,3 +1,5 @@
+export { EmptyState } from './EmptyState'
+export { ErrorBoundary } from './ErrorBoundary'
 export { FirstRunGuide } from './FirstRunGuide'
 export { ThemeToggle } from './ThemeToggle'
 export { LanguageSwitcher } from './LanguageSwitcher'

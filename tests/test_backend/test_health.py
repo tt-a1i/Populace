@@ -16,7 +16,10 @@ def client():
 def test_health_returns_ok(client):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] == "ok"
+    assert "redis" in body
+    assert "neo4j" in body
 
 
 def test_health_content_type(client):

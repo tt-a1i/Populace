@@ -22,10 +22,34 @@ _client: AsyncOpenAI | None = None
 _llm_semaphore: asyncio.Semaphore | None = None
 _llm_semaphore_limit: int | None = None
 
+# Runtime API key override — set by the /api/settings/llm-key endpoint.
+# Takes priority over the env-var-backed settings.llm_api_key.
+_runtime_api_key: str | None = None
+
+_INVALID_KEYS = {"", "changeme", "placeholder", "your-api-key", "sk-placeholder"}
+
+
+def set_runtime_api_key(key: str | None) -> None:
+    """Update the runtime API key and reset the cached client so the next call uses it."""
+    global _runtime_api_key, _client
+    _runtime_api_key = key.strip() if key else None
+    _client = None  # force re-init with new key
+
+
+def has_runtime_api_key() -> bool:
+    """Return True when a non-empty usable API key is available."""
+    key = (_runtime_api_key or settings.llm_api_key or "").strip()
+    return bool(key) and key.lower() not in _INVALID_KEYS and "placeholder" not in key.lower()
+
+
+def _effective_api_key() -> str:
+    """Return the best available API key: runtime override → env setting."""
+    return (_runtime_api_key or settings.llm_api_key or "").strip()
+
 
 def validate_llm_config() -> bool:
-    api_key = settings.llm_api_key.strip()
-    invalid_tokens = {"", "changeme", "placeholder", "your-api-key", "sk-placeholder"}
+    api_key = _effective_api_key()
+    invalid_tokens = _INVALID_KEYS
 
     if not api_key or api_key.lower() in invalid_tokens or "placeholder" in api_key.lower():
         raise ValueError("LLM_API_KEY is missing or invalid. Please configure LLM before starting simulation.")
@@ -37,7 +61,7 @@ def _get_client() -> AsyncOpenAI:
     if _client is None:
         validate_llm_config()
         _client = AsyncOpenAI(
-            api_key=settings.llm_api_key,
+            api_key=_effective_api_key(),
             base_url=settings.llm_base_url or None,
             timeout=settings.llm_timeout_seconds,
         )

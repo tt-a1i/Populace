@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Toolbar } from './components/toolbar/Toolbar'
 import {
@@ -12,7 +13,44 @@ import {
 import { TutorialOverlay } from './components/ui/TutorialOverlay'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useWebSocket } from './hooks/useWebSocket'
+import { getLlmKeyStatus } from './services/api'
 import { useThemeStore } from './stores/theme'
+
+function ApiKeyBanner() {
+  const { t } = useTranslation()
+  const [show, setShow] = useState(false)
+
+  useEffect(() => {
+    getLlmKeyStatus()
+      .then((s) => { if (!s.configured) setShow(true) })
+      .catch(() => {})
+  }, [])
+
+  if (!show) return null
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-2.5 text-sm text-amber-200">
+      <span>{t('api_key_banner.message')}</span>
+      <div className="flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent('populace:open-settings'))}
+          className="rounded-full border border-amber-300/30 bg-amber-300/15 px-3 py-1 text-xs font-medium text-amber-100 transition hover:bg-amber-300/25"
+        >
+          {t('api_key_banner.action')}
+        </button>
+        <button
+          type="button"
+          onClick={() => setShow(false)}
+          aria-label="Dismiss"
+          className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-400 transition hover:bg-white/10"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  )
+}
 
 const TownCanvas = lazy(() =>
   import('./components/town/TownCanvas').then((module) => ({ default: module.TownCanvas })),
@@ -262,6 +300,9 @@ function SimulationView() {
       )}
 
       <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col px-3 py-3 sm:px-6 sm:py-4 lg:px-8">
+        <div className="mb-3">
+          <ApiKeyBanner />
+        </div>
         <header className="rounded-[28px] border border-white/10 bg-white/5 px-4 py-4 shadow-[0_24px_80px_rgba(15,23,42,0.35)] backdrop-blur sm:px-5 xl:px-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>

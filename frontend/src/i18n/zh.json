@@ -46,6 +46,7 @@
     "heatmap": "关系热力图",
     "compare": "居民对比",
     "timeline": "世界时间线",
+    "settings": "系统设置",
     "current_tool": "当前工具："
   },
   "compare": {
@@ -196,5 +197,27 @@
   },
   "lang": {
     "switch": "EN"
+  },
+  "settings": {
+    "badge": "Settings",
+    "title": "系统设置",
+    "llm_key_label": "LLM API Key",
+    "llm_key_placeholder": "sk-...",
+    "llm_key_save": "保存",
+    "llm_key_saving": "保存中…",
+    "llm_key_status_ok": "✓ API Key 已配置",
+    "llm_key_status_missing": "未配置 API Key",
+    "llm_key_hint": "Key 仅存于内存，刷新页面后需重新输入。",
+    "language": "语言",
+    "theme": "主题",
+    "theme_dark": "暗色",
+    "theme_light": "亮色",
+    "sound": "音效",
+    "tutorial_reset": "重置引导教程",
+    "tutorial_reset_done": "已重置 ✓"
+  },
+  "api_key_banner": {
+    "message": "未配置 LLM API Key，AI 对话功能将不可用。",
+    "action": "前往设置"
   }
 }

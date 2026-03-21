@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SoundToggleButton } from './SoundToggleButton'
@@ -10,13 +10,16 @@ import { HeatmapPanel } from './HeatmapPanel'
 import { PersonaEditor } from './PersonaEditor'
 import { ResidentCreationWizard } from './ResidentCreationWizard'
 import { SavesPanel } from './SavesPanel'
+import { SettingsPanel } from './SettingsPanel'
 import { SpeedControl } from './SpeedControl'
 import { StatsPanel } from './StatsPanel'
 import { TimelinePanel } from './TimelinePanel'
 import { ReportsPanel } from '../report'
 import { LanguageSwitcher, MessageBar } from '../ui'
 
-type ToolKey = 'event' | 'persona' | 'build' | 'create' | 'report' | 'stats' | 'saves' | 'export' | 'heatmap' | 'compare' | 'timeline'
+const OPEN_SETTINGS_EVENT = 'populace:open-settings'
+
+type ToolKey = 'event' | 'persona' | 'build' | 'create' | 'report' | 'stats' | 'saves' | 'export' | 'heatmap' | 'compare' | 'timeline' | 'settings'
 
 function toneClass(tone: string, active: boolean): string {
   if (!active) return 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
@@ -31,6 +34,12 @@ export function Toolbar() {
   const { t } = useTranslation()
   const [activeTool, setActiveTool] = useState<ToolKey>('event')
 
+  useEffect(() => {
+    const handler = () => setActiveTool('settings')
+    window.addEventListener(OPEN_SETTINGS_EVENT, handler)
+    return () => window.removeEventListener(OPEN_SETTINGS_EVENT, handler)
+  }, [])
+
   const tools: Array<{ key: ToolKey; label: string; icon: string; tone: string }> = [
     { key: 'event', label: t('toolbar.event'), icon: '⚡', tone: 'cyan' },
     { key: 'persona', label: t('toolbar.persona'), icon: '👤', tone: 'amber' },
@@ -43,6 +52,7 @@ export function Toolbar() {
     { key: 'heatmap', label: t('toolbar.heatmap'), icon: '🟥', tone: 'violet' },
     { key: 'compare', label: t('toolbar.compare'), icon: '⚖️', tone: 'amber' },
     { key: 'timeline', label: t('toolbar.timeline'), icon: '📅', tone: 'violet' },
+    { key: 'settings', label: t('toolbar.settings'), icon: '⚙️', tone: 'cyan' },
   ]
 
   const panel = useMemo(() => {
@@ -56,6 +66,7 @@ export function Toolbar() {
     if (activeTool === 'heatmap') return <HeatmapPanel />
     if (activeTool === 'compare') return <ComparePanel />
     if (activeTool === 'timeline') return <TimelinePanel />
+    if (activeTool === 'settings') return <SettingsPanel />
     return <ReportsPanel />
   }, [activeTool])
 
