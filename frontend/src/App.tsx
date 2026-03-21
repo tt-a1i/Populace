@@ -69,6 +69,20 @@ function SimulationView() {
   )
   const [showGraph, setShowGraph] = useState(false)
   const [showToolbar, setShowToolbar] = useState(false)
+  const [activeQuickTool, setActiveQuickTool] = useState<string | null>(null)
+
+  const toggleTool = (tool: string, eventName?: string) => {
+    if (showToolbar && activeQuickTool === tool) {
+      setShowToolbar(false)
+      setActiveQuickTool(null)
+    } else {
+      setShowToolbar(true)
+      setActiveQuickTool(tool)
+      if (eventName) {
+        window.dispatchEvent(new CustomEvent(eventName))
+      }
+    }
+  }
 
   const time = useSimulationStore((s) => s.time)
   const weather = useSimulationStore((s) => s.weather)
@@ -156,34 +170,25 @@ function SimulationView() {
       {/* -- BOTTOM-CENTER: Quick Action Bar -- */}
       <div className="fixed inset-x-0 bottom-4 z-30 flex justify-center pointer-events-none">
         <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-950/80 px-2 py-2 shadow-xl backdrop-blur-sm">
-          <button
-            type="button"
-            onClick={() => setShowToolbar((v) => !v)}
-            className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-3 py-1.5 text-xs font-medium text-cyan-50 transition hover:bg-cyan-300/20"
-          >
-            {'\u26A1'} {t('toolbar.director')}
-          </button>
-          <button
-            type="button"
-            onClick={() => { setShowToolbar(true); window.dispatchEvent(new CustomEvent('populace:open-persona')) }}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-white/10"
-          >
-            {'\uD83D\uDC64'} {t('toolbar.persona')}
-          </button>
-          <button
-            type="button"
-            onClick={() => { setShowToolbar(true); window.dispatchEvent(new CustomEvent('populace:open-quest')) }}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-white/10"
-          >
-            {'\uD83C\uDFAF'} {t('toolbar.quest')}
-          </button>
-          <button
-            type="button"
-            onClick={() => { setShowToolbar(true); window.dispatchEvent(new CustomEvent('populace:open-report')) }}
-            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-white/10"
-          >
-            {'\uD83D\uDCF0'} {t('toolbar.report')}
-          </button>
+          {[
+            { key: 'director', icon: '\u26A1', event: 'populace:open-director' },
+            { key: 'persona', icon: '\uD83D\uDC64', event: 'populace:open-persona' },
+            { key: 'quest', icon: '\uD83C\uDFAF', event: 'populace:open-quest' },
+            { key: 'report', icon: '\uD83D\uDCF0', event: 'populace:open-report' },
+          ].map((tool) => (
+            <button
+              key={tool.key}
+              type="button"
+              onClick={() => toggleTool(tool.key, tool.event)}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                showToolbar && activeQuickTool === tool.key
+                  ? 'border-cyan-300/40 bg-cyan-300/15 text-cyan-50'
+                  : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              {tool.icon} {t(`toolbar.${tool.key}`)}
+            </button>
+          ))}
 
           <div className="mx-0.5 h-5 w-px bg-white/10" />
 
@@ -228,23 +233,23 @@ function SimulationView() {
         <>
           <button
             type="button"
-            onClick={() => setShowToolbar(false)}
-            className="fixed inset-0 z-30 bg-slate-950/40 backdrop-blur-[2px]"
+            onClick={() => { setShowToolbar(false); setActiveQuickTool(null) }}
+            className="fixed inset-0 z-30 bg-black/20"
             aria-label={t('app.close')}
           />
-          <div className="fixed inset-x-0 bottom-16 z-40 flex justify-center pointer-events-none">
-            <div className="pointer-events-auto w-full max-w-3xl rounded-2xl border border-white/10 bg-slate-950/95 p-4 shadow-2xl backdrop-blur-md mx-4">
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm font-semibold text-white">{t('app.open_tools')}</span>
+          <div className="fixed inset-x-0 bottom-14 z-40 flex justify-center pointer-events-none animate-[slideUp_200ms_ease-out]">
+            <div className="pointer-events-auto w-full max-w-2xl rounded-xl border border-white/10 bg-slate-950/92 p-3 shadow-2xl backdrop-blur-md mx-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-400">{activeQuickTool ? t(`toolbar.${activeQuickTool}`) : t('app.open_tools')}</span>
                 <button
                   type="button"
-                  onClick={() => setShowToolbar(false)}
+                  onClick={() => { setShowToolbar(false); setActiveQuickTool(null) }}
                   className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400 transition hover:bg-white/10 hover:text-white"
                 >
                   {'\u2715'} {t('app.close')}
                 </button>
               </div>
-              <div className="max-h-[60vh] overflow-y-auto">
+              <div className="max-h-[50vh] overflow-y-auto">
                 <Toolbar />
               </div>
             </div>
