@@ -42,12 +42,14 @@ interface RelationshipsState {
   history: RelationshipSnapshot[]
   lastAppliedTick: number
   replayTick: number | null
+  flashingEventKeys: Set<string>
   updateFromTick: (tickState: RelationshipTickState) => void
   initFromSnapshot: (residents: Array<{ id: string; name: string; mood?: string }>) => void
   setRelationshipsAbsolute: (
     rels: Array<{ from_id: string; to_id: string; type: string; intensity: number; reason?: string }>,
   ) => void
   setReplayTick: (tick: number | null) => void
+  addFlashingEventKeys: (keys: string[]) => void
 }
 
 const seedResidents: GraphResident[] = [
@@ -94,7 +96,14 @@ export const useRelationshipsStore = create<RelationshipsState>((set) => ({
   history: [],
   lastAppliedTick: 0,
   replayTick: null,
+  flashingEventKeys: new Set<string>(),
   setReplayTick: (tick) => set({ replayTick: tick }),
+  addFlashingEventKeys: (keys) =>
+    set((state) => {
+      const next = new Set(state.flashingEventKeys)
+      for (const k of keys) next.add(k)
+      return { flashingEventKeys: next }
+    }),
   updateFromTick: (tickState) => {
     const relationshipUpdates = tickState.relationships
 

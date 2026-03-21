@@ -180,6 +180,8 @@ export class GraphRenderer {
   private selectedResidentId: string | null = null
   private width = 640
   private height = 480
+  // key → expiry timestamp (ms)
+  private readonly flashingLinkKeys = new Map<string, number>()
   private readonly nodeState = new Map<string, Pick<GraphNode, 'x' | 'y' | 'vx' | 'vy'>>()
   private previousRelationships = new Map<string, GraphRelationship>()
   private readonly reducedMotion =
@@ -281,6 +283,21 @@ export class GraphRenderer {
     this.handleTick()
   }
 
+  /** Mark edge keys as flashing for the given duration (default 3 s). */
+  flashLinks(keys: string[], durationMs = 3_000): void {
+    const expiry = Date.now() + durationMs
+    for (const key of keys) {
+      this.flashingLinkKeys.set(key, expiry)
+    }
+    // Apply flash immediately to any already-rendered matching links
+    this.linkSelection?.each((link, index, nodes) => {
+      const key = graphLinkKey(link)
+      if (this.flashingLinkKeys.has(key)) {
+        this.animateLinkFlash(nodes[index] as SVGLineElement, link)
+      }
+    })
+  }
+
   destroy(): void {
     this.simulation?.stop()
     this.options.onHoverLink(null, null)
@@ -343,19 +360,25 @@ export class GraphRenderer {
 
       if (enteringLinkKeys.has(key)) {
         this.animateLinkEnter(element, link)
-        return
-      }
-
-      if (intensifyingLinkKeys.has(key) && previousRelationship) {
+      } else if (intensifyingLinkKeys.has(key) && previousRelationship) {
         this.animateLinkIntensify(element, link, previousRelationship)
-        return
+      } else {
+        select(element)
+          .interrupt()
+          .attr('stroke', relationshipColorScale(link.type))
+          .attr('stroke-opacity', this.linkOpacity(link))
+          .attr('stroke-width', this.linkWidth(link))
       }
 
-      select(element)
-        .interrupt()
-        .attr('stroke', relationshipColorScale(link.type))
-        .attr('stroke-opacity', this.linkOpacity(link))
-        .attr('stroke-width', this.linkWidth(link))
+      // Overlay flash animation if this edge has a pending relationship event
+      const expiry = this.flashingLinkKeys.get(key)
+      if (expiry !== undefined) {
+        if (Date.now() < expiry) {
+          this.animateLinkFlash(element, link)
+        } else {
+          this.flashingLinkKeys.delete(key)
+        }
+      }
     })
 
     this.linkSelection = mergedLinks
@@ -719,6 +742,24 @@ export class GraphRenderer {
             element.remove()
           })
       })
+  }
+
+  private animateLinkFlash(element: SVGLineElement, link: GraphLink): void {
+    if (this.reducedMotion) return
+    const color = relationshipColorScale(link.type)
+    const targetWidth = this.linkWidth(link)
+    // Pulse: bright white-gold → type-color, repeat 4 times over ~2 s
+    element.animate(
+      [
+        { stroke: '#fef3c7', strokeWidth: `${targetWidth * 2.2}px`, strokeOpacity: '1' },
+        { stroke: color,     strokeWidth: `${targetWidth}px`,        strokeOpacity: '0.65' },
+        { stroke: '#fef3c7', strokeWidth: `${targetWidth * 2.2}px`, strokeOpacity: '1' },
+        { stroke: color,     strokeWidth: `${targetWidth}px`,        strokeOpacity: '0.65' },
+        { stroke: '#fef3c7', strokeWidth: `${targetWidth * 2.2}px`, strokeOpacity: '1' },
+        { stroke: color,     strokeWidth: `${targetWidth * 1.2}px`, strokeOpacity: '0.9' },
+      ],
+      { duration: 2_000, easing: 'ease-in-out', fill: 'forwards' },
+    )
   }
 
   private isLinkHighlighted(

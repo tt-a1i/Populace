@@ -76,6 +76,7 @@ class SimulationState:
         # Achievement tracking
         self._achievements_store: dict[str, set[str]] = {}
         self._buildings_visited: dict[str, set[str]] = {}
+        self._rel_events_fired: set = set()
 
     async def restore_from_neo4j(self) -> None:
         """Restore prior session state at startup.
@@ -224,6 +225,7 @@ class SimulationState:
 
         self._achievements_store = {}
         self._buildings_visited = {}
+        self._rel_events_fired = set()
         self.world = load_scenario(template_path)
         self.loop = SimulationLoop(self.world, tick_handler=self._tick)
         self._task = None
@@ -245,6 +247,7 @@ class SimulationState:
 
         self._achievements_store = {}
         self._buildings_visited = {}
+        self._rel_events_fired = set()
         self.world = load_scenario_from_dict(scenario_data)
         self.loop = SimulationLoop(self.world, tick_handler=self._tick)
         self._task = None
@@ -314,6 +317,7 @@ class SimulationState:
         self._total_relationship_change_count = 0
         self._achievements_store = {}
         self._buildings_visited = {}
+        self._rel_events_fired = set()
 
         # Rebuild config
         cfg_data = data.get("config", {})
@@ -850,6 +854,14 @@ class SimulationState:
         from engine.types import AchievementUnlock
         for unlock in _check_achievements(self, dialogue_resident_ids):
             tick_state.achievement_unlocks.append(AchievementUnlock(**unlock))
+
+        # --- Relationship milestone events ---
+        if not hasattr(self, "_rel_events_fired"):
+            self._rel_events_fired = set()
+        from engine.relationship_events import check_relationship_events as _check_rel_events
+        from engine.types import RelationshipEvent
+        for ev in _check_rel_events(self.world, self):
+            tick_state.relationship_events.append(RelationshipEvent(**ev))
 
         # --- Neo4j persistence (spec §12) ---
         # Real-time: persist relationship changes that occurred this tick

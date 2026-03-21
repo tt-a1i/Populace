@@ -189,6 +189,17 @@ else:
 
 
     @dataclass
+    class RelationshipEvent:
+        """Fired when a relationship crosses a key intensity threshold."""
+        from_id: str
+        to_id: str
+        from_name: str
+        to_name: str
+        event_type: str   # 'best_friends' | 'confession' | 'public_argument'
+        dialogue: str     # special dialogue text for this milestone
+
+
+    @dataclass
     class TickState:
         """Complete diff pushed to the frontend each tick."""
 
@@ -201,6 +212,7 @@ else:
         weather: str = WeatherType.sunny.value
         goals: List["GoalUpdate"] = field(default_factory=list)
         achievement_unlocks: List["AchievementUnlock"] = field(default_factory=list)
+        relationship_events: List["RelationshipEvent"] = field(default_factory=list)
 
 
     # ---------------------------------------------------------------------------

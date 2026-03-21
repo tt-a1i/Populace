@@ -54,6 +54,7 @@ export function GraphPanel() {
   const replayTick = useRelationshipsStore((state) => state.replayTick)
   const lastAppliedTick = useRelationshipsStore((state) => state.lastAppliedTick)
   const setReplayTick = useRelationshipsStore((state) => state.setReplayTick)
+  const flashingEventKeys = useRelationshipsStore((state) => state.flashingEventKeys)
   const selectedResidentId = useSimulationStore((state) => state.selectedResidentId)
   const selectResident = useSimulationStore((state) => state.selectResident)
   const setHoveredPairIds = useSimulationStore((state) => state.setHoveredPairIds)
@@ -135,6 +136,12 @@ export function GraphPanel() {
   useEffect(() => {
     rendererRef.current?.render(filteredResidents, filteredRelationships, selectedResidentId)
   }, [filteredRelationships, filteredResidents, selectedResidentId])
+
+  useEffect(() => {
+    if (flashingEventKeys.size > 0) {
+      rendererRef.current?.flashLinks([...flashingEventKeys])
+    }
+  }, [flashingEventKeys])
 
   const handleReplayTickChange = (tick: number | null) => {
     if (tick === null) {

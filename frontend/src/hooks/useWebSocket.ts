@@ -65,6 +65,7 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
   const relUpdateFromTick = useRelationshipsStore((s) => s.updateFromTick)
   const relInitFromSnapshot = useRelationshipsStore((s) => s.initFromSnapshot)
   const relSetAbsolute = useRelationshipsStore((s) => s.setRelationshipsAbsolute)
+  const relAddFlashingKeys = useRelationshipsStore((s) => s.addFlashingEventKeys)
 
   // -------------------------------------------------------------------------
   // Message handler
@@ -79,6 +80,13 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
       }
 
       const { type, data } = msg
+
+      const relEventLabel = (eventType: string): string => {
+        if (eventType === 'best_friends') return '💚 成为挚友'
+        if (eventType === 'confession') return '💖 告白'
+        if (eventType === 'public_argument') return '⚡ 公开争吵'
+        return '🔗 关系事件'
+      }
 
       const commitTick = (tickData: Record<string, unknown>, playSounds = true) => {
         pendingTicksRef.current.push(tickData)
@@ -99,6 +107,9 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
             const achievementUnlocks = Array.isArray(queuedTick.achievement_unlocks)
               ? (queuedTick.achievement_unlocks as Array<{ resident_id: string; achievement_name: string; icon: string }>)
               : []
+            const relationshipEvents = Array.isArray(queuedTick.relationship_events)
+              ? (queuedTick.relationship_events as Array<{ from_id: string; to_id: string; from_name: string; to_name: string; event_type: string; dialogue: string }>)
+              : []
             sawDialogue = sawDialogue || dialogues.length > 0
             sawRelationshipDelta = sawRelationshipDelta || relationships.length > 0
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -113,6 +124,13 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
                 pushToast(`${unlock.icon} ${unlock.achievement_name}`)
                 play('achievement')
               }
+              for (const ev of relationshipEvents) {
+                pushToast(`${relEventLabel(ev.event_type)}: ${ev.from_name} & ${ev.to_name}`)
+                play('event')
+              }
+            }
+            if (relationshipEvents.length > 0) {
+              relAddFlashingKeys(relationshipEvents.map((ev) => `${ev.from_id}::${ev.to_id}`))
             }
           }
 
@@ -154,7 +172,7 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
         commitTick(data as Record<string, unknown>)
       }
     },
-    [play, pushToast, relInitFromSnapshot, relSetAbsolute, relUpdateFromTick, simInitFromSnapshot, simUpdateFromTick],
+    [play, pushToast, relAddFlashingKeys, relInitFromSnapshot, relSetAbsolute, relUpdateFromTick, simInitFromSnapshot, simUpdateFromTick],
   )
 
   // -------------------------------------------------------------------------
