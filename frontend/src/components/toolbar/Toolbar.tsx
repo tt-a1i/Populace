@@ -6,13 +6,14 @@ import { BuildPanel } from './BuildPanel'
 import { EventInjector } from './EventInjector'
 import { ExportPanel } from './ExportPanel'
 import { PersonaEditor } from './PersonaEditor'
+import { ResidentCreationWizard } from './ResidentCreationWizard'
 import { SavesPanel } from './SavesPanel'
 import { SpeedControl } from './SpeedControl'
 import { StatsPanel } from './StatsPanel'
 import { ReportsPanel } from '../report'
 import { LanguageSwitcher, MessageBar } from '../ui'
 
-type ToolKey = 'event' | 'persona' | 'build' | 'report' | 'stats' | 'saves' | 'export'
+type ToolKey = 'event' | 'persona' | 'build' | 'create' | 'report' | 'stats' | 'saves' | 'export'
 
 function toneClass(tone: string, active: boolean): string {
   if (!active) return 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
@@ -31,6 +32,7 @@ export function Toolbar() {
     { key: 'event', label: t('toolbar.event'), icon: '⚡', tone: 'cyan' },
     { key: 'persona', label: t('toolbar.persona'), icon: '👤', tone: 'amber' },
     { key: 'build', label: t('toolbar.build'), icon: '🏗', tone: 'emerald' },
+    { key: 'create', label: t('toolbar.create'), icon: '🧑', tone: 'emerald' },
     { key: 'report', label: t('toolbar.report'), icon: '📰', tone: 'rose' },
     { key: 'stats', label: t('toolbar.stats'), icon: '📊', tone: 'cyan' },
     { key: 'saves', label: t('toolbar.saves'), icon: '💾', tone: 'violet' },
@@ -43,6 +45,7 @@ export function Toolbar() {
     if (activeTool === 'saves') return <SavesPanel />
     if (activeTool === 'stats') return <StatsPanel />
     if (activeTool === 'build') return <BuildPanel />
+    if (activeTool === 'create') return <ResidentCreationWizard />
     if (activeTool === 'export') return <ExportPanel />
     return <ReportsPanel />
   }, [activeTool])
