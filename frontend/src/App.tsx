@@ -73,8 +73,7 @@ function SimulationView() {
   const time = useSimulationStore((s) => s.time)
   const weather = useSimulationStore((s) => s.weather)
   const season = useSimulationStore((s) => s.season)
-  const residents = useSimulationStore((s) => s.residents)
-  const buildings = useSimulationStore((s) => s.buildings)
+
 
   const isZh = i18n.language === 'zh'
   const weatherEmoji = WEATHER_EMOJI[weather] ?? WEATHER_EMOJI.sunny
@@ -129,31 +128,28 @@ function SimulationView() {
       )}
 
       {/* -- TOP-LEFT HUD: Status -- */}
-      <div className="fixed left-4 top-4 z-20 pointer-events-auto">
-        <div className="rounded-2xl border border-white/10 bg-slate-950/75 px-4 py-3 text-sm text-slate-200 shadow-lg backdrop-blur-sm">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-xs font-bold uppercase tracking-widest text-cyan-300">POPULACE</span>
-            <span className="text-slate-500">{'\u00B7'}</span>
-            <span className="text-xs text-slate-400">{time}</span>
-          </div>
-          <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
-            <span>{weatherEmoji} {weather}</span>
+      <div className="fixed left-3 top-3 z-20 pointer-events-auto">
+        <div className="rounded-xl border border-white/8 bg-slate-950/65 px-3 py-2 shadow-lg backdrop-blur-sm">
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="font-mono font-bold uppercase tracking-wider text-cyan-300/80">POPULACE</span>
+            <span className="text-slate-600">|</span>
+            <span className="text-slate-400">{time}</span>
+            <span className="text-slate-600">|</span>
+            <span>{weatherEmoji}</span>
             <span>{seasonEmoji} {seasonLabel}</span>
-            <span>{residents.length} {isZh ? '\u5C45\u6C11' : 'residents'}</span>
-            <span>{buildings.length} {isZh ? '\u5EFA\u7B51' : 'buildings'}</span>
           </div>
         </div>
       </div>
 
       {/* -- TOP-RIGHT: Settings icons -- */}
-      <div className="fixed right-4 top-4 z-20 flex items-center gap-2 pointer-events-auto">
+      <div className="fixed right-3 top-3 z-20 flex items-center gap-1.5 pointer-events-auto">
         <SoundToggleButton />
         <LanguageSwitcher />
         <ThemeToggle />
       </div>
 
       {/* -- BOTTOM-LEFT: Message Feed -- */}
-      <div className="fixed bottom-20 left-4 z-20 w-80 pointer-events-auto">
+      <div className="fixed bottom-14 left-3 z-20 w-72 pointer-events-none">
         <MessageBar />
       </div>
 
@@ -163,43 +159,44 @@ function SimulationView() {
           <button
             type="button"
             onClick={() => setShowToolbar((v) => !v)}
-            className="rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm font-medium text-cyan-50 transition hover:bg-cyan-300/20"
+            className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-3 py-1.5 text-xs font-medium text-cyan-50 transition hover:bg-cyan-300/20"
           >
             {'\u26A1'} {t('toolbar.director')}
           </button>
           <button
             type="button"
             onClick={() => { setShowToolbar(true); window.dispatchEvent(new CustomEvent('populace:open-persona')) }}
-            className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:bg-white/10"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-white/10"
           >
             {'\uD83D\uDC64'} {t('toolbar.persona')}
           </button>
           <button
             type="button"
             onClick={() => { setShowToolbar(true); window.dispatchEvent(new CustomEvent('populace:open-quest')) }}
-            className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:bg-white/10"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-white/10"
           >
             {'\uD83C\uDFAF'} {t('toolbar.quest')}
           </button>
           <button
             type="button"
             onClick={() => { setShowToolbar(true); window.dispatchEvent(new CustomEvent('populace:open-report')) }}
-            className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200 transition hover:bg-white/10"
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-white/10"
           >
             {'\uD83D\uDCF0'} {t('toolbar.report')}
           </button>
 
-          <div className="mx-1 h-6 w-px bg-white/10" />
+          <div className="mx-0.5 h-5 w-px bg-white/10" />
 
           <button
             type="button"
             onClick={() => setShowGraph((v) => !v)}
-            className={`rounded-xl border px-3 py-2 text-sm transition ${showGraph ? 'border-amber-300/40 bg-amber-300/15 text-amber-50' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+            className={`rounded-lg border px-2.5 py-1.5 text-xs transition ${showGraph ? 'border-amber-300/40 bg-amber-300/15 text-amber-50' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+            title={t('app.relationship_graph')}
           >
-            {'\uD83D\uDD78\uFE0F'} {t('app.relationship_graph')}
+            {'\uD83D\uDD78\uFE0F'}
           </button>
 
-          <div className="mx-1 h-6 w-px bg-white/10" />
+          <div className="mx-0.5 h-5 w-px bg-white/10" />
 
           <SpeedControl />
         </div>
@@ -255,16 +252,16 @@ function SimulationView() {
         </>
       )}
 
-      {/* -- Connection indicator -- */}
+      {/* -- Connection indicator (top-left, below HUD) -- */}
       <div
         className={[
-          'fixed bottom-4 right-4 z-20 rounded-full px-3 py-1 text-xs font-medium transition-colors pointer-events-auto',
+          'fixed left-3 top-11 z-20 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors pointer-events-none',
           connected
-            ? 'border border-emerald-400/30 bg-emerald-400/10 text-emerald-300 connection-pulse'
-            : 'border border-amber-400/30 bg-amber-400/10 text-amber-300',
+            ? 'text-emerald-400/60'
+            : 'text-amber-400/70',
         ].join(' ')}
       >
-        {connected ? t('app.connected') : t('app.connecting')}
+        {connected ? '\u25CF' : '\u25CB'}
       </div>
 
       {/* -- Onboarding + tutorial -- */}

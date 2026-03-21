@@ -10,7 +10,7 @@ export function LanguageSwitcher({ className = '' }: { className?: string }) {
     <button
       type="button"
       onClick={() => setLanguage(isZh ? 'en' : 'zh')}
-      className={`rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white ${className}`}
+      className={`flex h-8 items-center justify-center rounded-full border border-white/15 bg-white/5 px-2.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white ${className}`}
       title={isZh ? 'Switch to English' : '切换为中文'}
     >
       {t('lang.switch')}

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
 
 import { setSpeed, startSimulation, stopSimulation } from '../../services/api'
 import { useSimulationStore, type SimulationSpeed } from '../../stores'
@@ -7,7 +6,6 @@ import { useSimulationStore, type SimulationSpeed } from '../../stores'
 const speedValues: Array<Exclude<SimulationSpeed, 0>> = [1, 2, 5, 10, 50]
 
 export function SpeedControl() {
-  const { t } = useTranslation()
   const speed = useSimulationStore((state) => state.speed)
   const setStoreSpeed = useSimulationStore((state) => state.setSpeed)
   const setRunning = useSimulationStore((state) => state.setRunning)
@@ -37,18 +35,18 @@ export function SpeedControl() {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex items-center gap-1">
       <button
         type="button"
         onClick={() => void handlePause()}
         disabled={busy}
-        className={`rounded-full border px-4 py-2 text-sm transition ${
+        className={`rounded-lg border px-2 py-1.5 text-xs font-medium transition ${
           speed === 0
-            ? 'border-rose-300/50 bg-rose-400/15 text-rose-100'
-            : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
+            ? 'border-rose-300/40 bg-rose-400/15 text-rose-200'
+            : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
         }`}
       >
-        {t('speed.pause')}
+        ⏸
       </button>
 
       {speedValues.map((val) => (
@@ -57,13 +55,13 @@ export function SpeedControl() {
           type="button"
           onClick={() => void handleSpeedChange(val)}
           disabled={busy}
-          className={`rounded-full border px-4 py-2 text-sm transition ${
+          className={`rounded-lg border px-2 py-1.5 text-xs font-medium tabular-nums transition ${
             speed === val
               ? 'border-cyan-300/40 bg-cyan-300/15 text-cyan-50'
-              : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
+              : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
           }`}
         >
-          {t(`speed.${val}x` as 'speed.1x' | 'speed.2x' | 'speed.5x' | 'speed.10x' | 'speed.50x')}
+          {val}x
         </button>
       ))}
     </div>

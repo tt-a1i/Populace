@@ -9,14 +9,14 @@ export function SoundToggleButton() {
       aria-label={enabled ? '关闭音效' : '开启音效'}
       onClick={toggleEnabled}
       className={[
-        'rounded-full border px-4 py-2 text-sm transition',
+        'flex h-8 w-8 items-center justify-center rounded-full border text-sm transition',
         enabled
-          ? 'border-emerald-300/40 bg-emerald-300/15 text-emerald-50'
-          : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10',
+          ? 'border-emerald-300/30 bg-emerald-300/10 text-emerald-200'
+          : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
       ].join(' ')}
+      title={enabled ? '关闭音效' : '开启音效'}
     >
-      <span className="mr-2">{enabled ? '🔊' : '🔇'}</span>
-      {enabled ? '音效开' : '音效关'}
+      {enabled ? '🔊' : '🔇'}
     </button>
   )
 }
