@@ -335,8 +335,8 @@ async def restore_world_memories(world: Any, *, skip_position_reset: bool = Fals
                         emotion=row["emotion"],
                     )
                     agent.memory_stream.add(mem)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Skipping malformed memory row: %s", exc)
 
         # -- Restore reflections --
         for agent in world.agents:
@@ -350,8 +350,8 @@ async def restore_world_memories(world: Any, *, skip_position_reset: bool = Fals
                         derived_from=list(row.get("derived_from", [])),
                     )
                     agent.reflections.append(rf)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Skipping malformed reflection row: %s", exc)
 
         # -- Restore relationships --
         rel_rows = await load_relationships()
@@ -368,8 +368,8 @@ async def restore_world_memories(world: Any, *, skip_position_reset: bool = Fals
                     reason=row.get("reason", ""),
                 )
                 world.set_relationship(rel)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Skipping malformed relationship row: %s", exc)
 
         # -- Reset agent positions to home building entrance (spec §12) --
         # Skipped when the caller will apply fresher Redis positions afterwards.

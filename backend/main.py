@@ -138,10 +138,11 @@ _cors_origins = [
     for origin in settings.cors_allowed_origins.split(",")
     if origin.strip()
 ]
-# Always permit local dev servers regardless of config
-for _dev_origin in ("http://127.0.0.1:5173", "http://localhost:5173", "http://localhost:3000"):
-    if _dev_origin not in _cors_origins:
-        _cors_origins.append(_dev_origin)
+# Only permit local dev servers in non-production environments
+if settings.environment != "production":
+    for _dev_origin in ("http://127.0.0.1:5173", "http://localhost:5173", "http://localhost:3000"):
+        if _dev_origin not in _cors_origins:
+            _cors_origins.append(_dev_origin)
 
 app.add_middleware(
     CORSMiddleware,

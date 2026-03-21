@@ -28,7 +28,5 @@ def test_inject_event_missing_description(client):
 
 def test_list_buildings(client):
     response = client.get("/api/world/buildings")
-    if response.status_code == 404:
-        pytest.skip("buildings endpoint not available")
     assert response.status_code == 200
     assert isinstance(response.json(), list)

@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     app_name: str = Field(default="Populace Backend")
 
     # Deployment settings
+    environment: str = Field(default="development")
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8000)
     neo4j_uri: str = Field(default="bolt://neo4j:7687")

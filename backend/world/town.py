@@ -7,8 +7,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import pathlib
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from engine.generative_agent import GenerativeAgent
 from engine.types import Building, Resident, WorldConfig
@@ -181,8 +184,8 @@ def _load_initial_relationships(world: World, data: dict[str, Any]) -> None:
                 reason=rel_data.get("reason", ""),
             )
             world.set_relationship(rel)
-        except (KeyError, ValueError):
-            pass  # skip malformed entries silently
+        except (KeyError, ValueError) as exc:
+            logger.warning("Skipping malformed relationship entry: %s", exc)
 
 
 def load_scenario_from_dict(

@@ -160,9 +160,11 @@ def test_set_speed_invalid(client):
 
 
 def test_snapshot_contains_residents(client):
+    """Snapshot is served via WebSocket, not as a REST endpoint.
+    This test validates the REST endpoint if/when it becomes available."""
     response = client.get("/api/simulation/snapshot")
     if response.status_code == 404:
-        pytest.skip("snapshot endpoint not available")
+        pytest.skip("snapshot is served via WebSocket only — no REST endpoint yet")
     data = response.json()
     assert "residents" in data
     assert len(data["residents"]) > 0

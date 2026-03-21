@@ -139,8 +139,8 @@ async def subscribe_tick_events() -> AsyncIterator[dict[str, Any]]:
             if message and message.get("type") == "message":
                 try:
                     yield json.loads(message["data"])
-                except (json.JSONDecodeError, KeyError):
-                    pass
+                except (json.JSONDecodeError, KeyError) as exc:
+                    logger.warning("Skipping malformed Redis tick message: %s", exc)
     except Exception as exc:
         logger.debug("Redis subscribe_tick_events stopped: %s", exc)
         return

@@ -140,9 +140,8 @@ def test_timeline_records_preset_event(client):
     state._world_timeline = []
     state._timeline_id_counter = 0
 
-    result = state.enqueue_preset_event("market_day")
-    if result is None:
-        pytest.skip("preset 'market_day' not found")
+    result = state.enqueue_preset_event("storm")
+    assert result is not None, "preset 'storm' should exist"
 
     resp = client.get("/api/simulation/timeline")
     assert resp.status_code == 200

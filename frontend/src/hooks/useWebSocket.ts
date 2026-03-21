@@ -14,13 +14,29 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSound } from '../audio'
 import { useToast } from '../components/ui/ToastProvider'
 import { useRelationshipsStore } from '../stores/relationships'
+import type { SimulationSnapshot, SimulationTickState } from '../stores/simulation'
 import { useSimulationStore } from '../stores/simulation'
+import type { RelationshipDelta } from '../types'
+
+/** Tick payload as received from the WebSocket (superset of SimulationTickState). */
+interface WsTickPayload extends SimulationTickState {
+  achievement_unlocks?: Array<{ resident_id: string; achievement_name: string; icon: string }>
+  relationship_events?: Array<{
+    from_id: string
+    to_id: string
+    from_name: string
+    to_name: string
+    event_type: string
+    dialogue: string
+  }>
+}
 
 export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected'
 
 const MIN_BACKOFF_MS = 1_000
 const MAX_BACKOFF_MS = 30_000
 const MAX_RETRIES = 10
+const MAX_PENDING_TICKS = 200
 
 function buildWsUrl(): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -56,7 +72,7 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const mountedRef = useRef<boolean>(true)
   const frameRef = useRef<number | null>(null)
-  const pendingTicksRef = useRef<Array<Record<string, unknown>>>([])
+  const pendingTicksRef = useRef<WsTickPayload[]>([])
   const hasConnectedOnceRef = useRef(false)
   const shouldAnnounceReconnectRef = useRef(false)
 
@@ -88,7 +104,11 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
         return '🔗 关系事件'
       }
 
-      const commitTick = (tickData: Record<string, unknown>, playSounds = true) => {
+      const commitTick = (tickData: WsTickPayload, playSounds = true) => {
+        // Overflow protection: drop oldest ticks when renderer can't keep up
+        if (pendingTicksRef.current.length >= MAX_PENDING_TICKS) {
+          pendingTicksRef.current.splice(0, pendingTicksRef.current.length - MAX_PENDING_TICKS + 1)
+        }
         pendingTicksRef.current.push(tickData)
 
         if (frameRef.current !== null) {
@@ -102,22 +122,16 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
           let sawRelationshipDelta = false
 
           for (const queuedTick of queuedTicks) {
-            const dialogues = Array.isArray(queuedTick.dialogues) ? queuedTick.dialogues : []
-            const relationships = Array.isArray(queuedTick.relationships) ? queuedTick.relationships : []
-            const achievementUnlocks = Array.isArray(queuedTick.achievement_unlocks)
-              ? (queuedTick.achievement_unlocks as Array<{ resident_id: string; achievement_name: string; icon: string }>)
-              : []
-            const relationshipEvents = Array.isArray(queuedTick.relationship_events)
-              ? (queuedTick.relationship_events as Array<{ from_id: string; to_id: string; from_name: string; to_name: string; event_type: string; dialogue: string }>)
-              : []
+            const dialogues = queuedTick.dialogues ?? []
+            const relationships = queuedTick.relationships ?? []
+            const achievementUnlocks = queuedTick.achievement_unlocks ?? []
+            const relationshipEvents = queuedTick.relationship_events ?? []
             sawDialogue = sawDialogue || dialogues.length > 0
             sawRelationshipDelta = sawRelationshipDelta || relationships.length > 0
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            simUpdateFromTick(queuedTick as any)
+            simUpdateFromTick(queuedTick)
             relUpdateFromTick({
-              tick: typeof queuedTick.tick === 'number' ? queuedTick.tick : undefined,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              relationships: relationships as any,
+              tick: queuedTick.tick,
+              relationships: relationships as Array<RelationshipDelta & { reason?: string }>,
             })
             if (playSounds) {
               for (const unlock of achievementUnlocks) {
@@ -148,8 +162,7 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
       if (type === 'snapshot') {
         // Full state: initialise simulation store from residents list, then
         // apply last_tick on top for up-to-date positions/dialogues.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const snapshot = (data ?? {}) as any
+        const snapshot = (data ?? {}) as SimulationSnapshot
         setHasInitialSnapshot(true)
         setStartupTimedOut(false)
         simInitFromSnapshot(snapshot)
@@ -157,18 +170,18 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
         relInitFromSnapshot(snapshot.residents ?? [])
         // Seed initial relationships absolutely (not as deltas) from snapshot
         // Always call even with empty array to clear seed data on fresh simulations
-        relSetAbsolute((snapshot.relationships ?? []) as Array<{
+        relSetAbsolute(((snapshot as Record<string, unknown>).relationships ?? []) as Array<{
           from_id: string; to_id: string; type: string; intensity: number; reason?: string
         }>)
         if (snapshot.last_tick) {
           // Apply last_tick for positions/dialogues but SKIP relationship deltas to prevent
           // double-stacking with the absolute snapshot.relationships already applied above.
-          const lastTickNoRels = { ...(snapshot.last_tick as Record<string, unknown>), relationships: [] }
+          const lastTickNoRels: WsTickPayload = { ...snapshot.last_tick, relationships: [] }
           commitTick(lastTickNoRels, false)
         }
       } else if (type === 'tick') {
         // Incremental diff
-        commitTick(data as Record<string, unknown>)
+        commitTick(data as WsTickPayload)
       }
     },
     [play, pushToast, relAddFlashingKeys, relInitFromSnapshot, relSetAbsolute, relUpdateFromTick, simInitFromSnapshot, simUpdateFromTick],

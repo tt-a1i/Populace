@@ -7,10 +7,13 @@ world state produced by :meth:`SimulationState.save_state`.
 from __future__ import annotations
 
 import json
+import logging
 import pathlib
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
@@ -93,8 +96,8 @@ async def list_saves() -> list[SaveMetaResponse]:
             with open(path, encoding="utf-8") as fh:
                 data = json.load(fh)
             saves.append(SaveMetaResponse(**_save_meta(path.stem, data)))
-        except Exception:
-            pass  # Skip corrupt files
+        except Exception as exc:
+            logger.warning("Skipping corrupt save file %s: %s", path.name, exc)
     return saves
 
 

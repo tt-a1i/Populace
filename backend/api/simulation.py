@@ -1,11 +1,23 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import asdict, is_dataclass
 from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Body, Request
 from pydantic import BaseModel
+
+_log = logging.getLogger(__name__)
+
+
+def _log_task_exception(task: asyncio.Task) -> None:  # type: ignore[type-arg]
+    """Callback for fire-and-forget tasks — logs exceptions instead of silently dropping them."""
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        _log.warning("Background task %s failed: %s", task.get_name(), exc)
 
 from backend.api.schemas import (
     EconomyStatsResponse,
@@ -66,6 +78,8 @@ class SimulationState:
         self._max_experiment_history_ticks = max(200, self.world.config.tick_per_day * 30)
         # Dialogue tasks fired in previous ticks; results are harvested each tick
         self._pending_dialogues: list[asyncio.Task] = []
+        # Maps dialogue task → (resident_a_id, resident_b_id) — replaces dynamic attrs
+        self._dialogue_pair_ids: dict[asyncio.Task, tuple[str, str]] = {}
         # frozenset pairs of resident ids that have an in-flight dialogue task
         self._active_dialogue_pairs: set[frozenset] = set()
         # Active persistent events: list of dicts with remaining_ticks, radius, description
@@ -151,8 +165,8 @@ class SimulationState:
                             emotion=row["emotion"],
                         )
                         agent.memory_stream.add(mem)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        self._log.warning("Skipping malformed cached memory: %s", exc)
 
             positions = await load_agent_positions()
         except Exception as exc:
@@ -220,6 +234,7 @@ class SimulationState:
         for task in self._pending_dialogues:
             task.cancel()
         self._pending_dialogues.clear()
+        self._dialogue_pair_ids.clear()
         self._active_dialogue_pairs.clear()
         self._events.clear()
         self._active_events.clear()
@@ -244,6 +259,7 @@ class SimulationState:
         for task in self._pending_dialogues:
             task.cancel()
         self._pending_dialogues.clear()
+        self._dialogue_pair_ids.clear()
         self._active_dialogue_pairs.clear()
         self._events.clear()
         self._active_events.clear()
@@ -327,6 +343,7 @@ class SimulationState:
         for task in self._pending_dialogues:
             task.cancel()
         self._pending_dialogues.clear()
+        self._dialogue_pair_ids.clear()
         self._active_dialogue_pairs.clear()
         self._events.clear()
         self._active_events.clear()
@@ -722,7 +739,7 @@ class SimulationState:
             # Neo4j: real-time memory persistence (spec §12: "每 tick 实时写入")
             from backend.db.neo4j import save_memory as _neo4j_save_memory
             for mem in agent.memory_stream.all[-len(events) - 1:]:  # heartbeat + events
-                asyncio.create_task(_neo4j_save_memory(agent.resident.id, mem))
+                asyncio.create_task(_neo4j_save_memory(agent.resident.id, mem)).add_done_callback(_log_task_exception)
 
             # Step b — agent.retrieve(query)
             query = " ".join(e.description for e in events) if events else tick_time
@@ -737,7 +754,7 @@ class SimulationState:
                     agent.reflections.append(result)
                     # Neo4j: real-time reflection persistence (spec §12)
                     from backend.db.neo4j import save_reflection as _neo4j_save_reflection
-                    asyncio.create_task(_neo4j_save_reflection(agent.resident.id, result))
+                    asyncio.create_task(_neo4j_save_reflection(agent.resident.id, result)).add_done_callback(_log_task_exception)
 
             # Step d — agent.plan(context)
             # Always call agent.plan(); pass use_llm so the Agent subclass
@@ -796,36 +813,38 @@ class SimulationState:
 
         for task in self._pending_dialogues:
             if task.done():
+                pair_ids = self._dialogue_pair_ids.pop(task, None)
                 try:
                     result: DialogueResult = task.result()
-                    a_id, b_id = task._pair_ids  # type: ignore[attr-defined]
-                    for msg in result.messages:
-                        other_id = b_id if msg["speaker_id"] == a_id else a_id
-                        dialogue_updates.append(
-                            DialogueUpdate(
-                                from_id=msg["speaker_id"],
-                                to_id=other_id,
-                                text=msg["text"],
-                            )
-                        )
-                    if result.relationship_delta != 0:
-                        agent_a = agents_by_id.get(a_id)
-                        agent_b = agents_by_id.get(b_id)
-                        if agent_a is not None and agent_b is not None:
-                            relationship_deltas.extend(
-                                update_relationships_from_dialogue(
-                                    self.world,
-                                    agent_a,
-                                    agent_b,
-                                    float(result.relationship_delta),
+                    if pair_ids is not None:
+                        a_id, b_id = pair_ids
+                        for msg in result.messages:
+                            other_id = b_id if msg["speaker_id"] == a_id else a_id
+                            dialogue_updates.append(
+                                DialogueUpdate(
+                                    from_id=msg["speaker_id"],
+                                    to_id=other_id,
+                                    text=msg["text"],
                                 )
                             )
+                        if result.relationship_delta != 0:
+                            agent_a = agents_by_id.get(a_id)
+                            agent_b = agents_by_id.get(b_id)
+                            if agent_a is not None and agent_b is not None:
+                                relationship_deltas.extend(
+                                    update_relationships_from_dialogue(
+                                        self.world,
+                                        agent_a,
+                                        agent_b,
+                                        float(result.relationship_delta),
+                                    )
+                                )
                 except Exception:
-                    pass  # cancelled or failed — discard silently
+                    _log.warning("Dialogue task failed: %s", task.get_name(), exc_info=True)
                 finally:
                     # Remove from active set regardless of success/failure
-                    a_id, b_id = task._pair_ids  # type: ignore[attr-defined]
-                    self._active_dialogue_pairs.discard(frozenset([a_id, b_id]))
+                    if pair_ids is not None:
+                        self._active_dialogue_pairs.discard(frozenset(pair_ids))
             else:
                 still_pending.append(task)
 
@@ -863,7 +882,7 @@ class SimulationState:
                 if not should_start:
                     continue
                 task = asyncio.create_task(initiate_dialogue(a, b, self.world))
-                task._pair_ids = (a.resident.id, b.resident.id)  # type: ignore[attr-defined]
+                self._dialogue_pair_ids[task] = (a.resident.id, b.resident.id)
                 self._active_dialogue_pairs.add(pair)
                 self._pending_dialogues.append(task)
                 dialogue_count += 1
@@ -961,15 +980,15 @@ class SimulationState:
         # --- Neo4j persistence (spec §12) ---
         # Real-time: persist relationship changes that occurred this tick
         if relationship_deltas:
-            asyncio.create_task(self._persist_relationships())
+            asyncio.create_task(self._persist_relationships()).add_done_callback(_log_task_exception)
 
         # Snapshot every SNAPSHOT_INTERVAL_TICKS (configurable, default 10)
         interval = cfg.snapshot_interval_ticks
         if interval > 0 and self.world.current_tick % interval == 0:
-            asyncio.create_task(self._persist_snapshot())
+            asyncio.create_task(self._persist_snapshot()).add_done_callback(_log_task_exception)
 
         # --- Redis cache (spec §4.1 + §12) ---
-        asyncio.create_task(self._redis_tick(tick_state))
+        asyncio.create_task(self._redis_tick(tick_state)).add_done_callback(_log_task_exception)
         self._record_experiment_frame(tick_state)
 
         return tick_state
