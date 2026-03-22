@@ -34,6 +34,9 @@ def test_health_request_is_logged(client, caplog):
     assert response.status_code == 200
     assert any(
         record.levelno == logging.INFO
-        and record.message.startswith("HTTP GET /health -> 200 in ")
+        and getattr(record, "request_log", {}).get("method") == "GET"
+        and getattr(record, "request_log", {}).get("path") == "/health"
+        and getattr(record, "request_log", {}).get("status") == 200
+        and isinstance(getattr(record, "request_log", {}).get("duration_ms"), float)
         for record in caplog.records
     )
