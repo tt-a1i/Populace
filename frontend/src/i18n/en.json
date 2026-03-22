@@ -4,6 +4,7 @@
     "slogan_en": "Create a pixel town, watch AI residents live their drama.",
     "slogan_zh": "Create a pixel town and watch AI residents unfold their stories.",
     "start": "Start Simulation",
+    "guide": "Open User Guide",
     "footnote": "Based on Stanford Generative Agents paper · Open Source",
     "features": {
       "social_title": "AI Social Life",
@@ -43,7 +44,28 @@
     "modern_community_tags": ["Social", "Love & Rivalry", "Gossip"],
     "seaside_village_name": "Seaside Village",
     "seaside_village_desc": "A peaceful fishing village by the sea — fishermen and merchants unfolding stories in the ocean breeze.",
-    "seaside_village_tags": ["Fishing Village", "Seaside", "Slow Life"]
+    "seaside_village_tags": ["Fishing Village", "Seaside", "Slow Life"],
+    "mountain_village_name": "Mountain Village",
+    "mountain_village_desc": "A tucked-away village of trails, streams, hunters, and herbalists beneath the mountain ridges.",
+    "mountain_village_tags": ["Mountain", "Stream", "Herbalists", "Forest"],
+    "open_editor": "Edit Preset Scene",
+    "editor_label": "Scene Editor",
+    "editor_title": "Create a Custom Scene from a Template",
+    "editor_desc": "Choose a preset, then rename residents, personalities, and buildings before saving locally.",
+    "editor_close": "Close",
+    "editor_base": "Base Template",
+    "editor_scene_name": "Custom Scene Name",
+    "editor_buildings": "Buildings",
+    "editor_residents": "Residents",
+    "editor_resident_name": "Resident Name",
+    "editor_resident_personality": "Resident Personality",
+    "editor_reset": "Reset to Template",
+    "editor_save": "Save to Local Scenes",
+    "saved_label": "Local Scenes",
+    "saved_title": "Saved Custom Scenes",
+    "saved_count": "scenes",
+    "saved_badge": "LOCAL",
+    "custom_missing": "Saved custom scene not found"
   },
   "toolbar": {
     "director": "Director",
@@ -312,9 +334,20 @@
     "theme": "Theme",
     "theme_dark": "Dark",
     "theme_light": "Light",
+    "theme_color": "Accent",
+    "theme_color_blue": "Blue",
+    "theme_color_green": "Green",
+    "theme_color_purple": "Purple",
+    "theme_color_red": "Red",
+    "theme_color_orange": "Orange",
+    "theme_color_cyan": "Cyan",
     "sound": "Sound",
     "sound_on": "ON",
     "sound_off": "OFF",
+    "language_zh": "中文",
+    "language_en": "EN",
+    "guide": "User Guide",
+    "guide_open": "Open User Guide",
     "tutorial_reset": "Reset Tutorial",
     "tutorial_reset_done": "Reset ✓"
   },
@@ -372,7 +405,14 @@
     "conflict_desc": "Bring a mysterious stranger to shake things up",
     "watch": "Just Watch",
     "watch_desc": "Let the AI residents roam free",
-    "meet_event": "{{name}} ran into a neighbour at the plaza"
+    "meet_event": "{{name}} ran into a neighbour at the plaza",
+    "mood_keywords": {
+      "happy": ["happy", "开心", "高兴"],
+      "sad": ["sad", "悲伤", "难过"],
+      "angry": ["angry", "愤怒", "生气"],
+      "anxious": ["anxious", "焦虑"],
+      "neutral": ["neutral", "平静"]
+    }
   },
   "director": {
     "badge": "Director's Console",
@@ -444,11 +484,96 @@
     "reconnect": "Reconnect",
     "reconnecting": "Reconnecting {{seconds}}s…",
     "conn_interrupted": "Connection interrupted, reconnecting…",
+    "toolbar_region": "Main Toolbar",
+    "map_region": "Town Map",
+    "graph_region": "Relationship Graph Panel",
+    "panel_region": "Tool Panel",
     "open_tools": "Tools",
+    "resize_split_pane": "Resize map and graph panel width",
     "season_spring": "spring",
     "season_summer": "summer",
     "season_autumn": "autumn",
     "season_winter": "winter"
+  },
+  "guide_page": {
+    "badge": "Operator Manual",
+    "title": "Populace User Guide",
+    "description": "This quick manual helps you understand the map, relationship graph, god-mode controls, event injection, and save/load workflow. Skim it once, then come back whenever you need a refresher.",
+    "back": "Back",
+    "features_label": "Feature Areas",
+    "features": [
+      {
+        "title": "Map View",
+        "description": "The map is the town's main stage. Watch residents move, weather shift, buildings fill up, and interactions happen on actual tiles.",
+        "bullets": [
+          "Scroll to zoom, drag to pan, and double-click a resident to follow them.",
+          "Right-click the map for context actions tied to tiles, residents, and event entry points.",
+          "The top HUD continuously shows time, weather, and season."
+        ]
+      },
+      {
+        "title": "Relationship Graph",
+        "description": "The graph on the right visualizes love, friendship, rivalry, and acquaintance links so you can track how social structure evolves over time.",
+        "bullets": [
+          "Hover an edge to inspect relationship type and intensity.",
+          "Timeline replay lets you restore the graph to historical ticks.",
+          "Graph and map selection work together to show who is influencing whom."
+        ]
+      },
+      {
+        "title": "God Mode Tools",
+        "description": "Director controls, persona editing, and resident creation are your intervention panels. Use them to rewrite fate and manufacture drama on demand.",
+        "bullets": [
+          "Director tools are best for injecting emotions, arranging encounters, and spreading rumors.",
+          "Persona editing changes traits, goals, and current mood.",
+          "The resident wizard can drop a new character straight into the current social web."
+        ]
+      },
+      {
+        "title": "Events and Saves",
+        "description": "Event injection adds pressure to the town, while saves freeze the current world state. Together they support reproducible experiments and branching narratives.",
+        "bullets": [
+          "Preset events quickly trigger storms, strangers, and other dramatic setups.",
+          "Custom events are useful for testing prompts, relationship evolution, and crowd reactions.",
+          "Save, branch, and reload to compare how the town diverges under different decisions."
+        ]
+      }
+    ],
+    "shortcuts": {
+      "badge": "Keyboard Cheat Sheet",
+      "title": "Shortcut Reference",
+      "action": "Action",
+      "key": "Key",
+      "items": [
+        { "action": "Close the current drawer, graph, or overlay", "key": "Esc" },
+        { "action": "Zoom the map", "key": "Mouse wheel / trackpad pinch" },
+        { "action": "Pan the map", "key": "Drag the canvas" },
+        { "action": "Follow a resident", "key": "Double-click a resident" },
+        { "action": "Open tile context actions", "key": "Right-click the map" }
+      ]
+    },
+    "faq": {
+      "badge": "FAQ",
+      "title": "Frequently Asked Questions",
+      "items": [
+        {
+          "question": "Why am I stuck on the loading screen?",
+          "answer": "Usually the backend or WebSocket is not up yet. Confirm `docker compose up` is running, then retry the connection."
+        },
+        {
+          "question": "What is the difference between the daily report and the experiment report?",
+          "answer": "The daily report is a lightweight dramatic summary for sharing, while the experiment report aggregates multi-day relationship changes, metrics, and longer-form analysis."
+        },
+        {
+          "question": "I injected an event but nothing changed immediately. What now?",
+          "answer": "Check whether the simulation is paused, then watch the feed, timeline, and graph. Some effects only become visible after residents complete another tick."
+        },
+        {
+          "question": "Can I use saves to replay different narrative branches?",
+          "answer": "Yes. Save a baseline state, inject different events or parameters, then reload the baseline to run controlled comparisons."
+        }
+      ]
+    }
   },
   "build_panel": {
     "badge": "Build Mode",

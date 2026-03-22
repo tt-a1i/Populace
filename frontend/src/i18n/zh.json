@@ -4,6 +4,7 @@
     "slogan_en": "Create a pixel town, watch AI residents live their drama.",
     "slogan_zh": "创造一个像素小镇，围观 AI 居民的悲欢离合",
     "start": "开始模拟",
+    "guide": "查看用户指南",
     "footnote": "基于 Stanford Generative Agents 论文 · 完全开源",
     "features": {
       "social_title": "AI 自主社交",
@@ -43,7 +44,28 @@
     "modern_community_tags": ["社交", "爱恨情仇", "八卦"],
     "seaside_village_name": "海边渔村",
     "seaside_village_desc": "宁静的海边小渔村，渔夫与商人在海风中演绎各自的故事。",
-    "seaside_village_tags": ["渔村", "海边", "慢生活"]
+    "seaside_village_tags": ["渔村", "海边", "慢生活"],
+    "mountain_village_name": "云岚山村",
+    "mountain_village_desc": "群山、溪流与林间小径交错的山村，猎人与草药师共享古老传说。",
+    "mountain_village_tags": ["山村", "溪流", "草药", "山林"],
+    "open_editor": "编辑预设场景",
+    "editor_label": "场景编辑器",
+    "editor_title": "基于模板创建自定义场景",
+    "editor_desc": "选择任一预设模板，修改居民名字、性格和建筑名称后保存到本地。",
+    "editor_close": "关闭",
+    "editor_base": "基础模板",
+    "editor_scene_name": "自定义场景名称",
+    "editor_buildings": "建筑名称",
+    "editor_residents": "居民设定",
+    "editor_resident_name": "居民名字",
+    "editor_resident_personality": "居民性格",
+    "editor_reset": "恢复模板内容",
+    "editor_save": "保存到本地场景",
+    "saved_label": "本地场景",
+    "saved_title": "已保存的自定义场景",
+    "saved_count": "个场景",
+    "saved_badge": "LOCAL",
+    "custom_missing": "未找到已保存的自定义场景"
   },
   "toolbar": {
     "director": "导演台",
@@ -312,9 +334,20 @@
     "theme": "主题",
     "theme_dark": "暗色",
     "theme_light": "亮色",
+    "theme_color": "主题色",
+    "theme_color_blue": "蓝",
+    "theme_color_green": "绿",
+    "theme_color_purple": "紫",
+    "theme_color_red": "红",
+    "theme_color_orange": "橙",
+    "theme_color_cyan": "青",
     "sound": "音效",
     "sound_on": "开",
     "sound_off": "关",
+    "language_zh": "中文",
+    "language_en": "EN",
+    "guide": "用户指南",
+    "guide_open": "打开用户指南",
     "tutorial_reset": "重置引导教程",
     "tutorial_reset_done": "已重置 ✓"
   },
@@ -372,7 +405,14 @@
     "conflict_desc": "引入一个神秘陌生人，搅动小镇平静",
     "watch": "随便看看",
     "watch_desc": "放手让 AI 居民自由发展",
-    "meet_event": "{{name}}在广场遇到了邻居"
+    "meet_event": "{{name}}在广场遇到了邻居",
+    "mood_keywords": {
+      "happy": ["happy", "开心", "高兴"],
+      "sad": ["sad", "悲伤", "难过"],
+      "angry": ["angry", "愤怒", "生气"],
+      "anxious": ["anxious", "焦虑"],
+      "neutral": ["neutral", "平静"]
+    }
   },
   "director": {
     "badge": "Director's Console",
@@ -444,11 +484,96 @@
     "reconnect": "重新连接",
     "reconnecting": "重连中 {{seconds}}s...",
     "conn_interrupted": "连接中断，正在重连...",
+    "toolbar_region": "主工具栏",
+    "map_region": "小镇地图",
+    "graph_region": "关系图谱面板",
+    "panel_region": "工具面板",
     "open_tools": "工具面板",
+    "resize_split_pane": "调整地图和图谱面板宽度",
     "season_spring": "春天",
     "season_summer": "夏天",
     "season_autumn": "秋天",
     "season_winter": "冬天"
+  },
+  "guide_page": {
+    "badge": "Operator Manual",
+    "title": "Populace 用户指南",
+    "description": "这是一份面向操盘者的快速上手手册，帮你理解地图、关系图谱、上帝模式、事件注入和存档工作流。第一次进入时先扫一遍，再边玩边查即可。",
+    "back": "返回上一页",
+    "features_label": "功能分区",
+    "features": [
+      {
+        "title": "地图视图",
+        "description": "地图是小镇的主舞台。你可以观察居民移动、天气变化、建筑分布，以及居民在真实地块上的互动位置。",
+        "bullets": [
+          "滚轮缩放，拖拽平移，双击居民可锁定跟随。",
+          "右键地图可打开上下文菜单，快速查看地块、居民和事件入口。",
+          "顶部 HUD 会持续显示当前时间、天气与季节。"
+        ]
+      },
+      {
+        "title": "关系图谱",
+        "description": "右侧图谱将居民间的爱情、友谊、竞争和认识关系可视化，适合观察社交结构如何随时间演化。",
+        "bullets": [
+          "悬停边线可查看关系类型与强度。",
+          "时间线回放可将图谱状态切回历史 tick。",
+          "图谱与地图联动，方便追踪谁在影响谁。"
+        ]
+      },
+      {
+        "title": "上帝模式",
+        "description": "导演台、人设编辑、居民创建等工具都属于你的干预面板。你可以直接改写角色命运，制造戏剧冲突。",
+        "bullets": [
+          "导演台适合注入情绪、安排偶遇、传播谣言。",
+          "人设编辑可以修改人格、目标和当前情绪。",
+          "创建居民向导支持把新人直接投放进现有社会网络。"
+        ]
+      },
+      {
+        "title": "事件与存档",
+        "description": "事件投放负责给小镇加戏，存档负责冻结当下世界状态。两者结合，适合做可复现的实验或剧情分支。",
+        "bullets": [
+          "预设事件可以快速触发暴风雨、陌生人到访等局面。",
+          "自定义事件适合测试提示词、关系演化和群体反应。",
+          "存档后可随时回读，比较不同决策下的小镇走向。"
+        ]
+      }
+    ],
+    "shortcuts": {
+      "badge": "Keyboard Cheat Sheet",
+      "title": "快捷键速查",
+      "action": "操作",
+      "key": "按键",
+      "items": [
+        { "action": "关闭当前抽屉、图谱或浮层", "key": "Esc" },
+        { "action": "缩放地图", "key": "鼠标滚轮 / 触控板缩放" },
+        { "action": "平移地图", "key": "拖拽画布" },
+        { "action": "跟随居民", "key": "双击居民" },
+        { "action": "打开地块上下文操作", "key": "右键地图" }
+      ]
+    },
+    "faq": {
+      "badge": "FAQ",
+      "title": "常见问题",
+      "items": [
+        {
+          "question": "为什么我只看到加载界面？",
+          "answer": "通常是后端或 WebSocket 尚未启动。先确认 `docker compose up` 已正常运行，再点击重试连接。"
+        },
+        {
+          "question": "日报和实验报告有什么区别？",
+          "answer": "日报偏向轻量化剧情摘要与分享卡片，实验报告则会整理多日关系变化、统计指标和研究风格分析。"
+        },
+        {
+          "question": "事件投放后没有立刻看到变化怎么办？",
+          "answer": "先检查当前模拟是否暂停，再观察消息流、时间线和关系图谱。部分事件需要居民跑完一个 tick 才会完全体现。"
+        },
+        {
+          "question": "存档能否用于回放不同剧情分支？",
+          "answer": "可以。先保存一个基线存档，再在不同事件或参数下注入后续操作，最后加载基线重跑即可做对照实验。"
+        }
+      ]
+    }
   },
   "build_panel": {
     "badge": "Build Mode",

@@ -61,4 +61,39 @@ describe('GraphRenderer incremental DOM updates', () => {
     renderer.destroy()
     root.remove()
   })
+
+  it('renders avatar images inside graph nodes', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+
+    const renderer = new GraphRenderer(root, {
+      onHoverLink: () => undefined,
+      onHoverPair: () => undefined,
+      onSelectResident: () => undefined,
+    })
+
+    renderer.resize(640, 480)
+    renderer.render(
+      [
+        {
+          id: 'a',
+          name: 'Ada',
+          mood: 'happy',
+          skinColor: '#d8a27a',
+          hairStyle: 'bun',
+          hairColor: '#2b1b17',
+          outfitColor: '#3b82f6',
+        },
+      ],
+      [],
+      null,
+    )
+
+    const avatar = root.querySelector('.graph-node-avatar')
+    expect(avatar).not.toBeNull()
+    expect(avatar?.getAttribute('href')).toMatch(/^data:image\//)
+
+    renderer.destroy()
+    root.remove()
+  })
 })

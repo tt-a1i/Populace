@@ -1,0 +1,157 @@
+{
+  "name": "云岚山村",
+  "description": "藏在群山与溪流间的古朴山村，猎人、草药师与守庙人围绕四季山林过着紧密相连的生活。",
+  "map": {
+    "width": 40,
+    "height": 30,
+    "roads": [
+      { "x": 6, "y": 18, "width": 26, "height": 2 },
+      { "x": 14, "y": 9, "width": 2, "height": 11 },
+      { "x": 22, "y": 6, "width": 2, "height": 14 },
+      { "x": 28, "y": 11, "width": 2, "height": 9 }
+    ],
+    "water": [
+      { "x": 0, "y": 6, "width": 12, "height": 2 },
+      { "x": 10, "y": 7, "width": 2, "height": 9 },
+      { "x": 11, "y": 14, "width": 11, "height": 2 }
+    ]
+  },
+  "buildings": [
+    {
+      "id": "hunter_lodge",
+      "type": "home",
+      "name": "猎人小屋",
+      "capacity": 2,
+      "position": [9, 18]
+    },
+    {
+      "id": "herb_shop",
+      "type": "shop",
+      "name": "草药铺",
+      "capacity": 3,
+      "position": [15, 12]
+    },
+    {
+      "id": "mountain_shrine",
+      "type": "school",
+      "name": "山神庙",
+      "capacity": 4,
+      "position": [23, 8]
+    },
+    {
+      "id": "blacksmith",
+      "type": "shop",
+      "name": "铁匠铺",
+      "capacity": 3,
+      "position": [29, 13]
+    },
+    {
+      "id": "chief_house",
+      "type": "home",
+      "name": "村长家",
+      "capacity": 3,
+      "position": [20, 18]
+    },
+    {
+      "id": "hot_spring",
+      "type": "park",
+      "name": "温泉",
+      "capacity": 8,
+      "position": [30, 20]
+    }
+  ],
+  "residents": [
+    {
+      "id": "r_shanmu",
+      "name": "山木",
+      "personality": "寡言沉着的老猎人，熟悉山路与兽迹，习惯先观察再行动。",
+      "goals": ["在初雪前修好陷阱", "把打猎技艺传给年轻人"],
+      "mood": "neutral",
+      "home_id": "hunter_lodge",
+      "x": 10,
+      "y": 19
+    },
+    {
+      "id": "r_yelan",
+      "name": "叶岚",
+      "personality": "机敏大胆的年轻猎人，争强好胜，渴望证明自己比前辈更出色。",
+      "goals": ["独自追踪黑鹿", "赢得村里人的认可"],
+      "mood": "happy",
+      "home_id": "hunter_lodge",
+      "x": 11,
+      "y": 20
+    },
+    {
+      "id": "r_qingzhi",
+      "name": "青枝",
+      "personality": "温柔细致的草药师，记忆力极好，对每种药草的气味都异常敏感。",
+      "goals": ["配出新的止咳药方", "照顾好山里每一位病人"],
+      "mood": "happy",
+      "home_id": "herb_shop",
+      "x": 16,
+      "y": 13
+    },
+    {
+      "id": "r_muyao",
+      "name": "木遥",
+      "personality": "神神叨叨却心地善良的草药采集人，喜欢在林间自言自语。",
+      "goals": ["找到传说中的月影草", "给温泉边种满药花"],
+      "mood": "neutral",
+      "home_id": "herb_shop",
+      "x": 17,
+      "y": 14
+    },
+    {
+      "id": "r_shenpo",
+      "name": "神婆",
+      "personality": "敬畏山神、言语含蓄的守庙人，擅长安抚人心，也藏着不少旧秘密。",
+      "goals": ["守住山神庙香火", "解开村中古旧石碑的含义"],
+      "mood": "neutral",
+      "home_id": "mountain_shrine",
+      "x": 24,
+      "y": 9
+    },
+    {
+      "id": "r_tiechuan",
+      "name": "铁川",
+      "personality": "脾气火爆但重情重义的铁匠，做事干脆，说话像锤子一样直。",
+      "goals": ["打造最耐用的猎刀", "让铁匠铺重新热闹起来"],
+      "mood": "happy",
+      "home_id": "blacksmith",
+      "x": 30,
+      "y": 14
+    },
+    {
+      "id": "r_xunfeng",
+      "name": "寻枫",
+      "personality": "谨慎持重的年轻村长，凡事讲规矩，总想在传统和变化之间找平衡。",
+      "goals": ["修好通往山外的小径", "避免村里人因资源起争执"],
+      "mood": "neutral",
+      "home_id": "chief_house",
+      "x": 21,
+      "y": 19
+    },
+    {
+      "id": "r_wenxi",
+      "name": "温溪",
+      "personality": "爱笑健谈的温泉看守，最擅长撮合大家和解，也最爱听八卦。",
+      "goals": ["把温泉打理成全村聚会点", "撮合一对有缘人"],
+      "mood": "happy",
+      "home_id": "chief_house",
+      "x": 31,
+      "y": 21
+    }
+  ],
+  "initial_relationships": [
+    { "from_id": "r_shanmu", "to_id": "r_yelan", "type": "friendship", "intensity": 0.7, "familiarity": 0.8, "reason": "山木一直带着叶岚巡山，像师徒一样相处" },
+    { "from_id": "r_yelan", "to_id": "r_shanmu", "type": "friendship", "intensity": 0.6, "familiarity": 0.7, "reason": "嘴上不服气，心里却很敬重山木" },
+    { "from_id": "r_qingzhi", "to_id": "r_muyao", "type": "friendship", "intensity": 0.8, "familiarity": 0.8, "reason": "常一起上山采药，彼此最懂草木脾气" },
+    { "from_id": "r_muyao", "to_id": "r_qingzhi", "type": "friendship", "intensity": 0.7, "familiarity": 0.8, "reason": "青枝总能把她带回来的草药变成好药" },
+    { "from_id": "r_shenpo", "to_id": "r_xunfeng", "type": "knows", "intensity": 0.4, "familiarity": 0.6, "reason": "村长常来山神庙请教旧规矩" },
+    { "from_id": "r_xunfeng", "to_id": "r_shenpo", "type": "knows", "intensity": 0.5, "familiarity": 0.6, "reason": "神婆说话绕，但总能提醒他看长远" },
+    { "from_id": "r_tiechuan", "to_id": "r_yelan", "type": "rivalry", "intensity": 0.4, "familiarity": 0.5, "reason": "叶岚总嫌铁川打的箭头不够轻巧" },
+    { "from_id": "r_wenxi", "to_id": "r_tiechuan", "type": "friendship", "intensity": 0.5, "familiarity": 0.5, "reason": "铁匠铺关门后，铁川常去温泉边散心聊天" },
+    { "from_id": "r_wenxi", "to_id": "r_qingzhi", "type": "knows", "intensity": 0.4, "familiarity": 0.5, "reason": "青枝常给温泉客人准备舒缓药包" },
+    { "from_id": "r_qingzhi", "to_id": "r_wenxi", "type": "knows", "intensity": 0.4, "familiarity": 0.5, "reason": "温溪总能第一时间带来村里的消息" }
+  ]
+}

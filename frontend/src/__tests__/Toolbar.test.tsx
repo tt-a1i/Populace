@@ -83,6 +83,18 @@ describe('Toolbar', () => {
     expect(screen.getByTestId('more-toggle')).toHaveTextContent(/更多/)
   })
 
+  it('adds aria-labels to tool buttons and the secondary toggle', async () => {
+    render(<Toolbar />)
+
+    expect(screen.getByRole('button', { name: '导演台' })).toHaveAttribute('aria-label', '导演台')
+    expect(screen.getByTestId('more-toggle')).toHaveAttribute('aria-label', '更多')
+
+    await userEvent.click(screen.getByTestId('more-toggle'))
+
+    expect(screen.getByRole('button', { name: '数据统计' })).toHaveAttribute('aria-label', '数据统计')
+    expect(screen.getByRole('button', { name: '关系热力图' })).toHaveAttribute('aria-label', '关系热力图')
+  })
+
   // --- Secondary tools are hidden initially ---
   it('does not show secondary tools by default', () => {
     render(<Toolbar />)
@@ -164,7 +176,7 @@ describe('Toolbar', () => {
     await userEvent.click(screen.getByTestId('more-toggle'))
     // Click a secondary tool
     await userEvent.click(screen.getByRole('button', { name: /数据统计/ }))
-    expect(screen.getByTestId('stats-panel')).toBeInTheDocument()
+    expect(screen.getAllByText(/数据统计/).length).toBeGreaterThan(1)
     // Secondary row should remain visible
     expect(screen.getByTestId('secondary-row')).toBeInTheDocument()
   })

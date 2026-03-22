@@ -73,14 +73,14 @@ describe('SavesPanel notifications', () => {
 
     render(<SavesPanel />)
 
-    const loadButton = await screen.findByRole('button', { name: '加载' })
+    const loadButton = await screen.findByLabelText('加载 自动存档')
     await user.click(loadButton)
 
     await waitFor(() => {
       expect(mockLoadSave).toHaveBeenCalledWith('save-1')
     })
 
-    const deleteButton = await screen.findByRole('button', { name: '删除' })
+    const deleteButton = await screen.findByLabelText('删除 自动存档')
     await user.click(deleteButton)
 
     await waitFor(() => {

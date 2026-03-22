@@ -73,6 +73,20 @@ def test_start_unknown_scene_falls_back_to_default(client: TestClient) -> None:
     assert len(residents) == 10, "Unknown scene should fall back to 10-resident modern_community"
 
 
+def test_start_mountain_village_scene_loads_new_template(client: TestClient) -> None:
+    """POST /api/simulation/start can load the mountain_village preset."""
+    resp = client.post("/api/simulation/start", json={"scene": "mountain_village"})
+    assert resp.status_code == 200
+
+    residents = client.get("/api/residents").json()
+    assert len(residents) == 8
+    assert {resident["name"] for resident in residents} >= {"山木", "青枝", "温溪"}
+
+    buildings = client.get("/api/world/buildings").json()
+    assert len(buildings) == 6
+    assert {building["name"] for building in buildings} >= {"猎人小屋", "草药铺", "温泉"}
+
+
 def test_active_events_cleared_on_scene_switch(client: TestClient) -> None:
     """Active events from a previous scene must not leak into the new scene."""
     # Inject a multi-tick preset event

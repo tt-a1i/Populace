@@ -1,75 +1,53 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { type ScenarioData, generateScenario, startCustomSimulation, startSimulation } from '../../services/api'
+import { SceneEditor } from './SceneEditor'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { ThemeToggle } from './ThemeToggle'
+import { type CustomSceneRecord, PRESET_SCENES, loadCustomScenes, saveCustomScenes } from './sceneCatalog'
 
 interface ScenePickerProps {
   onEnter: () => void
   onBack: () => void
 }
 
-interface PreviewItem { emoji: string; x: number; y: number }
-
-const PRESET_SCENES = [
-  {
-    id: 'modern_community',
-    i18nKey: 'modern_community',
-    residents: 10,
-    buildings: 8,
-    color: 'from-cyan-500/20 to-violet-500/10',
-    border: 'border-cyan-400/30',
-    accent: 'text-cyan-300',
-    recommended: true,
-    preview: [
-      { emoji: '\uD83C\uDFE2', x: 8,  y: 12 },
-      { emoji: '\u2615', x: 55, y: 8  },
-      { emoji: '\uD83C\uDF33', x: 80, y: 30 },
-      { emoji: '\uD83C\uDFEA', x: 30, y: 50 },
-      { emoji: '\uD83D\uDC69', x: 20, y: 70 },
-      { emoji: '\uD83D\uDC68', x: 65, y: 65 },
-      { emoji: '\uD83D\uDCAC', x: 42, y: 38 },
-    ] as PreviewItem[],
-  },
-  {
-    id: 'seaside_village',
-    i18nKey: 'seaside_village',
-    residents: 6,
-    buildings: 6,
-    color: 'from-blue-500/20 to-teal-500/10',
-    border: 'border-blue-400/30',
-    accent: 'text-blue-300',
-    recommended: false,
-    preview: [
-      { emoji: '\u26F5', x: 55, y: 10 },
-      { emoji: '\uD83C\uDF0A', x: 20, y: 68 },
-      { emoji: '\uD83C\uDFE0', x: 8,  y: 30 },
-      { emoji: '\uD83D\uDC1F', x: 75, y: 55 },
-      { emoji: '\uD83C\uDFEE', x: 45, y: 42 },
-      { emoji: '\uD83D\uDC74', x: 30, y: 72 },
-    ] as PreviewItem[],
-  },
-]
-
 export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
   const { t } = useTranslation()
   const [selectedScene, setSelectedScene] = useState(PRESET_SCENES[0].id)
+  const [selectedCustomSceneId, setSelectedCustomSceneId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [customScenes, setCustomScenes] = useState<CustomSceneRecord[]>([])
+  const [editorOpen, setEditorOpen] = useState(false)
 
-  // Custom scenario state
   const [customDesc, setCustomDesc] = useState('')
   const [customGenerating, setCustomGenerating] = useState(false)
   const [customError, setCustomError] = useState<string | null>(null)
   const [generatedScenario, setGeneratedScenario] = useState<ScenarioData | null>(null)
   const [customStarting, setCustomStarting] = useState(false)
 
+  useEffect(() => {
+    const scenes = loadCustomScenes()
+    setCustomScenes(scenes)
+    if (scenes.length > 0) {
+      setSelectedCustomSceneId((current) => current ?? scenes[0].id)
+    }
+  }, [])
+
   const handleEnter = async () => {
     setLoading(true)
     setError(null)
     try {
-      await startSimulation(selectedScene)
+      if (selectedScene === 'custom_saved') {
+        const customScene = customScenes.find((scene) => scene.id === selectedCustomSceneId)
+        if (!customScene) {
+          throw new Error(t('scene.custom_missing'))
+        }
+        await startCustomSimulation(customScene.scenario)
+      } else {
+        await startSimulation(selectedScene)
+      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -77,7 +55,7 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
           : t('scene.backend_error_hint'),
       )
       setLoading(false)
-      return  // Stay on picking page — do NOT enter simulation
+      return
     }
     setLoading(false)
     onEnter()
@@ -111,9 +89,30 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
     }
   }
 
+  const handleSaveEditedScene = ({
+    scenario,
+    basedOn,
+  }: {
+    scenario: ScenarioData
+    basedOn: string
+  }) => {
+    const nextRecord: CustomSceneRecord = {
+      id: `custom_${Date.now()}`,
+      name: scenario.name,
+      basedOn,
+      scenario,
+      createdAt: new Date().toISOString(),
+    }
+    const nextScenes = [nextRecord, ...customScenes]
+    saveCustomScenes(nextScenes)
+    setCustomScenes(nextScenes)
+    setSelectedScene('custom_saved')
+    setSelectedCustomSceneId(nextRecord.id)
+    setEditorOpen(false)
+  }
+
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-slate-950 text-slate-100">
-      {/* Background glows (same as WelcomePage) */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(6,182,212,0.10),transparent)]" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_80%_100%,rgba(139,92,246,0.08),transparent)]" />
       <div
@@ -126,7 +125,6 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
       />
 
       <div className="relative z-10 w-full max-w-xl px-4 py-16 sm:px-0">
-        {/* Back button */}
         <button
           onClick={onBack}
           className="mb-8 flex items-center gap-1.5 text-sm text-slate-400 transition-colors hover:text-white"
@@ -137,7 +135,6 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
           {t('scene.back')}
         </button>
 
-        {/* Heading */}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-mono text-2xl font-bold text-white sm:text-3xl">{t('scene.title')}</h2>
@@ -149,7 +146,6 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
           </div>
         </div>
 
-        {/* ── Preset scene cards ── */}
         <div className="mt-8 flex flex-col gap-3">
           {PRESET_SCENES.map((scene) => {
             const isSelected = selectedScene === scene.id
@@ -167,7 +163,7 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
                 onClick={() => setSelectedScene(scene.id)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && setSelectedScene(scene.id)}
+                onKeyDown={(event) => event.key === 'Enter' && setSelectedScene(scene.id)}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -183,22 +179,20 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
                     </div>
                     <h3 className="mt-2 text-xl font-bold text-white">{t(`scene.${scene.i18nKey}_name`)}</h3>
                   </div>
-                  {/* Selection indicator */}
-                  <div className={[
-                    'mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
-                    isSelected
-                      ? `${scene.border} bg-white/20`
-                      : 'border-white/20 bg-transparent',
-                  ].join(' ')}>
+                  <div
+                    className={[
+                      'mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+                      isSelected ? `${scene.border} bg-white/20` : 'border-white/20 bg-transparent',
+                    ].join(' ')}
+                  >
                     {isSelected && <div className="h-2.5 w-2.5 rounded-full bg-white/80" />}
                   </div>
                 </div>
 
-                {/* Emoji mini-map preview */}
                 <div className="relative mt-4 h-16 w-full overflow-hidden rounded-xl border border-white/8 bg-black/20">
-                  {scene.preview.map((item, pi) => (
+                  {scene.preview.map((item, index) => (
                     <span
-                      key={pi}
+                      key={index}
                       className="pointer-events-none absolute text-lg leading-none"
                       style={{ left: `${item.x}%`, top: `${item.y}%` }}
                       aria-hidden="true"
@@ -236,20 +230,80 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
           })}
         </div>
 
-        {/* ── Custom scene ── */}
+        {customScenes.length > 0 && (
+          <div className="mt-4 rounded-3xl border border-amber-400/20 bg-amber-400/5 p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-200/80">
+                  {t('scene.saved_label')}
+                </span>
+                <h3 className="mt-2 text-lg font-bold text-white">{t('scene.saved_title')}</h3>
+              </div>
+              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300">
+                {customScenes.length} {t('scene.saved_count')}
+              </span>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3">
+              {customScenes.map((scene) => {
+                const isSelected = selectedScene === 'custom_saved' && selectedCustomSceneId === scene.id
+                return (
+                  <button
+                    key={scene.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedScene('custom_saved')
+                      setSelectedCustomSceneId(scene.id)
+                    }}
+                    className={[
+                      'rounded-2xl border p-4 text-left transition-all',
+                      isSelected
+                        ? 'border-amber-300/50 bg-amber-300/10 ring-2 ring-amber-300/30'
+                        : 'border-white/10 bg-slate-950/30 hover:border-white/20 hover:bg-white/[0.04]',
+                    ].join(' ')}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-white">{scene.name}</p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {t(`scene.${scene.basedOn}_name`)} · {scene.scenario.residents.length} {t('scene.residents')} · {scene.scenario.buildings.length} {t('scene.buildings')}
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-slate-300">
+                        {t('scene.saved_badge')}
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="mt-4 rounded-3xl border border-white/8 bg-white/[0.02] p-6">
-          <span className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-            {t('scene.custom_label')}
-          </span>
-          <h3 className="mt-2 text-lg font-bold text-white">{t('scene.custom_title')}</h3>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+                {t('scene.custom_label')}
+              </span>
+              <h3 className="mt-2 text-lg font-bold text-white">{t('scene.custom_title')}</h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditorOpen((current) => !current)}
+              className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-400/15"
+            >
+              {editorOpen ? t('scene.editor_close') : t('scene.open_editor')}
+            </button>
+          </div>
 
           <textarea
             className="mt-3 w-full resize-none rounded-xl border border-white/10 bg-slate-900/60 p-3 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-violet-400/50 focus:ring-1 focus:ring-violet-400/30"
             rows={3}
             placeholder={t('scene.custom_placeholder')}
             value={customDesc}
-            onChange={(e) => {
-              setCustomDesc(e.target.value)
+            onChange={(event) => {
+              setCustomDesc(event.target.value)
               setGeneratedScenario(null)
               setCustomError(null)
             }}
@@ -258,7 +312,7 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
           <button
             onClick={handleGenerateScenario}
             disabled={customGenerating || !customDesc.trim()}
-            className="mt-3 flex items-center gap-2 rounded-xl border border-violet-400/30 bg-violet-500/10 px-4 py-2 text-sm font-semibold text-violet-300 transition-colors hover:bg-violet-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="mt-3 flex items-center gap-2 rounded-xl border border-violet-400/30 bg-violet-500/10 px-4 py-2 text-sm font-semibold text-violet-300 transition-colors hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {customGenerating ? (
               <>
@@ -270,11 +324,8 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
             )}
           </button>
 
-          {customError && (
-            <p className="mt-3 text-xs text-red-300">{customError}</p>
-          )}
+          {customError && <p className="mt-3 text-xs text-red-300">{customError}</p>}
 
-          {/* Preview */}
           {generatedScenario && (
             <div className="mt-4 rounded-xl border border-white/8 bg-slate-900/40 p-4">
               <p className="text-sm font-bold text-white">{generatedScenario.name}</p>
@@ -283,9 +334,9 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
                 <span>🏘️ <span className="font-semibold text-slate-200">{generatedScenario.buildings.length}</span> {t('scene.buildings')}</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {generatedScenario.residents.slice(0, 8).map((r) => (
-                  <span key={r.id} className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">
-                    {r.name}
+                {generatedScenario.residents.slice(0, 8).map((resident) => (
+                  <span key={resident.id} className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">
+                    {resident.name}
                   </span>
                 ))}
                 {generatedScenario.residents.length > 8 && (
@@ -310,14 +361,20 @@ export function ScenePicker({ onEnter, onBack }: ScenePickerProps) {
           )}
         </div>
 
-        {/* Error */}
+        {editorOpen && (
+          <SceneEditor
+            initialBaseSceneId={PRESET_SCENES.find((scene) => scene.id === selectedScene)?.id ?? PRESET_SCENES[0].id}
+            onSave={handleSaveEditedScene}
+            onCancel={() => setEditorOpen(false)}
+          />
+        )}
+
         {error && (
           <p className="mt-4 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-2 text-sm text-red-300">
             {error}
           </p>
         )}
 
-        {/* Enter button */}
         <button
           onClick={handleEnter}
           disabled={loading}

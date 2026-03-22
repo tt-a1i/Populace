@@ -1,6 +1,7 @@
 export { EmptyState } from './EmptyState'
 export { ErrorBoundary } from './ErrorBoundary'
 export { FirstRunGuide } from './FirstRunGuide'
+export { SceneEditor } from './SceneEditor'
 export { ThemeToggle } from './ThemeToggle'
 export { LanguageSwitcher } from './LanguageSwitcher'
 export { LoadingTransition } from './LoadingTransition'
