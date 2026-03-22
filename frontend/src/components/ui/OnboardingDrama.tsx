@@ -77,6 +77,13 @@ export function OnboardingDrama({ onComplete }: OnboardingDramaProps) {
   const [opacity, setOpacity] = useState(1)
   const [showLine2, setShowLine2] = useState(false)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const moodKeywordMap = [
+    { key: 'happy', emoji: '😊' },
+    { key: 'sad', emoji: '😢' },
+    { key: 'angry', emoji: '😡' },
+    { key: 'anxious', emoji: '😰' },
+    { key: 'neutral', emoji: '😐' },
+  ] as const
 
   // Resident data from the simulation store
   const residents = useSimulationStore((s) => s.residents)
@@ -204,11 +211,12 @@ export function OnboardingDrama({ onComplete }: OnboardingDramaProps) {
   const moodEmoji = (mood?: string): string => {
     if (!mood) return ''
     const lower = mood.toLowerCase()
-    if (lower.includes('happy') || lower.includes('开心') || lower.includes('高兴')) return '😊'
-    if (lower.includes('sad') || lower.includes('悲伤') || lower.includes('难过')) return '😢'
-    if (lower.includes('angry') || lower.includes('愤怒') || lower.includes('生气')) return '😡'
-    if (lower.includes('anxious') || lower.includes('焦虑')) return '😰'
-    if (lower.includes('neutral') || lower.includes('平静')) return '😐'
+    for (const entry of moodKeywordMap) {
+      const keywords = t(`onboarding.mood_keywords.${entry.key}`, { returnObjects: true }) as string[]
+      if (keywords.some((keyword) => lower.includes(keyword))) {
+        return entry.emoji
+      }
+    }
     return '🙂'
   }
 

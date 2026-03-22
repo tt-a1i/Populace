@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { getLlmKeyStatus, setLlmKey } from '../../services/api'
 import { useSound } from '../../audio'
 import { setLanguage } from '../../i18n/config'
-import { useThemeStore } from '../../stores/theme'
+import { THEME_ACCENTS, useThemeStore } from '../../stores/theme'
 import { resetTutorial } from '../ui/TutorialOverlay'
 
 const LS_KEY = 'populace-llm-key'
@@ -34,7 +34,7 @@ function ToggleBtn({
       className={[
         'rounded-full border px-3 py-1 text-xs font-medium transition duration-200 active:scale-95',
         active
-          ? 'border-cyan-300/40 bg-cyan-300/15 text-cyan-50'
+          ? 'theme-accent-button-active'
           : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10',
       ].join(' ')}
     >
@@ -46,7 +46,9 @@ function ToggleBtn({
 export function SettingsPanel() {
   const { t, i18n } = useTranslation()
   const theme = useThemeStore((s) => s.theme)
+  const accent = useThemeStore((s) => s.accent)
   const toggleTheme = useThemeStore((s) => s.toggleTheme)
+  const setAccent = useThemeStore((s) => s.setAccent)
   const { enabled: soundEnabled, toggleEnabled: toggleSound } = useSound()
 
   const [apiKey, setApiKey] = useState(() => {
@@ -86,8 +88,11 @@ export function SettingsPanel() {
   }
 
   const isZh = i18n.language === 'zh'
+  const openGuide = () => {
+    window.dispatchEvent(new CustomEvent('populace:open-guide'))
+  }
   const inputClass =
-    'flex-1 rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-400/50'
+    'theme-accent-input flex-1 rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none'
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/4 p-5">
@@ -120,7 +125,7 @@ export function SettingsPanel() {
               type="button"
               onClick={handleSaveKey}
               disabled={saveState === 'saving'}
-              className="rounded-full border border-cyan-300/30 bg-cyan-300/12 px-4 py-1.5 text-sm text-cyan-50 transition duration-200 hover:bg-cyan-300/20 active:scale-95 disabled:opacity-40"
+              className="theme-accent-button-outline rounded-full border px-4 py-1.5 text-sm transition duration-200 active:scale-95 disabled:opacity-40"
             >
               {saveState === 'saving'
                 ? t('settings.llm_key_saving')
@@ -134,8 +139,8 @@ export function SettingsPanel() {
 
         {/* Language */}
         <Row label={t('settings.language')}>
-          <ToggleBtn active={isZh} onClick={() => setLanguage('zh')} label="中文" />
-          <ToggleBtn active={!isZh} onClick={() => setLanguage('en')} label="EN" />
+          <ToggleBtn active={isZh} onClick={() => setLanguage('zh')} label={t('settings.language_zh')} />
+          <ToggleBtn active={!isZh} onClick={() => setLanguage('en')} label={t('settings.language_en')} />
         </Row>
 
         {/* Theme */}
@@ -152,10 +157,45 @@ export function SettingsPanel() {
           />
         </Row>
 
+        <Row label={t('settings.theme_color')}>
+          {Object.values(THEME_ACCENTS).map((preset) => (
+            <button
+              key={preset.key}
+              type="button"
+              aria-pressed={accent === preset.key}
+              aria-label={t(`settings.theme_color_${preset.key}`)}
+              onClick={() => setAccent(preset.key)}
+              className={[
+                'flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition duration-200 active:scale-95',
+                accent === preset.key
+                  ? 'theme-accent-button-active'
+                  : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10',
+              ].join(' ')}
+            >
+              <span
+                aria-hidden="true"
+                className="h-3 w-3 rounded-full border border-white/20"
+                style={{ backgroundColor: preset.hex }}
+              />
+              {t(`settings.theme_color_${preset.key}`)}
+            </button>
+          ))}
+        </Row>
+
         {/* Sound */}
         <Row label={t('settings.sound')}>
-          <ToggleBtn active={soundEnabled} onClick={() => { if (!soundEnabled) toggleSound() }} label="ON" />
-          <ToggleBtn active={!soundEnabled} onClick={() => { if (soundEnabled) toggleSound() }} label="OFF" />
+          <ToggleBtn active={soundEnabled} onClick={() => { if (!soundEnabled) toggleSound() }} label={t('settings.sound_on')} />
+          <ToggleBtn active={!soundEnabled} onClick={() => { if (soundEnabled) toggleSound() }} label={t('settings.sound_off')} />
+        </Row>
+
+        <Row label={t('settings.guide')}>
+          <button
+            type="button"
+            onClick={openGuide}
+            className="theme-accent-button-outline rounded-full border px-4 py-1.5 text-sm transition duration-200 active:scale-95"
+          >
+            {t('settings.guide_open')}
+          </button>
         </Row>
 
         {/* Tutorial reset */}

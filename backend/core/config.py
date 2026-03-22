@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     llm_base_url: str = Field(default="")
     llm_model_name: str = Field(default="")
     cors_allowed_origins: str = Field(default="http://localhost:3000,http://frontend:3000")
+    rate_limit_window_seconds: int = Field(default=60)
+    rate_limit_max_requests: int = Field(default=120)
 
     # Simulation parameters
     tick_interval_seconds: float = Field(default=3.0)

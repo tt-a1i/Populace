@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface SplitPaneProps {
   left: ReactNode
@@ -26,6 +27,7 @@ export function SplitPane({
   storageKey = 'populace:split-pane-ratio',
   onRatioChange,
 }: SplitPaneProps) {
+  const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [ratio, setRatio] = useState(() => {
     if (typeof window === 'undefined') {
@@ -91,7 +93,7 @@ export function SplitPane({
       <div className="min-w-0 pr-2">{left}</div>
       <button
         type="button"
-        aria-label="调整地图和图谱面板宽度"
+        aria-label={t('app.resize_split_pane')}
         onDoubleClick={() => setRatio(defaultRatio)}
         onPointerDown={handlePointerDown}
         className="group relative h-full w-full cursor-col-resize touch-none bg-transparent p-0"

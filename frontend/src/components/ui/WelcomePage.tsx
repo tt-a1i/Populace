@@ -21,9 +21,10 @@ const PARTICLES = [
 
 interface WelcomePageProps {
   onStart: () => void
+  onGuide: () => void
 }
 
-export function WelcomePage({ onStart }: WelcomePageProps) {
+export function WelcomePage({ onStart, onGuide }: WelcomePageProps) {
   const { t } = useTranslation()
 
   const features = [
@@ -134,22 +135,34 @@ export function WelcomePage({ onStart }: WelcomePageProps) {
           ))}
         </div>
 
-        {/* CTA button */}
-        <button
-          onClick={onStart}
-          className="animate-fade-up group relative mt-14 overflow-hidden rounded-2xl px-12 py-4 text-base font-bold text-white shadow-[0_0_40px_rgba(6,182,212,0.18)] transition-all duration-300 hover:scale-[1.04] hover:shadow-[0_0_60px_rgba(6,182,212,0.35)] active:scale-100"
+        <div
+          className="animate-fade-up mt-14 flex flex-col items-center gap-3 sm:flex-row"
           style={{ animationDelay: '540ms' }}
         >
-          <span className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-violet-500 transition-opacity duration-300" />
-          <span className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-violet-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-          <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-500 group-hover:translate-x-full" />
-          <span className="relative z-10 flex items-center gap-2">
-            {t('welcome.start')}
-            <svg className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-            </svg>
-          </span>
-        </button>
+          <button
+            type="button"
+            onClick={onStart}
+            className="group relative overflow-hidden rounded-2xl px-12 py-4 text-base font-bold text-white shadow-[0_0_40px_rgba(6,182,212,0.18)] transition-all duration-300 hover:scale-[1.04] hover:shadow-[0_0_60px_rgba(6,182,212,0.35)] active:scale-100"
+          >
+            <span className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-violet-500 transition-opacity duration-300" />
+            <span className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-violet-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+            <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-500 group-hover:translate-x-full" />
+            <span className="relative z-10 flex items-center gap-2">
+              {t('welcome.start')}
+              <svg className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onGuide}
+            className="rounded-2xl border border-white/12 bg-white/[0.04] px-7 py-4 text-sm font-medium text-slate-200 transition duration-300 hover:border-cyan-300/35 hover:bg-cyan-300/10 hover:text-white active:scale-[0.98]"
+          >
+            {t('welcome.guide')}
+          </button>
+        </div>
 
         <p
           className="animate-fade-up mt-8 text-xs text-slate-600"

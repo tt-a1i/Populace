@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 logger = logging.getLogger(__name__)
 
@@ -26,16 +26,29 @@ try:
         ws_router,
     )
     from backend.db import close_driver, close_redis, get_driver, get_redis, initialize_constraints
+    from backend.observability import (
+        InMemoryRateLimiter,
+        RequestMetrics,
+        build_request_log,
+        configure_logging,
+        get_client_ip,
+        get_simulation_ticks_total,
+    )
     from backend.core.config import settings
 except ModuleNotFoundError:
     from api import SimulationState, achievements_router, director_router, quests_router, report_router, residents_router, saves_router, schemas, settings_router, simulation_router, world_router, ws_router
     from db import close_driver, close_redis, get_driver, get_redis, initialize_constraints
+    from observability import InMemoryRateLimiter, RequestMetrics, build_request_log, configure_logging, get_client_ip, get_simulation_ticks_total
     from core.config import settings
+
+configure_logging()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.simulation_state = SimulationState()
+    app.state.rate_limiter = InMemoryRateLimiter(limit=120, window_seconds=60)
+    app.state.request_metrics = RequestMetrics()
 
     # Neo4j — optional; warn and continue if unavailable
     try:
@@ -78,26 +91,57 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 @app.middleware("http")
 async def log_request_metrics(request: Request, call_next):
     start = time.perf_counter()
+    client_ip = get_client_ip(request.headers, request.client.host if request.client else None)
+
+    rate_limiter = getattr(request.app.state, "rate_limiter", None)
+    if request.url.path.startswith("/api/") and rate_limiter is not None and not rate_limiter.allow(client_ip):
+        duration_ms = (time.perf_counter() - start) * 1000
+        status_code = 429
+        request_log = build_request_log(
+            method=request.method,
+            path=request.url.path,
+            status=status_code,
+            duration_ms=duration_ms,
+        )
+        request_metrics = getattr(request.app.state, "request_metrics", None)
+        if request_metrics is not None:
+            request_metrics.observe(request.method, request.url.path, status_code, duration_ms)
+        logger.info("HTTP request completed", extra={"request_log": request_log})
+        payload = schemas.ErrorResponse(detail="rate limit exceeded", code="rate_limit_exceeded")
+        return JSONResponse(status_code=status_code, content=payload.model_dump())
+
     try:
         response = await call_next(request)
     except Exception:
         duration_ms = (time.perf_counter() - start) * 1000
         logger.exception(
-            "HTTP %s %s -> 500 in %.2fms",
-            request.method,
-            request.url.path,
-            duration_ms,
+            "HTTP request failed",
+            extra={
+                "request_log": build_request_log(
+                    method=request.method,
+                    path=request.url.path,
+                    status=500,
+                    duration_ms=duration_ms,
+                )
+            },
         )
-        raise
+        request_metrics = getattr(request.app.state, "request_metrics", None)
+        if request_metrics is not None:
+            request_metrics.observe(request.method, request.url.path, 500, duration_ms)
+        payload = schemas.ErrorResponse(detail="Internal server error", code="internal_server_error")
+        return JSONResponse(status_code=500, content=payload.model_dump())
 
     duration_ms = (time.perf_counter() - start) * 1000
-    logger.info(
-        "HTTP %s %s -> %s in %.2fms",
-        request.method,
-        request.url.path,
-        response.status_code,
-        duration_ms,
+    request_log = build_request_log(
+        method=request.method,
+        path=request.url.path,
+        status=response.status_code,
+        duration_ms=duration_ms,
     )
+    request_metrics = getattr(request.app.state, "request_metrics", None)
+    if request_metrics is not None:
+        request_metrics.observe(request.method, request.url.path, response.status_code, duration_ms)
+    logger.info("HTTP request completed", extra={"request_log": request_log})
     return response
 
 
@@ -153,6 +197,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/api/metrics")
+async def metrics(request: Request) -> PlainTextResponse:
+    request_metrics = getattr(request.app.state, "request_metrics", None)
+    simulation_state = getattr(request.app.state, "simulation_state", None)
+    from backend.api.ws import manager
+
+    body = ""
+    if request_metrics is not None:
+        body = request_metrics.render_prometheus(
+            active_connections=manager.count,
+            simulation_ticks_total=get_simulation_ticks_total(simulation_state),
+        )
+    return PlainTextResponse(body, media_type="text/plain; version=0.0.4")
 
 @app.get("/health", response_model=schemas.HealthResponse)
 async def health() -> schemas.HealthResponse:
