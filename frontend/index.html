@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="description" content="AI-driven social simulation — watch residents live, chat, and form relationships in a pixel town" />
   <meta name="theme-color" content="#020617" />
+  <link rel="manifest" href="/manifest.json" />
   <meta property="og:title" content="Populace — AI Social Simulation" />
   <meta property="og:description" content="Create a pixel town, watch AI residents live their drama." />
   <meta property="og:type" content="website" />
@@ -17,6 +18,15 @@
 </head>
 <body>
   <div id="root"></div>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("/sw.js").catch(function (error) {
+          console.error("Service worker registration failed:", error);
+        });
+      });
+    }
+  </script>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

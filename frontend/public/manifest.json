@@ -1,0 +1,17 @@
+{
+  "name": "Populace - AI Social Simulation",
+  "short_name": "Populace",
+  "description": "AI-driven social simulation in a pixel town.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
