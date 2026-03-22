@@ -1,6 +1,7 @@
 import logging
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
@@ -28,6 +29,7 @@ try:
     from backend.db import close_driver, close_redis, get_driver, get_redis, initialize_constraints
     from backend.observability import (
         InMemoryRateLimiter,
+        JsonRequestFormatter,
         RequestMetrics,
         build_request_log,
         configure_logging,
@@ -35,19 +37,25 @@ try:
         get_simulation_ticks_total,
     )
     from backend.core.config import settings
+    from backend.core.runtime import ensure_runtime_assets
 except ModuleNotFoundError:
     from api import SimulationState, achievements_router, director_router, quests_router, report_router, residents_router, saves_router, schemas, settings_router, simulation_router, world_router, ws_router
     from db import close_driver, close_redis, get_driver, get_redis, initialize_constraints
-    from observability import InMemoryRateLimiter, RequestMetrics, build_request_log, configure_logging, get_client_ip, get_simulation_ticks_total
+    from observability import InMemoryRateLimiter, JsonRequestFormatter, RequestMetrics, build_request_log, configure_logging, get_client_ip, get_simulation_ticks_total
     from core.config import settings
+    from core.runtime import ensure_runtime_assets
 
 configure_logging()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    ensure_runtime_assets(app.state.templates_dir)
     app.state.simulation_state = SimulationState()
-    app.state.rate_limiter = InMemoryRateLimiter(limit=120, window_seconds=60)
+    app.state.rate_limiter = InMemoryRateLimiter(
+        limit=settings.rate_limit_max_requests,
+        window_seconds=settings.rate_limit_window_seconds,
+    )
     app.state.request_metrics = RequestMetrics()
 
     # Neo4j — optional; warn and continue if unavailable
@@ -86,6 +94,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
+app.state.templates_dir = Path(__file__).parent / "world" / "templates"
 
 
 @app.middleware("http")
@@ -94,7 +103,7 @@ async def log_request_metrics(request: Request, call_next):
     client_ip = get_client_ip(request.headers, request.client.host if request.client else None)
 
     rate_limiter = getattr(request.app.state, "rate_limiter", None)
-    if request.url.path.startswith("/api/") and rate_limiter is not None and not rate_limiter.allow(client_ip):
+    if rate_limiter is not None and not rate_limiter.allow(client_ip):
         duration_ms = (time.perf_counter() - start) * 1000
         status_code = 429
         request_log = build_request_log(
@@ -128,7 +137,10 @@ async def log_request_metrics(request: Request, call_next):
         request_metrics = getattr(request.app.state, "request_metrics", None)
         if request_metrics is not None:
             request_metrics.observe(request.method, request.url.path, 500, duration_ms)
-        payload = schemas.ErrorResponse(detail="Internal server error", code="internal_server_error")
+        payload = schemas.ErrorResponse(
+            detail="Internal server error",
+            code="internal_server_error",
+        )
         return JSONResponse(status_code=500, content=payload.model_dump())
 
     duration_ms = (time.perf_counter() - start) * 1000
@@ -175,8 +187,18 @@ async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONR
                 422: "validation_error",
                 503: "service_unavailable",
             }.get(exc.status_code, "http_error"),
-        )
+    )
     return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled application error", exc_info=exc)
+    payload = schemas.ErrorResponse(
+        detail="Internal server error",
+        code="internal_server_error",
+    )
+    return JSONResponse(status_code=500, content=payload.model_dump())
 
 
 _cors_origins = [
