@@ -181,6 +181,16 @@ describe('TownCanvas', () => {
     expect(menu).toHaveStyle({ left: '24px', top: '24px' })
   })
 
+  it('exposes the map shell as a keyboard-focusable region', async () => {
+    render(<TownCanvas />)
+
+    const shell = await screen.findByTestId('town-canvas-shell')
+
+    expect(shell).toHaveAttribute('tabindex', '0')
+    expect(shell).toHaveAttribute('role', 'region')
+    expect(shell).toHaveAccessibleName('小镇地图')
+  })
+
   it('recognizes a click inside a building footprint when inspecting a tile', async () => {
     mockScreenToTile.mockReturnValue({ tileX: 5, tileY: 6, tileKind: 'grass' })
     const user = userEvent.setup()

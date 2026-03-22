@@ -17,6 +17,10 @@ export interface GraphResident {
   id: string
   name: string
   mood: ResidentMood
+  skinColor?: string | null
+  hairStyle?: string | null
+  hairColor?: string | null
+  outfitColor?: string | null
 }
 
 export interface GraphRelationship {
@@ -45,7 +49,15 @@ interface RelationshipsState {
   replayTick: number | null
   flashingEventKeys: Set<string>
   updateFromTick: (tickState: RelationshipTickState) => void
-  initFromSnapshot: (residents: Array<{ id: string; name: string; mood?: string }>) => void
+  initFromSnapshot: (residents: Array<{
+    id: string
+    name: string
+    mood?: string
+    skin_color?: string | null
+    hair_style?: string | null
+    hair_color?: string | null
+    outfit_color?: string | null
+  }>) => void
   setRelationshipsAbsolute: (
     rels: Array<{ from_id: string; to_id: string; type: string; intensity: number; reason?: string }>,
   ) => void
@@ -178,6 +190,10 @@ export const useRelationshipsStore = create<RelationshipsState>((set) => ({
         id: r.id,
         name: r.name,
         mood: (r.mood ?? 'neutral') as ResidentMood,
+        skinColor: r.skin_color ?? null,
+        hairStyle: r.hair_style ?? null,
+        hairColor: r.hair_color ?? null,
+        outfitColor: r.outfit_color ?? null,
       })),
       // Clear mock relationships; real ones accumulate via tick deltas
       relationships: [],

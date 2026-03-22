@@ -93,6 +93,7 @@ export function BuildPanel() {
         <button
           type="button"
           onClick={() => { setFormOpen((o) => !o); setError(null) }}
+          aria-label={formOpen ? t('build_panel.collapse') : t('build_panel.new_building')}
           className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-sm font-medium text-emerald-200 transition duration-200 hover:bg-emerald-300/20 active:scale-95"
         >
           {formOpen ? t('build_panel.collapse') : t('build_panel.new_building')}
@@ -109,6 +110,7 @@ export function BuildPanel() {
               <select
                 value={bType}
                 onChange={(e) => setBType(e.target.value)}
+                aria-label={t('build_panel.type_label')}
                 className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none"
               >
                 {BUILDING_TYPE_KEYS.map((bt) => (
@@ -122,6 +124,7 @@ export function BuildPanel() {
                 value={bName}
                 onChange={(e) => setBName(e.target.value)}
                 placeholder={t('build_panel.name_placeholder')}
+                aria-label={t('build_panel.name_label')}
                 className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none placeholder-slate-600"
               />
             </label>
@@ -133,6 +136,7 @@ export function BuildPanel() {
                 max={200}
                 value={bCapacity}
                 onChange={(e) => setBCapacity(Number(e.target.value))}
+                aria-label={t('build_panel.capacity_label')}
                 className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none"
               />
             </label>
@@ -146,6 +150,7 @@ export function BuildPanel() {
                   value={bX}
                   onChange={(e) => setBX(Number(e.target.value))}
                   placeholder="X"
+                  aria-label={`${t('build_panel.position_label')} X`}
                   className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none"
                 />
                 <input
@@ -155,6 +160,7 @@ export function BuildPanel() {
                   value={bY}
                   onChange={(e) => setBY(Number(e.target.value))}
                   placeholder="Y"
+                  aria-label={`${t('build_panel.position_label')} Y`}
                   className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none"
                 />
               </div>
@@ -166,6 +172,7 @@ export function BuildPanel() {
               type="button"
               disabled={busy}
               onClick={() => void handleBuild()}
+              aria-label={busy ? t('build_panel.building_busy') : t('build_panel.building_btn')}
               className="flex-1 rounded-xl bg-emerald-600/80 px-3 py-2 text-sm font-semibold text-white transition duration-200 hover:bg-emerald-500 active:scale-95 disabled:opacity-50"
             >
               {busy ? t('build_panel.building_busy') : t('build_panel.building_btn')}
@@ -173,6 +180,7 @@ export function BuildPanel() {
             <button
               type="button"
               onClick={() => setFormOpen(false)}
+              aria-label={t('build_panel.cancel')}
               className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 hover:bg-white/10"
             >
               {t('build_panel.cancel')}
@@ -216,6 +224,7 @@ export function BuildPanel() {
                   type="button"
                   disabled={demolishBusy === b.id}
                   onClick={() => void handleDemolish(b.id)}
+                  aria-label={`${t('build_panel.demolish')} ${b.name}`}
                   className="shrink-0 rounded-xl border border-rose-400/25 bg-rose-400/8 px-2.5 py-1.5 text-xs font-medium text-rose-300 transition duration-200 hover:bg-rose-400/18 active:scale-95 disabled:opacity-40"
                 >
                   {demolishBusy === b.id ? '…' : t('build_panel.demolish')}

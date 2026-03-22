@@ -1,6 +1,7 @@
-import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { GuidePage } from './pages/GuidePage'
 import { Toolbar } from './components/toolbar/Toolbar'
 import {
   FirstRunGuide,
@@ -18,7 +19,7 @@ import { SpeedControl } from './components/toolbar/SpeedControl'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useSimulationStore } from './stores/simulation'
-import { useThemeStore } from './stores/theme'
+import { THEME_ACCENTS, useThemeStore } from './stores/theme'
 
 const WEATHER_EMOJI: Record<string, string> = {
   sunny: '\u2600\uFE0F',
@@ -42,7 +43,7 @@ const GraphPanel = lazy(() =>
   import('./components/graph/GraphPanel').then((module) => ({ default: module.GraphPanel })),
 )
 
-type AppPage = 'welcome' | 'picking' | 'simulation'
+type AppPage = 'welcome' | 'picking' | 'guide' | 'simulation'
 
 function SimulationView() {
   const { t } = useTranslation()
@@ -116,7 +117,12 @@ function SimulationView() {
   return (
     <div className="fixed inset-0 bg-slate-950 animate-[fadeIn_600ms_ease-out]">
       {/* -- FULLSCREEN MAP -- */}
-      <div className="absolute inset-0">
+      <div
+        className="absolute inset-0"
+        role="region"
+        aria-label={t('app.map_region')}
+        tabIndex={2}
+      >
         <Suspense fallback={null}>
           <TownCanvas />
         </Suspense>
@@ -178,7 +184,7 @@ function SimulationView() {
         <button
           type="button"
           onClick={() => { setShowToolbar(true); setActiveQuickTool('settings'); window.dispatchEvent(new CustomEvent('populace:open-settings')) }}
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-sm text-slate-300 transition duration-200 hover:bg-white/10 hover:text-white active:scale-95"
+          className="theme-accent-focus flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-sm text-slate-300 transition duration-200 hover:bg-white/10 hover:text-white active:scale-95"
           title={t('toolbar.settings')}
           aria-label={t('toolbar.settings')}
         >
@@ -193,7 +199,12 @@ function SimulationView() {
 
       {/* -- BOTTOM-CENTER: Quick Action Bar -- */}
       <div className="fixed inset-x-0 bottom-3 z-30 flex justify-center pointer-events-none px-3">
-        <div className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/80 px-1.5 py-1.5 shadow-xl backdrop-blur-sm scrollbar-none">
+        <div
+          className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/80 px-1.5 py-1.5 shadow-xl backdrop-blur-sm scrollbar-none"
+          role="toolbar"
+          aria-label={t('app.toolbar_region')}
+          tabIndex={1}
+        >
           {[
             { key: 'director', icon: '\u26A1', event: 'populace:open-director' },
             { key: 'persona', icon: '\uD83D\uDC64', event: 'populace:open-persona' },
@@ -209,7 +220,7 @@ function SimulationView() {
               title={t(`toolbar.${tool.key}`)}
               className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition duration-200 active:scale-95 ${
                 showToolbar && activeQuickTool === tool.key
-                  ? 'border-cyan-300/40 bg-cyan-300/15 text-cyan-50'
+                  ? 'theme-accent-button-active'
                   : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
               }`}
             >
@@ -225,7 +236,7 @@ function SimulationView() {
             aria-pressed={graphVisible}
             aria-label={t('app.relationship_graph')}
             title={t('app.relationship_graph')}
-            className={`rounded-lg border px-2 py-1.5 text-xs transition duration-200 active:scale-95 ${graphVisible ? 'border-amber-300/40 bg-amber-300/15 text-amber-50' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+            className={`rounded-lg border px-2 py-1.5 text-xs transition duration-200 active:scale-95 ${graphVisible ? 'theme-accent-button-active' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
           >
             <span aria-hidden="true">{'\uD83D\uDD78\uFE0F'}</span>
           </button>
@@ -239,6 +250,10 @@ function SimulationView() {
       {/* -- RIGHT DRAWER: Graph Panel -- */}
       <div
         className={`fixed right-0 top-0 bottom-0 z-20 w-full transform transition-transform duration-300 will-change-transform sm:w-96 ${graphVisible ? 'translate-x-0' : 'translate-x-full'} pointer-events-auto`}
+        role="region"
+        aria-label={t('app.graph_region')}
+        tabIndex={graphVisible ? 3 : -1}
+        aria-hidden={!graphVisible}
       >
         <div className="h-full border-l border-white/10 bg-slate-950/92 p-3 backdrop-blur-md sm:p-4">
           <div className="mb-4 flex items-center justify-between">
@@ -268,12 +283,18 @@ function SimulationView() {
             aria-label={t('app.close')}
           />
           <div className="fixed inset-x-0 bottom-12 z-40 flex justify-center pointer-events-none animate-[slideUp_200ms_ease-out] sm:bottom-14">
-            <div className="pointer-events-auto w-full max-w-2xl rounded-xl border border-white/10 bg-slate-950/92 p-2 shadow-2xl backdrop-blur-md mx-2 sm:mx-3 sm:p-3">
+            <div
+              className="pointer-events-auto w-full max-w-2xl rounded-xl border border-white/10 bg-slate-950/92 p-2 shadow-2xl backdrop-blur-md mx-2 sm:mx-3 sm:p-3"
+              role="region"
+              aria-label={t('app.panel_region')}
+              tabIndex={4}
+            >
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-medium text-slate-400">{activeQuickTool ? t(`toolbar.${activeQuickTool}`) : t('app.open_tools')}</span>
                 <button
                   type="button"
                   onClick={() => { setShowToolbar(false); setActiveQuickTool(null) }}
+                  aria-label={t('app.close')}
                   className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400 transition duration-200 hover:bg-white/10 hover:text-white active:scale-95"
                 >
                   {'\u2715'} {t('app.close')}
@@ -318,6 +339,28 @@ function SimulationView() {
 function App() {
   const [page, setPage] = useState<AppPage>('welcome')
   const theme = useThemeStore((s) => s.theme)
+  const accent = useThemeStore((s) => s.accent)
+  const lastPageRef = useRef<Exclude<AppPage, 'guide'>>('welcome')
+
+  const openGuide = useCallback((source: Exclude<AppPage, 'guide'>) => {
+    lastPageRef.current = source
+    setPage('guide')
+  }, [])
+
+  useEffect(() => {
+    const handleOpenGuide = () => {
+      setPage((current) => {
+        if (current === 'guide') {
+          return current
+        }
+        lastPageRef.current = current
+        return 'guide'
+      })
+    }
+
+    window.addEventListener('populace:open-guide', handleOpenGuide)
+    return () => window.removeEventListener('populace:open-guide', handleOpenGuide)
+  }, [])
 
   // Apply / remove theme-light class on <html> for CSS overrides
   useEffect(() => {
@@ -328,8 +371,15 @@ function App() {
     }
   }, [theme])
 
+  useEffect(() => {
+    const palette = THEME_ACCENTS[accent]
+    document.documentElement.style.setProperty('--primary-color', palette.hex)
+    document.documentElement.style.setProperty('--primary-color-rgb', palette.rgb)
+    document.documentElement.style.setProperty('--primary-color-soft-text', palette.softText)
+  }, [accent])
+
   if (page === 'welcome') {
-    return <WelcomePage onStart={() => setPage('picking')} />
+    return <WelcomePage onStart={() => setPage('picking')} onGuide={() => openGuide('welcome')} />
   }
 
   if (page === 'picking') {
@@ -339,6 +389,10 @@ function App() {
         onBack={() => setPage('welcome')}
       />
     )
+  }
+
+  if (page === 'guide') {
+    return <GuidePage onBack={() => setPage(lastPageRef.current)} />
   }
 
   return <SimulationView />

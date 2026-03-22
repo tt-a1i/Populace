@@ -10,6 +10,7 @@ import {
   injectResidentMemory,
   patchResidentAttributes,
 } from '../../services/api'
+import { generateResidentAvatarDataUrl } from '../../lib/residentAvatar'
 import { useToast } from '../ui/ToastProvider'
 
 const MOOD_EMOJI: Record<string, string> = {
@@ -43,6 +44,10 @@ interface ResidentStoryPanelProps {
     energy?: number
     currentGoal?: string | null
     currentBuildingId?: string | null
+    skinColor?: string | null
+    hairStyle?: string | null
+    hairColor?: string | null
+    outfitColor?: string | null
   }>
   buildings: Array<{ id: string; name: string; type: string }>
   onClose: () => void
@@ -124,13 +129,20 @@ export function ResidentStoryPanel({
     <div className="flex h-full flex-col overflow-y-auto" data-testid="resident-story-panel">
       {/* ---- Header ---- */}
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="flex items-start gap-3">
+          <img
+            src={generateResidentAvatarDataUrl(resident)}
+            alt={`${resident.name} avatar`}
+            className="h-14 w-14 rounded-2xl border border-white/10 bg-slate-900/70 object-cover"
+          />
+          <div>
           <h3 className="font-display text-2xl text-white">
             {resident.name} {moodEmoji}
           </h3>
           {resident.mood && (
             <p className="mt-0.5 text-xs text-slate-400">{resident.mood}</p>
           )}
+          </div>
         </div>
         <button
           type="button"
@@ -228,7 +240,7 @@ export function ResidentStoryPanel({
                   </div>
                   <div className="mt-1 h-1 w-full rounded-full bg-white/10">
                     <div
-                      className="h-1 rounded-full bg-cyan-400/70 transition-all duration-300"
+                      className="theme-accent-bar h-1 rounded-full transition-all duration-300"
                       style={{ width: `${Math.round(rel.intensity * 100)}%` }}
                     />
                   </div>

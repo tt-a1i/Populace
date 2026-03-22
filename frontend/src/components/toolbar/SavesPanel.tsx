@@ -135,13 +135,16 @@ export function SavesPanel() {
         <input
           className="flex-1 rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-violet-400/50"
           placeholder={t('saves.name_placeholder')}
+          aria-label={t('saves.name_placeholder')}
           value={saveName}
           onChange={(e) => setSaveName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void handleSave()}
         />
         <button
+          type="button"
           onClick={() => void handleSave()}
           disabled={saving}
+          aria-label={t('saves.save')}
           className="flex items-center gap-1.5 rounded-xl bg-violet-500/20 border border-violet-400/30 px-4 py-2 text-sm font-semibold text-violet-300 transition duration-200 hover:bg-violet-500/30 active:scale-95 disabled:opacity-40"
         >
           {saving ? (
@@ -177,15 +180,19 @@ export function SavesPanel() {
               </div>
               <div className="flex shrink-0 gap-2">
                 <button
+                  type="button"
                   onClick={() => void handleLoad(save.id, save.name)}
                   disabled={loading === save.id}
+                  aria-label={`${t('saves.load')} ${save.name}`}
                   className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-300 transition duration-200 hover:bg-cyan-400/20 active:scale-95 disabled:opacity-40"
                 >
                   {loading === save.id ? t('saves.loading') : t('saves.load')}
                 </button>
                 <button
+                  type="button"
                   onClick={() => void handleDelete(save.id)}
                   disabled={deleting === save.id}
+                  aria-label={`${t('saves.delete')} ${save.name}`}
                   className="rounded-lg border border-red-400/20 bg-red-400/8 px-3 py-1 text-xs font-semibold text-red-400 transition duration-200 hover:bg-red-400/15 active:scale-95 disabled:opacity-40"
                 >
                   {deleting === save.id ? t('saves.deleting') : t('saves.delete')}

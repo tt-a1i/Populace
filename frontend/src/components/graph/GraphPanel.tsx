@@ -175,10 +175,11 @@ export function GraphPanel() {
                   key={type}
                   type="button"
                   aria-pressed={activeType === type}
+                  aria-label={type === 'all' ? t('graph.all') : t(`graph.rel_${type}`, type)}
                   onClick={() => setActiveType(type)}
                   className={`rounded-full border px-3 py-1.5 text-xs transition duration-200 active:scale-95 ${
                     activeType === type
-                      ? 'border-cyan-300/45 bg-cyan-300/16 text-cyan-50'
+                      ? 'theme-accent-button-active'
                       : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
                   }`}
                 >
@@ -201,7 +202,7 @@ export function GraphPanel() {
               step={0.1}
               value={minIntensity}
               onChange={(event) => setMinIntensity(Number(event.target.value))}
-              className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-amber-300"
+              className="theme-accent-range mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-white/10"
             />
             <div className="mt-2 flex justify-between text-[10px] text-slate-400">
               {graphIntensityThresholds.map((threshold) => (

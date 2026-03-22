@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { ResidentAchievement, ResidentRelationship } from '../../services/api'
 import { getResidentAchievements, getResidentRelationships } from '../../services/api'
+import { generateResidentAvatarDataUrl } from '../../lib/residentAvatar'
 import { useSimulationStore } from '../../stores/simulation'
 
 interface CompareData {
@@ -13,6 +14,7 @@ interface CompareData {
   occupation: string
   relationshipCount: number
   achievementCount: number
+  avatarUrl: string
 }
 
 function moodEmoji(mood: string): string {
@@ -70,6 +72,7 @@ export function ComparePanel() {
       occupation: r.occupation ?? 'unemployed',
       relationshipCount: rels.length,
       achievementCount: achs.filter((a) => a.unlocked).length,
+      avatarUrl: generateResidentAvatarDataUrl(r),
     }
   }
 
@@ -86,7 +89,7 @@ export function ComparePanel() {
   const handleSelectB = (id: string) => { setIdB(id); setDataA(null); setDataB(null) }
 
   const selectClass =
-    'rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-400/50'
+    'theme-accent-input rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-200 focus:outline-none'
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/4 p-5">
@@ -114,7 +117,7 @@ export function ComparePanel() {
           type="button"
           onClick={handleCompare}
           disabled={!idA || !idB || idA === idB || loading}
-          className="rounded-full border border-cyan-300/30 bg-cyan-300/12 px-4 py-1.5 text-sm text-cyan-50 transition duration-200 hover:bg-cyan-300/20 active:scale-95 disabled:opacity-40"
+          className="theme-accent-button-outline rounded-full border px-4 py-1.5 text-sm transition duration-200 active:scale-95 disabled:opacity-40"
         >
           {loading ? t('compare.comparing') : t('compare.compare')}
         </button>
@@ -125,9 +128,15 @@ export function ComparePanel() {
         <div>
           {/* Header */}
           <div className="mb-2 grid grid-cols-[1fr_auto_1fr] gap-2 px-3">
-            <div className="text-right text-sm font-semibold text-cyan-200">{dataA.name}</div>
+            <div className="flex items-center justify-end gap-2 text-right text-sm font-semibold">
+              <img src={dataA.avatarUrl} alt={`${dataA.name} avatar`} className="h-10 w-10 rounded-xl border border-white/10 object-cover" />
+              <span className="theme-accent-text">{dataA.name}</span>
+            </div>
             <div className="min-w-[6rem]" />
-            <div className="text-left text-sm font-semibold text-amber-200">{dataB.name}</div>
+            <div className="flex items-center gap-2 text-left text-sm font-semibold">
+              <img src={dataB.avatarUrl} alt={`${dataB.name} avatar`} className="h-10 w-10 rounded-xl border border-white/10 object-cover" />
+              <span className="theme-accent-text">{dataB.name}</span>
+            </div>
           </div>
 
           {/* Rows */}

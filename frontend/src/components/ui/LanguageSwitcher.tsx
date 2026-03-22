@@ -10,6 +10,7 @@ export function LanguageSwitcher({ className = '' }: { className?: string }) {
     <button
       type="button"
       onClick={() => setLanguage(isZh ? 'en' : 'zh')}
+      aria-label={isZh ? t('lang.switch_to_en') : t('lang.switch_to_zh')}
       className={`flex h-8 items-center justify-center rounded-full border border-white/15 bg-white/5 px-2.5 text-xs font-semibold text-slate-300 transition duration-200 hover:bg-white/10 hover:text-white active:scale-95 ${className}`}
       title={isZh ? t('lang.switch_to_en') : t('lang.switch_to_zh')}
     >

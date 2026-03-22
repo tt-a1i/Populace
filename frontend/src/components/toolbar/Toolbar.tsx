@@ -1,19 +1,24 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BuildPanel } from './BuildPanel'
 import { ComparePanel } from './ComparePanel'
 import { DirectorConsole } from './DirectorConsole'
 import { ExportPanel } from './ExportPanel'
-import { HeatmapPanel } from './HeatmapPanel'
 import { PersonaEditor } from './PersonaEditor'
 import { QuestPanel } from './QuestPanel'
 import { ResidentCreationWizard } from './ResidentCreationWizard'
 import { SavesPanel } from './SavesPanel'
 import { SettingsPanel } from './SettingsPanel'
-import { StatsPanel } from './StatsPanel'
 import { TimelinePanel } from './TimelinePanel'
 import { ReportsPanel } from '../report'
+
+const StatsPanel = lazy(() =>
+  import('./StatsPanel').then((module) => ({ default: module.StatsPanel })),
+)
+const HeatmapPanel = lazy(() =>
+  import('./HeatmapPanel').then((module) => ({ default: module.HeatmapPanel })),
+)
 
 const OPEN_SETTINGS_EVENT = 'populace:open-settings'
 
@@ -27,20 +32,16 @@ interface ToolDef {
 }
 
 const TONE_GLOW: Record<string, string> = {
-  cyan: 'bg-cyan-400/60 shadow-[0_0_8px_rgba(34,211,238,0.3)]',
-  amber: 'bg-amber-400/60 shadow-[0_0_8px_rgba(245,158,11,0.3)]',
-  emerald: 'bg-emerald-400/60 shadow-[0_0_8px_rgba(52,211,153,0.3)]',
-  violet: 'bg-violet-400/60 shadow-[0_0_8px_rgba(167,139,250,0.3)]',
-  rose: 'bg-rose-400/60 shadow-[0_0_8px_rgba(251,113,133,0.3)]',
+  cyan: 'theme-accent-indicator',
+  amber: 'theme-accent-indicator',
+  emerald: 'theme-accent-indicator',
+  violet: 'theme-accent-indicator',
+  rose: 'theme-accent-indicator',
 }
 
-function toneClass(tone: string, active: boolean): string {
+function toneClass(_tone: string, active: boolean): string {
   if (!active) return 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
-  if (tone === 'cyan') return 'border-cyan-300/40 bg-cyan-300/15 text-cyan-50'
-  if (tone === 'amber') return 'border-amber-300/40 bg-amber-300/15 text-amber-50'
-  if (tone === 'emerald') return 'border-emerald-300/40 bg-emerald-300/15 text-emerald-50'
-  if (tone === 'violet') return 'border-violet-300/40 bg-violet-300/15 text-violet-50'
-  return 'border-rose-300/40 bg-rose-300/15 text-rose-50'
+  return 'theme-accent-button-active'
 }
 
 const SECONDARY_KEYS: ReadonlySet<ToolKey> = new Set([
@@ -131,11 +132,23 @@ export function Toolbar() {
     if (activeTool === 'persona') return <PersonaEditor />
     if (activeTool === 'quest') return <QuestPanel />
     if (activeTool === 'saves') return <SavesPanel />
-    if (activeTool === 'stats') return <StatsPanel />
+    if (activeTool === 'stats') {
+      return (
+        <Suspense fallback={<PanelLoading label={t('toolbar.stats')} />}>
+          <StatsPanel />
+        </Suspense>
+      )
+    }
     if (activeTool === 'build') return <BuildPanel />
     if (activeTool === 'create') return <ResidentCreationWizard />
     if (activeTool === 'export') return <ExportPanel />
-    if (activeTool === 'heatmap') return <HeatmapPanel />
+    if (activeTool === 'heatmap') {
+      return (
+        <Suspense fallback={<PanelLoading label={t('toolbar.heatmap')} />}>
+          <HeatmapPanel />
+        </Suspense>
+      )
+    }
     if (activeTool === 'compare') return <ComparePanel />
     if (activeTool === 'timeline') return <TimelinePanel />
     if (activeTool === 'settings') return <SettingsPanel />
@@ -153,6 +166,7 @@ export function Toolbar() {
               type="button"
               data-active={activeTool === tool.key}
               aria-pressed={activeTool === tool.key}
+              aria-label={tool.label}
               onClick={() => handleToolClick(tool.key)}
               className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition duration-200 active:scale-95 ${toneClass(tool.tone, activeTool === tool.key)}`}
             >
@@ -164,6 +178,7 @@ export function Toolbar() {
             type="button"
             data-testid="more-toggle"
             aria-expanded={showSecondary}
+            aria-label={showSecondary ? t('toolbar.less') : t('toolbar.more')}
             onClick={() => setShowSecondary((v) => !v)}
             className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] text-slate-400 transition duration-200 hover:bg-white/10 active:scale-95"
           >
@@ -178,6 +193,7 @@ export function Toolbar() {
                 type="button"
                 data-active={activeTool === tool.key}
                 aria-pressed={activeTool === tool.key}
+                aria-label={tool.label}
                 onClick={() => handleToolClick(tool.key)}
                 className={`rounded-lg border px-2.5 py-1 text-[11px] transition duration-200 active:scale-95 ${toneClass(tool.tone, activeTool === tool.key)}`}
               >
@@ -196,6 +212,14 @@ export function Toolbar() {
       </div>
 
       {panel}
+    </div>
+  )
+}
+
+function PanelLoading({ label }: { label: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-slate-300">
+      {label}
     </div>
   )
 }

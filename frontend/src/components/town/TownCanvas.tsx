@@ -382,6 +382,9 @@ export function TownCanvas() {
       ref={shellRef}
       data-testid="town-canvas-shell"
       onContextMenu={handleContextMenu}
+      role="region"
+      aria-label={t('app.map_region')}
+      tabIndex={0}
       className="relative flex h-full w-full overflow-hidden bg-slate-950"
     >
       <div id="town-canvas" ref={hostRef} className="h-full w-full" />

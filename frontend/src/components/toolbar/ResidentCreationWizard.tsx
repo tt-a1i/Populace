@@ -95,6 +95,7 @@ export function ResidentCreationWizard() {
         <button
           type="button"
           onClick={handleReset}
+          aria-label={t('create_resident.add_another')}
           className="rounded-2xl border border-emerald-300/30 bg-emerald-300/15 px-5 py-3 text-sm font-medium text-emerald-50 transition duration-200 hover:bg-emerald-300/25 active:scale-95"
         >
           {t('create_resident.add_another')}
@@ -127,6 +128,7 @@ export function ResidentCreationWizard() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t('create_resident.name_placeholder')}
+              aria-label={t('create_resident.name')}
               className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-slate-50 outline-none focus:border-emerald-300/40"
             />
           </label>
@@ -136,6 +138,7 @@ export function ResidentCreationWizard() {
             <select
               value={mood}
               onChange={(e) => setMood(e.target.value)}
+              aria-label={t('create_resident.mood')}
               className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-slate-50 outline-none focus:border-emerald-300/40"
             >
               {MOOD_OPTIONS.map((m) => (
@@ -149,6 +152,7 @@ export function ResidentCreationWizard() {
             <select
               value={homeBuildingId}
               onChange={(e) => setHomeBuildingId(e.target.value)}
+              aria-label={t('create_resident.home_building')}
               className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-slate-50 outline-none focus:border-emerald-300/40"
             >
               <option value="">{t('create_resident.no_home')}</option>
@@ -162,6 +166,7 @@ export function ResidentCreationWizard() {
             type="button"
             onClick={() => setStep(1)}
             disabled={!name.trim()}
+            aria-label={t('create_resident.next')}
             className="rounded-2xl border border-emerald-300/30 bg-emerald-300/15 px-5 py-3 text-sm font-medium text-emerald-50 transition duration-200 hover:bg-emerald-300/25 active:scale-95 disabled:opacity-40"
           >
             {t('create_resident.next')}
@@ -180,6 +185,7 @@ export function ResidentCreationWizard() {
                   key={key}
                   type="button"
                   onClick={() => setPersonality(label)}
+                  aria-label={label}
                   className={`rounded-full border px-3 py-1.5 text-xs transition duration-200 active:scale-95 ${
                     personality === label
                       ? 'border-emerald-300/45 bg-emerald-300/16 text-emerald-50'
@@ -199,6 +205,7 @@ export function ResidentCreationWizard() {
               onChange={(e) => setPersonality(e.target.value)}
               rows={3}
               placeholder={t('create_resident.personality_placeholder')}
+              aria-label={t('create_resident.personality_custom')}
               className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-slate-50 outline-none focus:border-emerald-300/40"
             />
           </label>
@@ -207,6 +214,7 @@ export function ResidentCreationWizard() {
             <button
               type="button"
               onClick={() => setStep(0)}
+              aria-label={t('create_resident.back')}
               className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300 transition duration-200 hover:bg-white/10 active:scale-95"
             >
               {t('create_resident.back')}
@@ -215,6 +223,7 @@ export function ResidentCreationWizard() {
               type="button"
               onClick={() => setStep(2)}
               disabled={!personality.trim()}
+              aria-label={t('create_resident.next')}
               className="flex-1 rounded-2xl border border-emerald-300/30 bg-emerald-300/15 px-4 py-3 text-sm font-medium text-emerald-50 transition duration-200 hover:bg-emerald-300/25 active:scale-95 disabled:opacity-40"
             >
               {t('create_resident.next')}
@@ -240,6 +249,7 @@ export function ResidentCreationWizard() {
                       type="checkbox"
                       checked={!!selected}
                       onChange={() => toggleRelationship(resident.id)}
+                      aria-label={resident.name}
                       className="accent-emerald-400"
                     />
                     <span className="flex-1 text-sm text-slate-200">{resident.name}</span>
@@ -247,6 +257,7 @@ export function ResidentCreationWizard() {
                       <select
                         value={selected.type}
                         onChange={(e) => updateRelType(resident.id, e.target.value)}
+                        aria-label={`${resident.name} relationship type`}
                         className="rounded-xl border border-white/10 bg-slate-900 px-2 py-1 text-xs text-slate-300 outline-none"
                       >
                         {REL_TYPES.map((type) => (
@@ -284,6 +295,7 @@ export function ResidentCreationWizard() {
               type="button"
               onClick={() => setStep(1)}
               disabled={busy}
+              aria-label={t('create_resident.back')}
               className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300 transition duration-200 hover:bg-white/10 active:scale-95 disabled:opacity-40"
             >
               {t('create_resident.back')}
@@ -292,6 +304,7 @@ export function ResidentCreationWizard() {
               type="button"
               onClick={() => void handleCreate()}
               disabled={busy}
+              aria-label={busy ? t('create_resident.creating') : t('create_resident.confirm')}
               className="flex-1 rounded-2xl border border-emerald-300/30 bg-emerald-300/15 px-4 py-3 text-sm font-medium text-emerald-50 transition duration-200 hover:bg-emerald-300/25 active:scale-95 disabled:opacity-40"
             >
               {busy ? t('create_resident.creating') : t('create_resident.confirm')}

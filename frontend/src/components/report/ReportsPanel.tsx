@@ -16,6 +16,7 @@ export function ReportsPanel() {
         <button
           type="button"
           aria-pressed={activeTab === 'daily'}
+          aria-label={t('report.title')}
           onClick={() => setActiveTab('daily')}
           className={`rounded-full border px-4 py-2 text-sm transition duration-200 active:scale-95 ${
             activeTab === 'daily'
@@ -28,6 +29,7 @@ export function ReportsPanel() {
         <button
           type="button"
           aria-pressed={activeTab === 'experiment'}
+          aria-label={t('report.experiment_tab')}
           onClick={() => setActiveTab('experiment')}
           className={`rounded-full border px-4 py-2 text-sm transition duration-200 active:scale-95 ${
             activeTab === 'experiment'

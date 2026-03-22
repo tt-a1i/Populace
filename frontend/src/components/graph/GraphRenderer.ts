@@ -15,6 +15,7 @@ import { scaleOrdinal } from 'd3-scale'
 import { select, type Selection } from 'd3-selection'
 import { transition } from 'd3-transition'
 
+import { generateResidentAvatarDataUrl } from '../../lib/residentAvatar'
 import type { GraphRelationship, GraphResident, ResidentMood } from '../../stores/relationships'
 
 type GraphNode = GraphResident &
@@ -443,6 +444,7 @@ export class GraphRenderer {
 
           group.append('circle').attr('class', 'graph-node-glow')
           group.append('circle').attr('class', 'graph-node-ring')
+          group.append('image').attr('class', 'graph-node-avatar')
           group.append('circle').attr('class', 'graph-node-core')
           return group
         },
@@ -462,6 +464,16 @@ export class GraphRenderer {
       .attr('fill', '#0f172a')
       .attr('stroke', (node) => moodColorScale(node.mood))
       .attr('stroke-width', (node) => (node.id === this.selectedResidentId ? 5 : 3))
+
+    nodeGroups
+      .select<SVGImageElement>('image.graph-node-avatar')
+      .attr('x', (node) => (node.id === this.selectedResidentId ? -11 : -9))
+      .attr('y', (node) => (node.id === this.selectedResidentId ? -11 : -9))
+      .attr('width', (node) => (node.id === this.selectedResidentId ? 22 : 18))
+      .attr('height', (node) => (node.id === this.selectedResidentId ? 22 : 18))
+      .attr('href', (node) => generateResidentAvatarDataUrl(node))
+      .attr('preserveAspectRatio', 'xMidYMid slice')
+      .attr('clip-path', 'circle(50%)')
 
     nodeGroups
       .select<SVGCircleElement>('circle.graph-node-core')
