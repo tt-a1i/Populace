@@ -1,4 +1,5 @@
 export { EmptyState } from './EmptyState'
+export { PanelShell } from './PanelShell'
 export { ErrorBoundary } from './ErrorBoundary'
 export { FirstRunGuide } from './FirstRunGuide'
 export { SceneEditor } from './SceneEditor'
@@ -10,4 +11,5 @@ export { ScenePicker } from './ScenePicker'
 
 export { TimelineSlider } from './TimelineSlider'
 export { ToastProvider, useToast } from './ToastProvider'
+export { RightPanel } from './RightPanel'
 export { WelcomePage } from './WelcomePage'

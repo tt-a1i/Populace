@@ -5,6 +5,8 @@ import type { ResidentAchievement, ResidentRelationship } from '../../services/a
 import { getResidentAchievements, getResidentRelationships } from '../../services/api'
 import { generateResidentAvatarDataUrl } from '../../lib/residentAvatar'
 import { useSimulationStore } from '../../stores/simulation'
+import { EmptyState } from '../ui/EmptyState'
+import { PanelShell } from '../ui/PanelShell'
 
 interface CompareData {
   name: string
@@ -25,23 +27,24 @@ function moodEmoji(mood: string): string {
 }
 
 function occupationLabel(occ: string): string {
-  // Capitalize the occupation name (already English from backend)
   return occ.charAt(0).toUpperCase() + occ.slice(1)
 }
 
-interface RowProps {
-  label: string
-  a: string | number
-  b: string | number
-}
-
-function CompareRow({ label, a, b }: RowProps) {
+function CompareRow({ label, a, b }: { label: string; a: string | number; b: string | number }) {
   const diff = typeof a === 'number' && typeof b === 'number' && a !== b
+  const aHigher = diff && (a as number) > (b as number)
+  const bHigher = diff && (b as number) > (a as number)
   return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-xl px-3 py-2 even:bg-white/4">
-      <div className={`text-right text-sm ${diff && a > b ? 'font-semibold text-cyan-300' : 'text-slate-200'}`}>{a}</div>
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-lg px-3 py-2 even:bg-white/[0.03]">
+      <div className={`text-right text-sm ${aHigher ? 'font-semibold text-cyan-300' : 'text-slate-200'}`}>
+        {aHigher && <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-cyan-400" />}
+        {a}
+      </div>
       <div className="min-w-[6rem] text-center text-[10px] uppercase tracking-widest text-slate-500">{label}</div>
-      <div className={`text-left text-sm ${diff && b > a ? 'font-semibold text-amber-300' : 'text-slate-200'}`}>{b}</div>
+      <div className={`text-left text-sm ${bHigher ? 'font-semibold text-amber-300' : 'text-slate-200'}`}>
+        {b}
+        {bHigher && <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />}
+      </div>
     </div>
   )
 }
@@ -88,26 +91,22 @@ export function ComparePanel() {
   const handleSelectA = (id: string) => { setIdA(id); setDataA(null); setDataB(null) }
   const handleSelectB = (id: string) => { setIdB(id); setDataA(null); setDataB(null) }
 
-  const selectClass =
-    'theme-accent-input rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-200 focus:outline-none'
-
   return (
-    <div className="rounded-xl border border-white/10 bg-white/4 p-5">
-      <p className="mb-1 text-[10px] uppercase tracking-[0.3em] text-slate-400">
-        {t('compare.badge')}
-      </p>
-      <h3 className="mb-4 text-base font-semibold text-white">{t('compare.title')}</h3>
-
-      {/* Selectors */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <select className={selectClass} value={idA} onChange={(e) => handleSelectA(e.target.value)}>
+    <PanelShell
+      icon="⚖️"
+      title={t('compare.title')}
+      badge={t('compare.badge')}
+    >
+      {/* ── Selectors (side-by-side) ── */}
+      <div className="flex flex-wrap items-center gap-3">
+        <select className="panel-select flex-1 min-w-[120px]" value={idA} onChange={(e) => handleSelectA(e.target.value)}>
           <option value="">{t('compare.select_a')}</option>
           {residents.map((r) => (
             <option key={r.id} value={r.id}>{r.name}</option>
           ))}
         </select>
-        <span className="text-slate-500">vs</span>
-        <select className={selectClass} value={idB} onChange={(e) => handleSelectB(e.target.value)}>
+        <span className="text-sm font-semibold text-slate-500">vs</span>
+        <select className="panel-select flex-1 min-w-[120px]" value={idB} onChange={(e) => handleSelectB(e.target.value)}>
           <option value="">{t('compare.select_b')}</option>
           {residents.filter((r) => r.id !== idA).map((r) => (
             <option key={r.id} value={r.id}>{r.name}</option>
@@ -117,36 +116,36 @@ export function ComparePanel() {
           type="button"
           onClick={handleCompare}
           disabled={!idA || !idB || idA === idB || loading}
-          className="theme-accent-button-outline rounded-full border px-4 py-1.5 text-sm transition duration-200 active:scale-95 disabled:opacity-40"
+          className="btn-primary rounded-xl px-4 py-2 text-sm font-medium transition duration-200 active:scale-95"
         >
           {loading ? t('compare.comparing') : t('compare.compare')}
         </button>
       </div>
 
-      {/* Results */}
-      {dataA && dataB && (
-        <div>
-          {/* Header */}
-          <div className="mb-2 grid grid-cols-[1fr_auto_1fr] gap-2 px-3">
-            <div className="flex items-center justify-end gap-2 text-right text-sm font-semibold">
+      {/* ── Results (dual-column cards) ── */}
+      {dataA && dataB ? (
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+          {/* Header with avatars */}
+          <div className="mb-3 grid grid-cols-[1fr_auto_1fr] gap-2 px-3">
+            <div className="flex items-center justify-end gap-2 text-right">
               <img src={dataA.avatarUrl} alt={`${dataA.name} avatar`} className="h-10 w-10 rounded-xl border border-white/10 object-cover" />
-              <span className="theme-accent-text">{dataA.name}</span>
+              <span className="text-sm font-semibold text-cyan-300">{dataA.name}</span>
             </div>
             <div className="min-w-[6rem]" />
-            <div className="flex items-center gap-2 text-left text-sm font-semibold">
+            <div className="flex items-center gap-2 text-left">
               <img src={dataB.avatarUrl} alt={`${dataB.name} avatar`} className="h-10 w-10 rounded-xl border border-white/10 object-cover" />
-              <span className="theme-accent-text">{dataB.name}</span>
+              <span className="text-sm font-semibold text-amber-300">{dataB.name}</span>
             </div>
           </div>
 
-          {/* Rows */}
+          {/* Comparison rows */}
           <div className="grid gap-0.5">
             <CompareRow label={t('compare.mood')} a={`${moodEmoji(dataA.mood)} ${dataA.mood}`} b={`${moodEmoji(dataB.mood)} ${dataB.mood}`} />
             <CompareRow label={t('compare.occupation')} a={occupationLabel(dataA.occupation)} b={occupationLabel(dataB.occupation)} />
             <CompareRow label={t('compare.coins')} a={dataA.coins} b={dataB.coins} />
             <CompareRow label={t('compare.relationships')} a={dataA.relationshipCount} b={dataB.relationshipCount} />
             <CompareRow label={t('compare.achievements')} a={dataA.achievementCount} b={dataB.achievementCount} />
-            <div className="mt-1 rounded-xl bg-white/4 px-3 py-2">
+            <div className="mt-1 rounded-xl bg-white/[0.03] px-3 py-2">
               <div className="mb-1 text-center text-[10px] uppercase tracking-widest text-slate-500">{t('compare.personality')}</div>
               <div className="grid grid-cols-2 gap-3">
                 <p className="text-right text-xs leading-5 text-slate-300">{dataA.personality}</p>
@@ -155,11 +154,13 @@ export function ComparePanel() {
             </div>
           </div>
         </div>
+      ) : (
+        <EmptyState
+          icon="⚖️"
+          message={t('compare.hint')}
+          hint={idA || idB ? undefined : t('compare.badge')}
+        />
       )}
-
-      {!dataA && !dataB && (idA || idB) && (
-        <p className="text-center text-sm text-slate-500">{t('compare.hint')}</p>
-      )}
-    </div>
+    </PanelShell>
   )
 }

@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { useSound } from '../../audio'
 import { type SaveMeta, deleteSave, listSaves, loadSave, saveGame } from '../../services/api'
 import { useToast } from '../ui/ToastProvider'
+import { EmptyState } from '../ui/EmptyState'
+import { PanelShell } from '../ui/PanelShell'
 
 export function SavesPanel() {
   const { t } = useTranslation()
@@ -126,14 +128,15 @@ export function SavesPanel() {
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-slate-950/70 p-5 ">
-      <p className="text-[11px] uppercase tracking-[0.3em] text-violet-200/70">{t('saves.badge')}</p>
-      <h3 className="mt-2 font-display text-2xl text-white">{t('saves.title')}</h3>
-
-      {/* Save current state */}
-      <div className="mt-4 flex gap-2">
+    <PanelShell
+      icon="💾"
+      title={t('saves.title')}
+      badge={t('saves.badge')}
+    >
+      {/* ── Save current state ── */}
+      <div className="flex gap-2">
         <input
-          className="flex-1 rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-violet-400/50"
+          className="panel-input flex-1"
           placeholder={t('saves.name_placeholder')}
           aria-label={t('saves.name_placeholder')}
           value={saveName}
@@ -145,63 +148,73 @@ export function SavesPanel() {
           onClick={() => void handleSave()}
           disabled={saving}
           aria-label={t('saves.save')}
-          className="flex items-center gap-1.5 rounded-xl bg-violet-500/20 border border-violet-400/30 px-4 py-2 text-sm font-semibold text-violet-300 transition duration-200 hover:bg-violet-500/30 active:scale-95 disabled:opacity-40"
+          className="btn-primary flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition duration-200 active:scale-95"
         >
           {saving ? (
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-transparent" />
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
           ) : '💾'}
           {t('saves.save')}
         </button>
       </div>
 
-      {/* Feedback */}
-      {successMsg && (
-        <p className="mt-2 text-xs text-emerald-400">{successMsg}</p>
-      )}
-      {error && (
-        <p className="mt-2 text-xs text-red-400">{error}</p>
-      )}
+      {/* ── Feedback ── */}
+      {successMsg && <p className="text-xs text-emerald-400">{successMsg}</p>}
+      {error && <p className="text-xs text-red-400">{error}</p>}
 
-      {/* Save list */}
-      <div className="mt-4 space-y-2">
-        {saves.length === 0 ? (
-          <p className="text-sm text-slate-500">{t('saves.empty')}</p>
-        ) : (
-          saves.map((save) => (
-            <div
-              key={save.id}
-              className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-white">{save.name}</p>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Tick {save.tick} · {formatDate(save.created_at)}
-                </p>
+      {/* ── Save list (timeline style) ── */}
+      <div>
+        <p className="panel-section-label mb-2">{t('saves.badge')}</p>
+        <div className="space-y-0">
+          {saves.length === 0 ? (
+            <EmptyState
+              icon="💾"
+              message={t('saves.empty')}
+              hint={t('saves.name_placeholder')}
+            />
+          ) : (
+            saves.map((save, i) => (
+              <div key={save.id} className="relative flex gap-3 pb-3">
+                {/* Timeline connector */}
+                <div className="flex flex-col items-center">
+                  <div className="h-2.5 w-2.5 rounded-full border-2 border-violet-400/50 bg-violet-400/20" />
+                  {i < saves.length - 1 && (
+                    <div className="w-px flex-1 bg-white/[0.06]" />
+                  )}
+                </div>
+                {/* Card */}
+                <div className="flex flex-1 items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-white">{save.name}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      Tick {save.tick} · {formatDate(save.created_at)}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleLoad(save.id, save.name)}
+                      disabled={loading === save.id}
+                      aria-label={`${t('saves.load')} ${save.name}`}
+                      className="btn-secondary rounded-lg px-3 py-1 text-xs font-semibold transition duration-200 active:scale-95"
+                    >
+                      {loading === save.id ? t('saves.loading') : t('saves.load')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete(save.id)}
+                      disabled={deleting === save.id}
+                      aria-label={`${t('saves.delete')} ${save.name}`}
+                      className="btn-danger rounded-lg px-3 py-1 text-xs font-semibold transition duration-200 active:scale-95"
+                    >
+                      {deleting === save.id ? t('saves.deleting') : t('saves.delete')}
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="flex shrink-0 gap-2">
-                <button
-                  type="button"
-                  onClick={() => void handleLoad(save.id, save.name)}
-                  disabled={loading === save.id}
-                  aria-label={`${t('saves.load')} ${save.name}`}
-                  className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-300 transition duration-200 hover:bg-cyan-400/20 active:scale-95 disabled:opacity-40"
-                >
-                  {loading === save.id ? t('saves.loading') : t('saves.load')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleDelete(save.id)}
-                  disabled={deleting === save.id}
-                  aria-label={`${t('saves.delete')} ${save.name}`}
-                  className="rounded-lg border border-red-400/20 bg-red-400/8 px-3 py-1 text-xs font-semibold text-red-400 transition duration-200 hover:bg-red-400/15 active:scale-95 disabled:opacity-40"
-                >
-                  {deleting === save.id ? t('saves.deleting') : t('saves.delete')}
-                </button>
-              </div>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
-    </div>
+    </PanelShell>
   )
 }

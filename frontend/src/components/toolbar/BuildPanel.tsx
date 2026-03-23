@@ -4,16 +4,18 @@ import { useTranslation } from 'react-i18next'
 import { addBuilding, getBuildings, removeBuilding } from '../../services/api'
 import { useSimulationStore } from '../../stores/simulation'
 import type { Building } from '../../types'
+import { EmptyState } from '../ui/EmptyState'
+import { PanelShell } from '../ui/PanelShell'
 
 const BUILDING_TYPE_KEYS = [
-  { value: 'home', i18nKey: 'build_panel.type_home' },
-  { value: 'cafe', i18nKey: 'build_panel.type_cafe' },
-  { value: 'park', i18nKey: 'build_panel.type_park' },
-  { value: 'shop', i18nKey: 'build_panel.type_shop' },
-  { value: 'school', i18nKey: 'build_panel.type_school' },
-  { value: 'gym', i18nKey: 'build_panel.type_gym' },
-  { value: 'library', i18nKey: 'build_panel.type_library' },
-  { value: 'hospital', i18nKey: 'build_panel.type_hospital' },
+  { value: 'home', i18nKey: 'build_panel.type_home', icon: '🏠' },
+  { value: 'cafe', i18nKey: 'build_panel.type_cafe', icon: '☕' },
+  { value: 'park', i18nKey: 'build_panel.type_park', icon: '🌳' },
+  { value: 'shop', i18nKey: 'build_panel.type_shop', icon: '🛍️' },
+  { value: 'school', i18nKey: 'build_panel.type_school', icon: '🏫' },
+  { value: 'gym', i18nKey: 'build_panel.type_gym', icon: '💪' },
+  { value: 'library', i18nKey: 'build_panel.type_library', icon: '📚' },
+  { value: 'hospital', i18nKey: 'build_panel.type_hospital', icon: '🏥' },
 ]
 
 const TYPE_COLORS: Record<string, string> = {
@@ -25,6 +27,11 @@ const TYPE_COLORS: Record<string, string> = {
   gym: '#0e7490',
   library: '#9333ea',
   hospital: '#be185d',
+}
+
+const TYPE_ICONS: Record<string, string> = {
+  home: '🏠', cafe: '☕', park: '🌳', shop: '🛍️',
+  school: '🏫', gym: '💪', library: '📚', hospital: '🏥',
 }
 
 function typeBadgeStyle(type: string): React.CSSProperties {
@@ -84,26 +91,25 @@ export function BuildPanel() {
   }
 
   return (
-    <div className="rounded-xl border border-emerald-300/20 bg-slate-950/70 p-5 text-slate-100 ">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.3em] text-emerald-200/70">{t('build_panel.badge')}</p>
-          <h3 className="mt-1 font-display text-2xl text-white">{t('build_panel.title')}</h3>
-        </div>
+    <PanelShell
+      icon="🏗️"
+      title={t('build_panel.title')}
+      badge={t('build_panel.badge')}
+      headerRight={
         <button
           type="button"
           onClick={() => { setFormOpen((o) => !o); setError(null) }}
           aria-label={formOpen ? t('build_panel.collapse') : t('build_panel.new_building')}
-          className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1.5 text-sm font-medium text-emerald-200 transition duration-200 hover:bg-emerald-300/20 active:scale-95"
+          className="btn-primary rounded-xl px-3 py-1.5 text-xs font-medium transition duration-200 active:scale-95"
         >
-          {formOpen ? t('build_panel.collapse') : t('build_panel.new_building')}
+          {formOpen ? t('build_panel.collapse') : `+ ${t('build_panel.new_building')}`}
         </button>
-      </div>
-
+      }
+    >
       {/* ── Build form ── */}
       {formOpen && (
-        <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-4">
-          <p className="mb-3 text-[11px] uppercase tracking-[0.28em] text-emerald-300/70">{t('build_panel.form_title')}</p>
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
+          <p className="panel-section-label mb-3">{t('build_panel.form_title')}</p>
           <div className="grid grid-cols-2 gap-3">
             <label className="col-span-2 grid gap-1 text-xs text-slate-300">
               {t('build_panel.type_label')}
@@ -111,10 +117,10 @@ export function BuildPanel() {
                 value={bType}
                 onChange={(e) => setBType(e.target.value)}
                 aria-label={t('build_panel.type_label')}
-                className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none"
+                className="panel-select"
               >
                 {BUILDING_TYPE_KEYS.map((bt) => (
-                  <option key={bt.value} value={bt.value}>{t(bt.i18nKey)}</option>
+                  <option key={bt.value} value={bt.value}>{bt.icon} {t(bt.i18nKey)}</option>
                 ))}
               </select>
             </label>
@@ -125,7 +131,7 @@ export function BuildPanel() {
                 onChange={(e) => setBName(e.target.value)}
                 placeholder={t('build_panel.name_placeholder')}
                 aria-label={t('build_panel.name_label')}
-                className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none placeholder-slate-600"
+                className="panel-input"
               />
             </label>
             <label className="grid gap-1 text-xs text-slate-300">
@@ -137,7 +143,7 @@ export function BuildPanel() {
                 value={bCapacity}
                 onChange={(e) => setBCapacity(Number(e.target.value))}
                 aria-label={t('build_panel.capacity_label')}
-                className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none"
+                className="panel-input"
               />
             </label>
             <div className="grid gap-1 text-xs text-slate-300">
@@ -151,7 +157,7 @@ export function BuildPanel() {
                   onChange={(e) => setBX(Number(e.target.value))}
                   placeholder="X"
                   aria-label={`${t('build_panel.position_label')} X`}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none"
+                  className="panel-input w-full"
                 />
                 <input
                   type="number"
@@ -161,7 +167,7 @@ export function BuildPanel() {
                   onChange={(e) => setBY(Number(e.target.value))}
                   placeholder="Y"
                   aria-label={`${t('build_panel.position_label')} Y`}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 outline-none"
+                  className="panel-input w-full"
                 />
               </div>
             </div>
@@ -173,7 +179,7 @@ export function BuildPanel() {
               disabled={busy}
               onClick={() => void handleBuild()}
               aria-label={busy ? t('build_panel.building_busy') : t('build_panel.building_btn')}
-              className="flex-1 rounded-xl bg-emerald-600/80 px-3 py-2 text-sm font-semibold text-white transition duration-200 hover:bg-emerald-500 active:scale-95 disabled:opacity-50"
+              className="btn-primary flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition duration-200 active:scale-95"
             >
               {busy ? t('build_panel.building_busy') : t('build_panel.building_btn')}
             </button>
@@ -181,7 +187,7 @@ export function BuildPanel() {
               type="button"
               onClick={() => setFormOpen(false)}
               aria-label={t('build_panel.cancel')}
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 hover:bg-white/10"
+              className="btn-secondary rounded-xl px-3 py-2 text-sm transition duration-200"
             >
               {t('build_panel.cancel')}
             </button>
@@ -189,43 +195,49 @@ export function BuildPanel() {
         </div>
       )}
 
-      {/* ── Building list ── */}
-      <div className="mt-4">
-        <p className="mb-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
+      {/* ── Building list (card style) ── */}
+      <div>
+        <p className="panel-section-label mb-2">
           {t('build_panel.existing_title')} · {buildings.length} {t('build_panel.existing_count')}
         </p>
         <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
           {buildings.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-500">
-              {t('build_panel.no_buildings')}
-            </p>
+            <EmptyState
+              icon="🏗️"
+              message={t('build_panel.no_buildings')}
+              actionLabel={!formOpen ? t('build_panel.new_building') : undefined}
+              onAction={!formOpen ? () => setFormOpen(true) : undefined}
+            />
           ) : (
             buildings.map((b) => (
               <div
                 key={b.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-slate-900/50 px-4 py-3"
+                className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3"
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-medium text-white">{b.name}</p>
-                    <span
-                      className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide"
-                      style={typeBadgeStyle(b.type)}
-                    >
-                      {b.type}
-                    </span>
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <span className="text-lg leading-none">{TYPE_ICONS[b.type] ?? '🏢'}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-medium text-white">{b.name}</p>
+                      <span
+                        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide"
+                        style={typeBadgeStyle(b.type)}
+                      >
+                        {b.type}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {t('build_panel.position_info')} ({b.position[0]}, {b.position[1]}) · {t('build_panel.capacity_info')} {b.capacity}
+                      {b.occupants ? ` · ${t('build_panel.occupants_info')} ${b.occupants}` : ''}
+                    </p>
                   </div>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    {t('build_panel.position_info')} ({b.position[0]}, {b.position[1]}) · {t('build_panel.capacity_info')} {b.capacity}
-                    {b.occupants ? ` · ${t('build_panel.occupants_info')} ${b.occupants}` : ''}
-                  </p>
                 </div>
                 <button
                   type="button"
                   disabled={demolishBusy === b.id}
                   onClick={() => void handleDemolish(b.id)}
                   aria-label={`${t('build_panel.demolish')} ${b.name}`}
-                  className="shrink-0 rounded-xl border border-rose-400/25 bg-rose-400/8 px-2.5 py-1.5 text-xs font-medium text-rose-300 transition duration-200 hover:bg-rose-400/18 active:scale-95 disabled:opacity-40"
+                  className="btn-danger shrink-0 rounded-xl px-2.5 py-1.5 text-xs font-medium transition duration-200 active:scale-95"
                 >
                   {demolishBusy === b.id ? '…' : t('build_panel.demolish')}
                 </button>
@@ -234,6 +246,6 @@ export function BuildPanel() {
           )}
         </div>
       </div>
-    </div>
+    </PanelShell>
   )
 }

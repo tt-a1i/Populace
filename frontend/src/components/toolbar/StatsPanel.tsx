@@ -9,6 +9,7 @@ import {
   getNetworkAnalysis,
   getSimulationStats,
 } from '../../services/api'
+import { PanelShell } from '../ui/PanelShell'
 
 function formatMoodScore(score: number): string {
   return score.toFixed(2)
@@ -181,23 +182,23 @@ export function StatsPanel() {
   }, [stats, t])
 
   return (
-    <div data-testid="stats-panel" className="grid gap-4 rounded-xl border border-white/10 bg-slate-950/70 p-5 text-slate-100 ">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.3em] text-cyan-200/70">{t('stats.badge')}</p>
-          <h3 className="mt-2 font-display text-2xl text-white">{t('stats.title')}</h3>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{t('stats.desc')}</p>
-        </div>
+    <PanelShell
+      icon="📊"
+      title={t('stats.title')}
+      badge={t('stats.badge')}
+      headerRight={
         <button
           type="button"
           onClick={() => void loadStats('refresh')}
           disabled={loading || refreshing}
           aria-label={refreshing ? t('stats.refreshing') : t('stats.refresh')}
-          className="rounded-xl border border-cyan-300/30 bg-cyan-300/12 px-4 py-2 text-sm font-medium text-cyan-50 transition duration-200 hover:bg-cyan-300/20 active:scale-95 disabled:opacity-50"
+          className="btn-secondary rounded-xl px-3 py-1.5 text-xs font-medium transition duration-200 active:scale-95"
         >
           {refreshing ? t('stats.refreshing') : t('stats.refresh')}
         </button>
-      </div>
+      }
+    >
+      <p className="text-sm leading-6 text-slate-300">{t('stats.desc')}</p>
 
       {loading ? (
         <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-slate-300">
@@ -209,25 +210,27 @@ export function StatsPanel() {
         </div>
       ) : stats ? (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {/* ── Metric number cards ── */}
+          <div data-testid="stats-panel" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {metricCards.map((card) => (
               <article
                 key={card.label}
-                className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4"
+                className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-4"
               >
-                <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">{card.label}</p>
-                <p className="mt-3 font-display text-3xl text-white">{card.value}</p>
+                <p className="panel-section-label">{card.label}</p>
+                <p className="mt-2 font-display text-3xl text-white">{card.value}</p>
               </article>
             ))}
           </div>
 
+          {/* ── Resident highlight cards ── */}
           <div className="grid gap-3 lg:grid-cols-3">
             <article className="rounded-xl border border-emerald-300/16 bg-emerald-300/8 px-4 py-4">
-              <p className="text-[11px] uppercase tracking-[0.28em] text-emerald-100/70">{t('stats.most_social_resident')}</p>
-              <p className="mt-3 text-xl font-semibold text-white">
+              <p className="panel-section-label text-emerald-100/70">{t('stats.most_social_resident')}</p>
+              <p className="mt-2 text-xl font-semibold text-white">
                 {stats.most_social_resident?.name ?? t('stats.empty_value')}
               </p>
-              <p className="mt-2 text-sm text-emerald-100/75">
+              <p className="mt-1.5 text-sm text-emerald-100/75">
                 {stats.most_social_resident
                   ? t('stats.relationship_summary', {
                       count: stats.most_social_resident.relationship_count,
@@ -238,11 +241,11 @@ export function StatsPanel() {
             </article>
 
             <article className="rounded-xl border border-amber-300/16 bg-amber-300/8 px-4 py-4">
-              <p className="text-[11px] uppercase tracking-[0.28em] text-amber-100/70">{t('stats.loneliest_resident')}</p>
-              <p className="mt-3 text-xl font-semibold text-white">
+              <p className="panel-section-label text-amber-100/70">{t('stats.loneliest_resident')}</p>
+              <p className="mt-2 text-xl font-semibold text-white">
                 {stats.loneliest_resident?.name ?? t('stats.empty_value')}
               </p>
-              <p className="mt-2 text-sm text-amber-100/75">
+              <p className="mt-1.5 text-sm text-amber-100/75">
                 {stats.loneliest_resident
                   ? t('stats.relationship_summary', {
                       count: stats.loneliest_resident.relationship_count,
@@ -253,13 +256,13 @@ export function StatsPanel() {
             </article>
 
             <article className="rounded-xl border border-violet-300/16 bg-violet-300/8 px-4 py-4">
-              <p className="text-[11px] uppercase tracking-[0.28em] text-violet-100/70">{t('stats.strongest_relationship')}</p>
-              <p className="mt-3 text-xl font-semibold text-white">
+              <p className="panel-section-label text-violet-100/70">{t('stats.strongest_relationship')}</p>
+              <p className="mt-2 text-xl font-semibold text-white">
                 {stats.strongest_relationship
                   ? `${stats.strongest_relationship.from_name} ↔ ${stats.strongest_relationship.to_name}`
                   : t('stats.empty_value')}
               </p>
-              <p className="mt-2 text-sm text-violet-100/75">
+              <p className="mt-1.5 text-sm text-violet-100/75">
                 {stats.strongest_relationship
                   ? `${stats.strongest_relationship.type} · ${stats.strongest_relationship.intensity.toFixed(2)}`
                   : t('stats.empty_desc')}
@@ -269,8 +272,8 @@ export function StatsPanel() {
 
           {/* ── Mood Trend Chart ── */}
           {moodHistory.length > 0 && (
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
-              <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500 mb-3">{t('stats.mood_trend_title')}</p>
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-4">
+              <p className="panel-section-label mb-3">{t('stats.mood_trend_title')}</p>
               <MoodTrendChart history={moodHistory} waitingLabel={t('stats.waiting_ticks')} />
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
                 {[...new Map(moodHistory.map(e => [e.resident_id, e.resident_name])).entries()].slice(0, 10).map(([id, name], i) => (
@@ -285,13 +288,13 @@ export function StatsPanel() {
 
           {/* ── Network Influence Ranking ── */}
           {networkData.length > 0 && (
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
-              <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500 mb-3">{t('stats.network_rank_title')}</p>
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-4">
+              <p className="panel-section-label mb-3">{t('stats.network_rank_title')}</p>
               <NetworkRankChart data={networkData} relationshipsSuffix={t('stats.relationships_suffix')} />
             </div>
           )}
         </>
       ) : null}
-    </div>
+    </PanelShell>
   )
 }

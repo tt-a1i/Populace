@@ -6,17 +6,9 @@ import { useSound } from '../../audio'
 import { setLanguage } from '../../i18n/config'
 import { THEME_ACCENTS, useThemeStore } from '../../stores/theme'
 import { resetTutorial } from '../ui/TutorialOverlay'
+import { PanelShell } from '../ui/PanelShell'
 
 const LS_KEY = 'populace-llm-key'
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-xl px-4 py-3 even:bg-white/4">
-      <span className="text-sm text-slate-300">{label}</span>
-      <div className="flex shrink-0 items-center gap-2">{children}</div>
-    </div>
-  )
-}
 
 function ToggleBtn({
   active,
@@ -40,6 +32,28 @@ function ToggleBtn({
     >
       {label}
     </button>
+  )
+}
+
+function SettingsGroup({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+      <p className="panel-section-label mb-2 flex items-center gap-1.5">
+        <span>{icon}</span> {title}
+      </p>
+      <div className="grid gap-1">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-lg px-3 py-2.5 even:bg-white/[0.03]">
+      <span className="text-sm text-slate-300">{label}</span>
+      <div className="flex shrink-0 items-center gap-2">{children}</div>
+    </div>
   )
 }
 
@@ -91,21 +105,18 @@ export function SettingsPanel() {
   const openGuide = () => {
     window.dispatchEvent(new CustomEvent('populace:open-guide'))
   }
-  const inputClass =
-    'theme-accent-input flex-1 rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none'
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/4 p-5">
-      <p className="mb-1 text-[10px] uppercase tracking-[0.3em] text-slate-400">
-        {t('settings.badge')}
-      </p>
-      <h3 className="mb-5 text-base font-semibold text-white">{t('settings.title')}</h3>
-
-      <div className="grid gap-1">
-        {/* LLM API Key */}
-        <div className="rounded-xl px-4 py-3">
+    <PanelShell
+      icon="⚙️"
+      title={t('settings.title')}
+      badge={t('settings.badge')}
+    >
+      {/* ── Data ── */}
+      <SettingsGroup title={t('settings.llm_key_label')} icon="🔑">
+        <div className="px-3 py-2">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm text-slate-300">{t('settings.llm_key_label')}</span>
+            <span className="text-xs text-slate-400">{t('settings.llm_key_hint')}</span>
             <span
               className={`text-xs font-medium ${configured ? 'text-emerald-400' : 'text-amber-400'}`}
             >
@@ -115,7 +126,7 @@ export function SettingsPanel() {
           <div className="flex gap-2">
             <input
               type="password"
-              className={inputClass}
+              className="panel-input flex-1"
               placeholder={t('settings.llm_key_placeholder')}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
@@ -125,7 +136,7 @@ export function SettingsPanel() {
               type="button"
               onClick={handleSaveKey}
               disabled={saveState === 'saving'}
-              className="theme-accent-button-outline rounded-full border px-4 py-1.5 text-sm transition duration-200 active:scale-95 disabled:opacity-40"
+              className="btn-secondary rounded-xl px-4 py-1.5 text-sm transition duration-200 active:scale-95"
             >
               {saveState === 'saving'
                 ? t('settings.llm_key_saving')
@@ -134,16 +145,16 @@ export function SettingsPanel() {
                 : t('settings.llm_key_save')}
             </button>
           </div>
-          <p className="mt-1.5 text-[11px] text-slate-500">{t('settings.llm_key_hint')}</p>
         </div>
+      </SettingsGroup>
 
-        {/* Language */}
+      {/* ── Appearance ── */}
+      <SettingsGroup title={t('settings.theme')} icon="🎨">
         <Row label={t('settings.language')}>
           <ToggleBtn active={isZh} onClick={() => setLanguage('zh')} label={t('settings.language_zh')} />
           <ToggleBtn active={!isZh} onClick={() => setLanguage('en')} label={t('settings.language_en')} />
         </Row>
 
-        {/* Theme */}
         <Row label={t('settings.theme')}>
           <ToggleBtn
             active={theme === 'dark'}
@@ -181,24 +192,28 @@ export function SettingsPanel() {
             </button>
           ))}
         </Row>
+      </SettingsGroup>
 
-        {/* Sound */}
+      {/* ── Audio ── */}
+      <SettingsGroup title={t('settings.sound')} icon="🔊">
         <Row label={t('settings.sound')}>
           <ToggleBtn active={soundEnabled} onClick={() => { if (!soundEnabled) toggleSound() }} label={t('settings.sound_on')} />
           <ToggleBtn active={!soundEnabled} onClick={() => { if (soundEnabled) toggleSound() }} label={t('settings.sound_off')} />
         </Row>
+      </SettingsGroup>
 
+      {/* ── About ── */}
+      <SettingsGroup title={t('settings.guide')} icon="ℹ️">
         <Row label={t('settings.guide')}>
           <button
             type="button"
             onClick={openGuide}
-            className="theme-accent-button-outline rounded-full border px-4 py-1.5 text-sm transition duration-200 active:scale-95"
+            className="btn-secondary rounded-full px-4 py-1.5 text-sm transition duration-200 active:scale-95"
           >
             {t('settings.guide_open')}
           </button>
         </Row>
 
-        {/* Tutorial reset */}
         <Row label={t('settings.tutorial_reset')}>
           <button
             type="button"
@@ -208,7 +223,7 @@ export function SettingsPanel() {
             {tutorialReset ? t('settings.tutorial_reset_done') : '↺'}
           </button>
         </Row>
-      </div>
-    </div>
+      </SettingsGroup>
+    </PanelShell>
   )
 }

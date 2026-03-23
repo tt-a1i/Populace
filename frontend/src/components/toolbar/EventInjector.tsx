@@ -11,6 +11,7 @@ import {
   injectPresetEvent,
 } from '../../services/api'
 import { useToast } from '../ui/ToastProvider'
+import { PanelShell } from '../ui/PanelShell'
 
 // Static icon + colour map for known preset IDs
 const PRESET_META: Record<string, { icon: string; color: string }> = {
@@ -104,19 +105,14 @@ export function EventInjector() {
   }
 
   return (
-    <div className={[
-      'grid gap-4 rounded-xl border p-4 text-slate-100 transition-all duration-300',
-      flashBorder
-        ? 'border-cyan-400/50 bg-slate-950/70 shadow-[0_0_24px_rgba(34,211,238,0.12),0_18px_44px_rgba(15,23,42,0.35)]'
-        : 'border-white/10 bg-slate-950/70 shadow-[0_18px_44px_rgba(15,23,42,0.35)]',
-    ].join(' ')}>
-      <div>
-        <p className="text-[11px] uppercase tracking-[0.3em] text-cyan-200/70">{t('event_injector.badge')}</p>
-        <h3 className="mt-2 font-display text-2xl text-white">{t('event_injector.title')}</h3>
-        <p className="mt-2 text-sm leading-6 text-slate-300">{t('event_injector.desc')}</p>
-      </div>
+    <PanelShell
+      icon="⚡"
+      title={t('event_injector.title')}
+      badge={t('event_injector.badge')}
+    >
+      <p className="text-sm leading-6 text-slate-300">{t('event_injector.desc')}</p>
 
-      {/* ── Preset event cards ── */}
+      {/* ── Preset event card grid ── */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {presets.map((preset) => {
           const meta = PRESET_META[preset.id] ?? DEFAULT_META
@@ -129,8 +125,9 @@ export function EventInjector() {
               title={preset.description}
               onClick={() => void handlePreset(preset.id, preset.name)}
               className={[
-                'group flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition duration-200 active:scale-95 disabled:opacity-60',
+                'group flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition duration-200 active:scale-95 disabled:opacity-60',
                 meta.color,
+                flashBorder ? 'ring-1 ring-cyan-400/30' : '',
               ].join(' ')}
             >
               <span className="text-xl">{meta.icon}</span>
@@ -147,8 +144,8 @@ export function EventInjector() {
 
       {/* ── Active events countdown ── */}
       {activeEvents.length > 0 && (
-        <div className="rounded-2xl border border-amber-400/20 bg-amber-400/8 p-3">
-          <p className="mb-2 text-[10px] uppercase tracking-[0.3em] text-amber-300/70">{t('director.active_events_label')}</p>
+        <div className="rounded-xl border border-amber-400/20 bg-amber-400/8 p-3">
+          <p className="panel-section-label mb-2 text-amber-300/70">{t('director.active_events_label')}</p>
           <div className="flex flex-col gap-1.5">
             {activeEvents.map((ev) => (
               <div key={ev.id} className="flex items-center justify-between gap-2">
@@ -179,22 +176,22 @@ export function EventInjector() {
             onChange={(e) => setCustomEvent(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void handleCustom()}
             placeholder={t('event_injector.custom_placeholder')}
-            className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-slate-50 outline-none transition duration-200 placeholder:text-slate-500 focus:border-cyan-300/40 focus:bg-white/10"
+            className="panel-input flex-1"
           />
           <button
             type="button"
             disabled={!canSubmitCustom || busy}
             onClick={() => void handleCustom()}
-            className="rounded-2xl border border-amber-300/30 bg-amber-300/15 px-5 py-3 text-sm font-medium text-amber-50 transition duration-200 hover:bg-amber-300/25 active:scale-95 disabled:opacity-50"
+            className="btn-primary rounded-xl px-5 py-2 text-sm font-medium transition duration-200 active:scale-95"
           >
             {t('event_injector.submit')}
           </button>
         </div>
       </label>
 
-      <p className="text-xs uppercase tracking-[0.26em] text-slate-400">
+      <p className="panel-section-label">
         {lastEvent ? `Latest: ${lastEvent}` : t('event_injector.empty')}
       </p>
-    </div>
+    </PanelShell>
   )
 }

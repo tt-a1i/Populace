@@ -62,17 +62,20 @@ export function Toolbar() {
     const openQuest = () => setActiveTool('quest')
     const openReport = () => setActiveTool('report')
     const openDirector = () => setActiveTool('director')
+    const closePanel = () => { setActiveTool('director'); setShowSecondary(false) }
     window.addEventListener(OPEN_SETTINGS_EVENT, openSettings)
     window.addEventListener('populace:open-persona', openPersona)
     window.addEventListener('populace:open-quest', openQuest)
     window.addEventListener('populace:open-report', openReport)
     window.addEventListener('populace:open-director', openDirector)
+    window.addEventListener('populace:close-panel', closePanel)
     return () => {
       window.removeEventListener(OPEN_SETTINGS_EVENT, openSettings)
       window.removeEventListener('populace:open-persona', openPersona)
       window.removeEventListener('populace:open-quest', openQuest)
       window.removeEventListener('populace:open-report', openReport)
       window.removeEventListener('populace:open-director', openDirector)
+      window.removeEventListener('populace:close-panel', closePanel)
     }
   }, [])
 
