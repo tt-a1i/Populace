@@ -14,6 +14,8 @@ vi.mock('../services/api', () => ({
   getResidentMemories: mockGetResidentMemories,
   getResidentRelationships: mockGetResidentRelationships,
   teleportResident: vi.fn(),
+  getResidentFamilyTree: vi.fn().mockResolvedValue({ root: { id: '', name: '', age_days: 0, deceased: false, relation: 'self' }, parents: [], spouse: null, children: [] }),
+  chatWithResident: vi.fn().mockResolvedValue({ reply: 'hello', resident_id: 'r1', resident_name: 'test' }),
 }))
 
 import { TownChrome, type TownContextMenuState, type TownInspectionState, type TownPlaceholder } from '../components/town/TownChrome'
@@ -86,6 +88,7 @@ const inspection: TownInspectionState = {
   tileX: 4,
   tileY: 5,
   tileKind: 'grass',
+  buildingId: 'cafe',
   buildingName: '\u6668\u66e6\u5496\u5561\u9986',
   residentCount: 1,
 }
@@ -109,6 +112,7 @@ function buildProps(selectedResidentId: string | null) {
     buildings,
     relationships,
     selectedResidentId,
+    followedResidentId: null,
     currentTime: 'Day 2, 09:30',
     messageFeed: [
       { text: '\u5c0f\u660e \u5bf9 \u5c0f\u7ea2 \u8bf4\uff1a\u4eca\u5929\u771f\u70ed\u95f9\u3002' },
@@ -123,6 +127,7 @@ function buildProps(selectedResidentId: string | null) {
     onPlacePlaceholder: vi.fn(),
     onClearResidentSelection: vi.fn(),
     onDismissInspection: vi.fn(),
+    onCancelFollow: vi.fn(),
   } satisfies React.ComponentProps<typeof TownChrome>
 }
 
@@ -147,6 +152,7 @@ describe('TownChrome', () => {
         buildings={buildings}
         relationships={relationships}
         selectedResidentId={null}
+        followedResidentId={null}
         currentTime="Day 1, 08:00"
         messageFeed={[]}
         contextMenu={contextMenu}
@@ -158,6 +164,7 @@ describe('TownChrome', () => {
         onPlacePlaceholder={onPlacePlaceholder}
         onClearResidentSelection={vi.fn()}
         onDismissInspection={vi.fn()}
+        onCancelFollow={vi.fn()}
       />,
     )
 
@@ -195,6 +202,7 @@ describe('TownChrome', () => {
         buildings={buildings}
         relationships={relationships}
         selectedResidentId="r1"
+        followedResidentId={null}
         currentTime="Day 2, 09:30"
         messageFeed={[{ text: '\u5c0f\u660e \u5bf9 \u5c0f\u7ea2 \u8bf4\uff1a\u4eca\u5929\u771f\u70ed\u95f9\u3002' }]}
         contextMenu={null}
@@ -206,6 +214,7 @@ describe('TownChrome', () => {
         onPlacePlaceholder={vi.fn()}
         onClearResidentSelection={vi.fn()}
         onDismissInspection={vi.fn()}
+        onCancelFollow={vi.fn()}
       />,
     )
 
@@ -233,6 +242,7 @@ describe('TownChrome', () => {
         buildings={buildings}
         relationships={relationships}
         selectedResidentId="r1"
+        followedResidentId={null}
         currentTime="Day 1, 08:00"
         messageFeed={[]}
         contextMenu={null}
@@ -244,6 +254,7 @@ describe('TownChrome', () => {
         onPlacePlaceholder={vi.fn()}
         onClearResidentSelection={vi.fn()}
         onDismissInspection={vi.fn()}
+        onCancelFollow={vi.fn()}
       />,
     )
 

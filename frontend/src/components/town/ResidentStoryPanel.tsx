@@ -12,6 +12,8 @@ import {
 } from '../../services/api'
 import { generateResidentAvatarDataUrl } from '../../lib/residentAvatar'
 import { useToast } from '../ui/ToastProvider'
+import { ChatPanel } from './ChatPanel'
+import { FamilyTreePanel } from './FamilyTreePanel'
 
 const MOOD_EMOJI: Record<string, string> = {
   happy: '\u{1F60A}',
@@ -53,12 +55,13 @@ const REL_BAR_COLOR: Record<string, string> = {
   dislike: '#f97316',
 }
 
-type TabKey = 'memories' | 'diary' | 'relations' | 'achievements'
+type TabKey = 'memories' | 'diary' | 'relations' | 'family' | 'achievements'
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'memories', label: '\u8BB0\u5FC6' },
   { key: 'diary', label: '\u65E5\u8BB0' },
   { key: 'relations', label: '\u5173\u7CFB' },
+  { key: 'family', label: '\u65CF\u8C31' },
   { key: 'achievements', label: '\u6210\u5C31' },
 ]
 
@@ -120,6 +123,7 @@ export function ResidentStoryPanel({
   const [memories, setMemories] = useState<ResidentMemory[]>([])
   const [relationships, setRelationships] = useState<ResidentRelationship[]>([])
   const [memoirBusy, setMemoirBusy] = useState(false)
+  const [showChat, setShowChat] = useState(false)
   const [activeTab, setActiveTab] = useState<TabKey>('memories')
 
   const resident = residents.find((r) => r.id === residentId)
@@ -149,6 +153,16 @@ export function ResidentStoryPanel({
   }, [residentId])
 
   if (!resident) return null
+
+  if (showChat) {
+    return (
+      <ChatPanel
+        residentId={residentId}
+        resident={resident}
+        onClose={() => setShowChat(false)}
+      />
+    )
+  }
 
   const moodEmoji = MOOD_EMOJI[resident.mood ?? ''] ?? ''
   const energyPct = Math.round((resident.energy ?? 1.0) * 100)
@@ -333,6 +347,11 @@ export function ResidentStoryPanel({
           )}
         </div>
 
+        {/* Family tree */}
+        <div className={activeTab === 'family' ? '' : 'hidden'}>
+          <FamilyTreePanel residentId={residentId} />
+        </div>
+
         {/* Achievements — 2x3 grid */}
         <div className={activeTab === 'achievements' ? '' : 'hidden'}>
           <div className="grid grid-cols-3 gap-2">
@@ -461,6 +480,26 @@ export function ResidentStoryPanel({
                 <path d="M10.75 16.82A7.462 7.462 0 0115 15.5c.71 0 1.396.098 2.046.282A.75.75 0 0018 15.06v-11a.75.75 0 00-.546-.721A9.006 9.006 0 0015 3a8.999 8.999 0 00-4.25 1.065V16.82zM9.25 4.065A8.999 8.999 0 005 3c-.85 0-1.673.118-2.454.339A.75.75 0 002 4.06v11a.75.75 0 00.954.721A7.506 7.506 0 015 15.5c1.579 0 3.042.487 4.25 1.32V4.065z" />
               </svg>
             )}
+          </button>
+          <button
+            type="button"
+            title={t('resident_panel.chat', '\u5BF9\u8BDD')}
+            aria-label={t('resident_panel.chat', '\u5BF9\u8BDD')}
+            onClick={() => setShowChat(true)}
+            className="btn-micro flex h-9 w-9 items-center justify-center rounded-xl border border-violet-300/30 bg-violet-300/10 text-violet-200 transition duration-200 hover:bg-violet-300/20 active:scale-95"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="h-4 w-4"
+            >
+              <path
+                fillRule="evenodd"
+                d="M3.43 2.524A41.29 41.29 0 0110 2c2.236 0 4.43.18 6.57.524 1.437.231 2.43 1.49 2.43 2.902v5.148c0 1.413-.993 2.67-2.43 2.902a41.202 41.202 0 01-5.183.501.78.78 0 00-.528.224l-3.579 3.58A.75.75 0 016 17.25v-3.443a41.033 41.033 0 01-2.57-.33C2.013 13.245 1 11.986 1 10.574V5.426c0-1.413.993-2.67 2.43-2.902z"
+                clipRule="evenodd"
+              />
+            </svg>
           </button>
         </div>
       </div>

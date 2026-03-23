@@ -9,6 +9,8 @@ vi.mock('../services/api', () => ({
   generateMemoir: vi.fn(),
   injectResidentMemory: vi.fn(),
   patchResidentAttributes: vi.fn(),
+  getResidentFamilyTree: vi.fn().mockResolvedValue({ self: { id: '', name: '', age_days: 0, deceased: false, relation: 'self' }, parents: [], children: [], siblings: [], partner: null }),
+  chatWithResident: vi.fn().mockResolvedValue({ reply: 'hello', resident_id: 'r1', resident_name: 'test' }),
 }))
 
 import { ComparePanel } from '../components/toolbar/ComparePanel'

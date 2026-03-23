@@ -345,6 +345,114 @@ async def create_resident(payload: ResidentCreateRequest, request: Request) -> R
 # POST /api/residents/{resident_id}/transfer
 # ---------------------------------------------------------------------------
 
+class FamilyMemberResponse(BaseModel):
+    id: str
+    name: str
+    age_days: int = 0
+    deceased: bool = False
+    relation: str  # "self", "parent", "child", "spouse"
+
+
+class FamilyTreeResponse(BaseModel):
+    root: FamilyMemberResponse
+    parents: list[FamilyMemberResponse] = Field(default_factory=list)
+    spouse: FamilyMemberResponse | None = None
+    children: list[FamilyMemberResponse] = Field(default_factory=list)
+
+
+@router.get(
+    "/{resident_id}/family-tree",
+    response_model=FamilyTreeResponse,
+    responses=error_responses(404, 503),
+)
+async def get_family_tree(resident_id: str, request: Request) -> FamilyTreeResponse:
+    """Build a family tree for a resident from relationships and population history."""
+    state = get_simulation_state(request)
+    agent = _find_agent(state, resident_id)
+    if agent is None:
+        raise _NOT_FOUND
+
+    alive_ids = {a.resident.id for a in state.world.agents}
+
+    def _member(rid: str, relation: str) -> FamilyMemberResponse:
+        a = _find_agent(state, rid)
+        if a:
+            return FamilyMemberResponse(
+                id=rid,
+                name=a.resident.name,
+                age_days=a.resident.age_days,
+                deceased=False,
+                relation=relation,
+            )
+        return FamilyMemberResponse(
+            id=rid, name=rid, age_days=0, deceased=True, relation=relation,
+        )
+
+    root = FamilyMemberResponse(
+        id=resident_id,
+        name=agent.resident.name,
+        age_days=agent.resident.age_days,
+        deceased=False,
+        relation="self",
+    )
+
+    # Scan relationships for parent-child bonds (reason contains "家庭纽带")
+    parents: list[FamilyMemberResponse] = []
+    children: list[FamilyMemberResponse] = []
+    seen_ids: set[str] = set()
+
+    for (from_id, to_id), rel in state.world.relationships.items():
+        if rel.reason and "家庭纽带" in rel.reason:
+            if to_id == resident_id and from_id not in seen_ids:
+                # from_id is a parent or child — determine by age
+                other = _find_agent(state, from_id)
+                if other and other.resident.age_days > agent.resident.age_days:
+                    parents.append(_member(from_id, "parent"))
+                elif other and other.resident.age_days < agent.resident.age_days:
+                    children.append(_member(from_id, "child"))
+                else:
+                    parents.append(_member(from_id, "parent"))
+                seen_ids.add(from_id)
+            elif from_id == resident_id and to_id not in seen_ids:
+                other = _find_agent(state, to_id)
+                if other and other.resident.age_days > agent.resident.age_days:
+                    parents.append(_member(to_id, "parent"))
+                elif other and other.resident.age_days < agent.resident.age_days:
+                    children.append(_member(to_id, "child"))
+                else:
+                    children.append(_member(to_id, "child"))
+                seen_ids.add(to_id)
+
+    # Also scan timeline events for birth records
+    timeline = getattr(state, "_timeline_events", [])
+    for event in timeline:
+        meta = event.get("metadata", {})
+        if meta.get("event_type") == "birth":
+            if meta.get("resident_id") == resident_id:
+                for pid in meta.get("parent_ids", []):
+                    if pid not in seen_ids:
+                        parents.append(_member(pid, "parent"))
+                        seen_ids.add(pid)
+            elif resident_id in meta.get("parent_ids", []):
+                child_id = meta["resident_id"]
+                if child_id not in seen_ids:
+                    children.append(_member(child_id, "child"))
+                    seen_ids.add(child_id)
+
+    # Find spouse: bidirectional love relationship with highest intensity
+    spouse: FamilyMemberResponse | None = None
+    best_love = 0.0
+    for (from_id, to_id), rel in state.world.relationships.items():
+        if from_id == resident_id and rel.type.value == "love" and rel.intensity > best_love:
+            reverse_key = (to_id, from_id)
+            reverse = state.world.relationships.get(reverse_key)
+            if reverse and reverse.type.value == "love":
+                best_love = rel.intensity
+                spouse = _member(to_id, "spouse")
+
+    return FamilyTreeResponse(root=root, parents=parents, spouse=spouse, children=children)
+
+
 class TransferRequest(BaseModel):
     to_id: str
     amount: int
@@ -396,4 +504,92 @@ async def transfer_coins(
     return TransferResponse(
         from_resident=ResidentResponse(**asdict(from_agent.resident)),
         to_resident=ResidentResponse(**asdict(to_agent.resident)),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Resident chat — direct user → resident conversation
+# ---------------------------------------------------------------------------
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=500)
+
+class ChatResponse(BaseModel):
+    reply: str
+    resident_id: str
+    resident_name: str
+
+
+@router.post(
+    "/{resident_id}/chat",
+    response_model=ChatResponse,
+    responses=error_responses(404, 422, 503),
+)
+async def chat_with_resident(
+    resident_id: str,
+    payload: ChatRequest,
+    request: Request,
+) -> ChatResponse:
+    """User sends a message to a resident; the resident replies based on personality and memories."""
+    import uuid
+    from engine.types import Memory
+    from backend.llm.client import chat_completion, has_runtime_api_key
+
+    state = get_simulation_state(request)
+    agent = _find_agent(state, resident_id)
+    if agent is None:
+        raise _NOT_FOUND
+
+    resident = agent.resident
+    recent_memories = agent.memory_stream.retrieve("", k=5)
+    memory_text = "\n".join(
+        f"- {m.content}" for m in recent_memories
+    ) or "\uff08\u65e0\u8fd1\u671f\u8bb0\u5fc6\uff09"
+
+    system_prompt = (
+        f"\u4f60\u662f{resident.name}\uff0c\u4e00\u4e2a\u865a\u62df\u5c0f\u9547\u7684\u5c45\u6c11\u3002\n"
+        f"\u6027\u683c\uff1a{resident.personality}\n"
+        f"\u5f53\u524d\u5fc3\u60c5\uff1a{resident.mood}\n"
+        f"\u804c\u4e1a\uff1a{resident.occupation}\n"
+        f"\u8fd1\u671f\u8bb0\u5fc6\uff1a\n{memory_text}\n\n"
+        f"\u8bf7\u4ee5{resident.name}\u7684\u8eab\u4efd\u3001\u6027\u683c\u548c\u8bed\u6c14\u56de\u590d\u7528\u6237\u7684\u5bf9\u8bdd\u3002"
+        f"\u56de\u590d\u7b80\u77ed\u81ea\u7136\uff081-3\u53e5\u8bdd\uff09\uff0c\u50cf\u771f\u4eba\u804a\u5929\u4e00\u6837\u3002"
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": payload.message},
+    ]
+
+    reply: str | None = None
+    if has_runtime_api_key():
+        reply = await chat_completion(messages, max_tokens=150)
+
+    if reply is None:
+        reply = f"\uff08{resident.name}\u770b\u7740\u4f60\u5fae\u5fae\u4e00\u7b11\uff09\u55ef\u2026\u2026\u6211\u73b0\u5728\u5fc3\u60c5{resident.mood}\u3002"
+
+    now = state.world.simulation_time()
+    user_mem = Memory(
+        id=str(uuid.uuid4()),
+        content=f"\u6709\u4eba\u5bf9\u6211\u8bf4\uff1a\u201c{payload.message}\u201d",
+        timestamp=now,
+        importance=0.6,
+        emotion="neutral",
+        source="injected",
+    )
+    reply_mem = Memory(
+        id=str(uuid.uuid4()),
+        content=f"\u6211\u56de\u590d\u8bf4\uff1a\u201c{reply}\u201d",
+        timestamp=now,
+        importance=0.5,
+        emotion=resident.mood,
+        source="injected",
+    )
+    agent.memory_stream.add(user_mem)
+    agent.memory_stream.add(reply_mem)
+
+    return ChatResponse(
+        reply=reply,
+        resident_id=resident.id,
+        resident_name=resident.name,
     )
