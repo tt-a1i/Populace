@@ -1547,6 +1547,79 @@ async def get_performance(request: Request) -> PerformanceResponse:
     )
 
 
+class SocialIndicatorsResponse(BaseModel):
+    gini_coefficient: float = 0.0
+    social_cohesion: float = 0.0
+    happiness_index: float = 0.0
+    population: int = 0
+    avg_mood_score: float = 0.0
+    total_coins: int = 0
+    avg_energy: float = 0.0
+    total_relationships: int = 0
+
+
+def _compute_gini(values: list[float]) -> float:
+    """Compute the Gini coefficient from a list of values."""
+    if not values or all(v == 0 for v in values):
+        return 0.0
+    n = len(values)
+    sorted_vals = sorted(values)
+    cumulative = sum((2 * (i + 1) - n - 1) * v for i, v in enumerate(sorted_vals))
+    total = sum(sorted_vals)
+    if total == 0:
+        return 0.0
+    return round(cumulative / (n * total), 4)
+
+
+@router.get("/social-indicators", response_model=SocialIndicatorsResponse, responses=error_responses(503))
+async def get_social_indicators(request: Request) -> SocialIndicatorsResponse:
+    """Compute society-level indicators: Gini coefficient, social cohesion, happiness index."""
+    state = get_simulation_state(request)
+    agents = state.world.agents
+    if not agents:
+        return SocialIndicatorsResponse()
+
+    # Gini coefficient (coin inequality)
+    coin_values = [float(a.resident.coins) for a in agents]
+    gini = _compute_gini(coin_values)
+
+    # Social cohesion (average relationship intensity)
+    all_rels = state.world.relationships if hasattr(state.world, "relationships") else []
+    avg_intensity = 0.0
+    total_rels = len(all_rels)
+    if total_rels > 0:
+        avg_intensity = round(sum(r.intensity for r in all_rels) / total_rels, 3)
+
+    # Happiness index: weighted blend of mood(0.5) + energy(0.3) + wealth(0.2)
+    mood_scores = [_mood_score(getattr(a.resident, "mood", "neutral")) for a in agents]
+    avg_mood = sum(mood_scores) / len(mood_scores) if mood_scores else 0.0
+    # Normalize mood from [-1,1] to [0,1]
+    norm_mood = (avg_mood + 1) / 2
+
+    energies = [getattr(a.resident, "energy", 50) for a in agents]
+    avg_energy = sum(energies) / len(energies) if energies else 50.0
+    norm_energy = min(avg_energy / 100.0, 1.0)
+
+    total_coins = sum(a.resident.coins for a in agents)
+    avg_coins = total_coins / len(agents)
+    # Normalize wealth: log scale capped at 1000 coins
+    import math
+    norm_wealth = min(math.log1p(avg_coins) / math.log1p(1000), 1.0)
+
+    happiness = round(0.5 * norm_mood + 0.3 * norm_energy + 0.2 * norm_wealth, 3)
+
+    return SocialIndicatorsResponse(
+        gini_coefficient=gini,
+        social_cohesion=avg_intensity,
+        happiness_index=happiness,
+        population=len(agents),
+        avg_mood_score=round(avg_mood, 3),
+        total_coins=total_coins,
+        avg_energy=round(avg_energy, 1),
+        total_relationships=total_rels,
+    )
+
+
 @router.get("/timeline", response_model=list[TimelineEventResponse], responses=error_responses(503))
 async def get_world_timeline(request: Request) -> list[TimelineEventResponse]:
     """Return the world event timeline sorted by tick descending (newest first, max 200)."""

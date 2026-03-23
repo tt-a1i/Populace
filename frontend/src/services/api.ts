@@ -589,6 +589,21 @@ export function getPerformanceMetrics() {
   return request<PerformanceMetrics>('/api/simulation/performance')
 }
 
+export interface SocialIndicators {
+  gini_coefficient: number
+  social_cohesion: number
+  happiness_index: number
+  population: number
+  avg_mood_score: number
+  total_coins: number
+  avg_energy: number
+  total_relationships: number
+}
+
+export function getSocialIndicators() {
+  return request<SocialIndicators>('/api/simulation/social-indicators')
+}
+
 export interface MemoirPayload {
   resident_id: string
   resident_name: string

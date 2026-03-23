@@ -24,7 +24,7 @@ const HeatmapPanel = lazy(() =>
 
 const OPEN_SETTINGS_EVENT = 'populace:open-settings'
 
-type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity'
+type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard'
 
 interface ToolDef {
   key: ToolKey
@@ -47,7 +47,7 @@ function toneClass(_tone: string, active: boolean): string {
 }
 
 const SECONDARY_KEYS: ReadonlySet<ToolKey> = new Set([
-  'create', 'build', 'stats', 'dialogue', 'activity', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings',
+  'create', 'build', 'stats', 'dialogue', 'activity', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings', 'dashboard',
 ])
 
 export function Toolbar() {
@@ -121,6 +121,7 @@ export function Toolbar() {
     { key: 'timeline', label: t('toolbar.timeline'), icon: '\uD83D\uDCC5', tone: 'violet' },
     { key: 'export', label: t('toolbar.export'), icon: '\uD83D\uDCE4', tone: 'cyan' },
     { key: 'settings', label: t('toolbar.settings'), icon: '\u2699\uFE0F', tone: 'cyan' },
+    { key: 'dashboard', label: t('toolbar.dashboard', { defaultValue: 'Dashboard' }), icon: '\uD83D\uDCCA', tone: 'cyan' },
   ]
 
   const allTools = [...primaryTools, ...secondaryTools]
@@ -161,6 +162,7 @@ export function Toolbar() {
     if (activeTool === 'compare') return <ComparePanel />
     if (activeTool === 'timeline') return <TimelinePanel />
     if (activeTool === 'settings') return <SettingsPanel />
+    if (activeTool === 'dashboard') return <DashboardView />
     return <ReportsPanel />
   }, [activeTool, t])
 
