@@ -244,7 +244,7 @@ export class GraphRenderer {
   private simulation: Simulation<GraphNode, GraphLink> | null = null
   private linkForce: ForceLink<GraphNode, GraphLink> | null = null
   private nodeSelection: Selection<SVGGElement, GraphNode, SVGGElement, unknown> | null = null
-  private linkSelection: Selection<SVGLineElement, GraphLink, SVGGElement, unknown> | null = null
+  private linkSelection: Selection<SVGPathElement, GraphLink, SVGGElement, unknown> | null = null
   private triangleSelection: Selection<SVGPolygonElement, TriangleDatum, SVGGElement, unknown> | null = null
   private communitySelection: Selection<SVGEllipseElement, CommunityDatum, SVGGElement, unknown> | null = null
   private labelSelection: Selection<SVGTextElement, GraphNode, SVGGElement, unknown> | null = null
@@ -272,7 +272,7 @@ export class GraphRenderer {
     this.background = this.svg
       .append('rect')
       .attr('class', 'graph-background')
-      .attr('fill', 'transparent')
+      .attr('fill', 'url(#dot-grid)')
       .attr('width', this.width)
       .attr('height', this.height)
       .style('pointer-events', 'all')
@@ -292,6 +292,21 @@ export class GraphRenderer {
       .append('stop')
       .attr('offset', (stop) => stop.offset)
       .attr('stop-color', (stop) => stop.color)
+
+    const dotGrid = defs.append('pattern')
+      .attr('id', 'dot-grid')
+      .attr('width', 20)
+      .attr('height', 20)
+      .attr('patternUnits', 'userSpaceOnUse')
+    dotGrid.append('rect')
+      .attr('width', 20)
+      .attr('height', 20)
+      .attr('fill', 'transparent')
+    dotGrid.append('circle')
+      .attr('cx', 10)
+      .attr('cy', 10)
+      .attr('r', 0.7)
+      .attr('fill', 'rgba(148, 163, 184, 0.12)')
 
     this.surface = this.svg.append('g')
     this.communityLayer = this.surface.append('g').attr('class', 'graph-communities').style('pointer-events', 'none')
@@ -372,7 +387,7 @@ export class GraphRenderer {
     this.linkSelection?.each((link, index, nodes) => {
       const key = graphLinkKey(link)
       if (this.flashingLinkKeys.has(key)) {
-        this.animateLinkFlash(nodes[index] as SVGLineElement, link)
+        this.animateLinkFlash(nodes[index] as SVGPathElement, link)
       }
     })
   }
@@ -396,22 +411,25 @@ export class GraphRenderer {
     intensifyingLinkKeys: Set<string>,
   ): void {
     const linkSelection = this.linkLayer
-      .selectAll<SVGLineElement, GraphLink>('line.graph-link')
+      .selectAll<SVGPathElement, GraphLink>('path.graph-link')
       .data(links, (datum) => graphLinkKey(datum as GraphLink))
 
     linkSelection.exit().each((link, index, nodes) => {
-      this.animateLinkExit(nodes[index] as SVGLineElement, link as GraphRelationship)
+      this.animateLinkExit(nodes[index] as SVGPathElement, link as GraphRelationship)
     })
 
     const linkEnter = linkSelection
       .enter()
-      .append('line')
+      .append('path')
       .attr('class', 'graph-link')
+      .attr('fill', 'none')
       .attr('stroke-linecap', 'round')
-      .attr('x1', (link) => this.resolveNodePosition((link.source as GraphNode).id ?? String(link.source))?.x ?? 0)
-      .attr('y1', (link) => this.resolveNodePosition((link.source as GraphNode).id ?? String(link.source))?.y ?? 0)
-      .attr('x2', (link) => this.resolveNodePosition((link.source as GraphNode).id ?? String(link.source))?.x ?? 0)
-      .attr('y2', (link) => this.resolveNodePosition((link.source as GraphNode).id ?? String(link.source))?.y ?? 0)
+      .attr('d', (link) => {
+        const pos = this.resolveNodePosition((link.source as GraphNode).id ?? String(link.source))
+        const x = pos?.x ?? 0
+        const y = pos?.y ?? 0
+        return `M${x},${y} Q${x},${y} ${x},${y}`
+      })
       .attr('stroke-opacity', 0)
       .attr('stroke-width', 0)
       .style('pointer-events', 'stroke')
@@ -439,7 +457,7 @@ export class GraphRenderer {
       })
 
     mergedLinks.each((link, index, nodes) => {
-      const element = nodes[index] as SVGLineElement
+      const element = nodes[index] as SVGPathElement
       const key = graphLinkKey(link)
       const previousRelationship = this.previousRelationships.get(key)
 
@@ -601,13 +619,21 @@ export class GraphRenderer {
       })
 
     nodeGroups.call(dragBehavior)
-    nodeGroups.on('click', (event: MouseEvent, node: GraphNode) => {
-      if (event.defaultPrevented) {
-        return
-      }
-      event.stopPropagation()
-      this.options.onSelectResident(node.id)
-    })
+    nodeGroups
+      .on('click', (event: MouseEvent, node: GraphNode) => {
+        if (event.defaultPrevented) {
+          return
+        }
+        event.stopPropagation()
+        this.options.onSelectResident(node.id)
+      })
+      .on('mouseenter', (_event: MouseEvent, node: GraphNode) => {
+        this.highlightResidentEdges(node.id)
+      })
+      .on('mouseleave', () => {
+        this.clearResidentHighlight()
+      })
+    nodeGroups.style('transition', 'opacity 200ms ease')
     this.nodeSelection = nodeGroups
   }
 
@@ -671,6 +697,7 @@ export class GraphRenderer {
       .attr('font-size', (node) => (node.id === this.selectedResidentId ? 13 : 12))
       .attr('font-weight', (node) => (node.id === this.selectedResidentId ? 700 : 600))
       .attr('opacity', (node) => (node.deceased ? 0.72 : 1))
+      .style('transition', 'opacity 200ms ease')
       .text((node) => node.name)
 
     this.labelSelection = labels
@@ -707,11 +734,7 @@ export class GraphRenderer {
   private readonly handleTick = (): void => {
     this.positionCommunities()
     this.triangleSelection?.attr('points', (triangle) => this.pointsForTriangle(triangle.nodeIds))
-    this.linkSelection
-      ?.attr('x1', (link) => (link.source as GraphNode).x ?? 0)
-      .attr('y1', (link) => (link.source as GraphNode).y ?? 0)
-      .attr('x2', (link) => (link.target as GraphNode).x ?? 0)
-      .attr('y2', (link) => (link.target as GraphNode).y ?? 0)
+    this.linkSelection?.attr('d', (link) => this.computeCurvePath(link))
 
     this.nodeSelection?.attr('transform', (node) => `translate(${node.x ?? 0}, ${node.y ?? 0})`)
     this.labelSelection
@@ -758,7 +781,7 @@ export class GraphRenderer {
     this.linkSelection?.attr('stroke-opacity', (link) => this.linkOpacity(link))
   }
 
-  private animateLinkEnter(element: SVGLineElement, link: GraphLink): void {
+  private animateLinkEnter(element: SVGPathElement, link: GraphLink): void {
     const targetWidth = this.linkWidth(link)
     const targetOpacity = this.linkOpacity(link)
     const source = this.resolveLinkEndpoint(link.source)
@@ -845,7 +868,7 @@ export class GraphRenderer {
   }
 
   private animateLinkIntensify(
-    element: SVGLineElement,
+    element: SVGPathElement,
     link: GraphRelationship,
     previousRelationship: GraphRelationship,
   ): void {
@@ -870,7 +893,7 @@ export class GraphRenderer {
       .attr('stroke-width', targetWidth)
   }
 
-  private animateLinkExit(element: SVGLineElement, link: GraphRelationship): void {
+  private animateLinkExit(element: SVGPathElement, link: GraphRelationship): void {
     element.style.pointerEvents = 'none'
     const midpoint = this.linkMidpoint(link)
 
@@ -915,7 +938,7 @@ export class GraphRenderer {
       })
   }
 
-  private animateLinkFlash(element: SVGLineElement, link: GraphLink): void {
+  private animateLinkFlash(element: SVGPathElement, link: GraphLink): void {
     if (this.reducedMotion) return
     const color = relationshipColorScale(link.type)
     const targetWidth = this.linkWidth(link)
@@ -1089,5 +1112,50 @@ export class GraphRenderer {
         .attr('r', 0.8)
         .remove()
     }
+  }
+
+  private computeCurvePath(link: GraphLink): string {
+    const source = link.source as GraphNode
+    const target = link.target as GraphNode
+    const sx = source.x ?? 0
+    const sy = source.y ?? 0
+    const tx = target.x ?? 0
+    const ty = target.y ?? 0
+
+    const dx = tx - sx
+    const dy = ty - sy
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1
+    const nx = -dy / dist
+    const ny = dx / dist
+    const curvature = Math.min(22, dist * 0.1)
+
+    const mx = (sx + tx) / 2 + nx * curvature
+    const my = (sy + ty) / 2 + ny * curvature
+
+    return `M${sx},${sy} Q${mx},${my} ${tx},${ty}`
+  }
+
+  private highlightResidentEdges(nodeId: string): void {
+    this.linkSelection?.attr('stroke-opacity', (link) =>
+      link.from_id === nodeId || link.to_id === nodeId ? 0.98 : 0.06,
+    )
+    const connectedIds = new Set<string>()
+    connectedIds.add(nodeId)
+    this.linkSelection?.data().forEach((link) => {
+      if (link.from_id === nodeId) connectedIds.add(link.to_id)
+      if (link.to_id === nodeId) connectedIds.add(link.from_id)
+    })
+    this.nodeSelection?.attr('opacity', (node) =>
+      connectedIds.has(node.id) ? (node.deceased ? 0.5 : 1) : 0.15,
+    )
+    this.labelSelection?.attr('opacity', (node) =>
+      connectedIds.has(node.id) ? (node.deceased ? 0.72 : 1) : 0.15,
+    )
+  }
+
+  private clearResidentHighlight(): void {
+    this.linkSelection?.attr('stroke-opacity', (link) => this.linkOpacity(link))
+    this.nodeSelection?.attr('opacity', (node) => (node.deceased ? 0.5 : 1))
+    this.labelSelection?.attr('opacity', (node) => (node.deceased ? 0.72 : 1))
   }
 }

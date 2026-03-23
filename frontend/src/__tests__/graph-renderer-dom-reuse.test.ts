@@ -49,7 +49,7 @@ describe('GraphRenderer incremental DOM updates', () => {
     )
 
     const initialNode = root.querySelector('g.graph-node')
-    const initialLink = root.querySelector('line.graph-link')
+    const initialLink = root.querySelector('path.graph-link')
     const initialLabel = root.querySelector('text.graph-label')
 
     renderer.render(
@@ -64,7 +64,7 @@ describe('GraphRenderer incremental DOM updates', () => {
     )
 
     expect(root.querySelector('g.graph-node')).toBe(initialNode)
-    expect(root.querySelector('line.graph-link')).toBe(initialLink)
+    expect(root.querySelector('path.graph-link')).toBe(initialLink)
     expect(root.querySelector('text.graph-label')).toBe(initialLabel)
 
     renderer.destroy()
@@ -159,9 +159,9 @@ describe('GraphRenderer incremental DOM updates', () => {
       null,
     )
 
-    const links = Array.from(root.querySelectorAll<SVGLineElement>('line.graph-link'))
-    const strongLink = links.find((line) => ((line as SVGLineElement & { __data__?: { intensity?: number } }).__data__?.intensity) === 0.95)
-    const weakLink = links.find((line) => ((line as SVGLineElement & { __data__?: { intensity?: number } }).__data__?.intensity) === 0.2)
+    const links = Array.from(root.querySelectorAll<SVGPathElement>('path.graph-link'))
+    const strongLink = links.find((line) => ((line as SVGPathElement & { __data__?: { intensity?: number } }).__data__?.intensity) === 0.95)
+    const weakLink = links.find((line) => ((line as SVGPathElement & { __data__?: { intensity?: number } }).__data__?.intensity) === 0.2)
 
     expect(Number(strongLink?.getAttribute('stroke-width'))).toBeGreaterThan(Number(weakLink?.getAttribute('stroke-width')))
 

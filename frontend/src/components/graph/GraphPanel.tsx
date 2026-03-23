@@ -192,7 +192,7 @@ export function GraphPanel() {
                   aria-pressed={activeType === type}
                   aria-label={type === 'all' ? String(t('graph.all')) : String(t(`graph.rel_${type}`))}
                   onClick={() => setActiveType(type)}
-                  className={`rounded-full border px-3 py-1.5 text-xs transition duration-200 active:scale-95 ${
+                  className={`btn-micro rounded-full border px-3 py-1.5 text-xs transition duration-200 active:scale-95 ${
                     activeType === type
                       ? 'theme-accent-button-active'
                       : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
