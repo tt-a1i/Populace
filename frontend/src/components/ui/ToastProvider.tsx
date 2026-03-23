@@ -88,7 +88,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const timersRef = React.useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
 
   React.useEffect(() => {
-    return () => { timersRef.current.forEach(clearTimeout) }
+    const timers = timersRef.current
+    return () => { timers.forEach(clearTimeout) }
   }, [])
 
   const pushToast = React.useCallback(

@@ -202,38 +202,44 @@ function NetworkRankChart({ data, relationshipsSuffix }: { data: NetworkAnalysis
 function OccupationPieChart({ data }: { data: OccupationDistEntry[] }) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
   const total = data.reduce((sum, d) => sum + d.count, 0)
-  if (total === 0) return null
+
+  const slices = useMemo(() => {
+    if (total === 0) return []
+    const SIZE = 180
+    const cx = SIZE / 2, cy = SIZE / 2, R = 68, innerR = 40
+    let a = -Math.PI / 2
+
+    return data.map((d, i) => {
+      const sweep = (d.count / total) * Math.PI * 2
+      const startAngle = a
+      a += sweep
+      const endAngle = a
+      const largeArc = sweep > Math.PI ? 1 : 0
+
+      const x1 = cx + R * Math.cos(startAngle)
+      const y1 = cy + R * Math.sin(startAngle)
+      const x2 = cx + R * Math.cos(endAngle)
+      const y2 = cy + R * Math.sin(endAngle)
+      const ix1 = cx + innerR * Math.cos(endAngle)
+      const iy1 = cy + innerR * Math.sin(endAngle)
+      const ix2 = cx + innerR * Math.cos(startAngle)
+      const iy2 = cy + innerR * Math.sin(startAngle)
+
+      const path = [
+        `M${x1.toFixed(1)},${y1.toFixed(1)}`,
+        `A${R},${R} 0 ${largeArc} 1 ${x2.toFixed(1)},${y2.toFixed(1)}`,
+        `L${ix1.toFixed(1)},${iy1.toFixed(1)}`,
+        `A${innerR},${innerR} 0 ${largeArc} 0 ${ix2.toFixed(1)},${iy2.toFixed(1)}`,
+        'Z',
+      ].join(' ')
+
+      return { path, color: PIE_COLORS[i % PIE_COLORS.length], label: d.occupation, count: d.count, pct: ((d.count / total) * 100).toFixed(0) }
+    })
+  }, [data, total])
+
+  if (slices.length === 0) return null
 
   const SIZE = 180
-  const cx = SIZE / 2, cy = SIZE / 2, R = 68, innerR = 40
-  let angle = -Math.PI / 2
-
-  const slices = data.map((d, i) => {
-    const sweep = (d.count / total) * Math.PI * 2
-    const startAngle = angle
-    angle += sweep
-    const endAngle = angle
-    const largeArc = sweep > Math.PI ? 1 : 0
-
-    const x1 = cx + R * Math.cos(startAngle)
-    const y1 = cy + R * Math.sin(startAngle)
-    const x2 = cx + R * Math.cos(endAngle)
-    const y2 = cy + R * Math.sin(endAngle)
-    const ix1 = cx + innerR * Math.cos(endAngle)
-    const iy1 = cy + innerR * Math.sin(endAngle)
-    const ix2 = cx + innerR * Math.cos(startAngle)
-    const iy2 = cy + innerR * Math.sin(startAngle)
-
-    const path = [
-      `M${x1.toFixed(1)},${y1.toFixed(1)}`,
-      `A${R},${R} 0 ${largeArc} 1 ${x2.toFixed(1)},${y2.toFixed(1)}`,
-      `L${ix1.toFixed(1)},${iy1.toFixed(1)}`,
-      `A${innerR},${innerR} 0 ${largeArc} 0 ${ix2.toFixed(1)},${iy2.toFixed(1)}`,
-      'Z',
-    ].join(' ')
-
-    return { path, color: PIE_COLORS[i % PIE_COLORS.length], label: d.occupation, count: d.count, pct: ((d.count / total) * 100).toFixed(0) }
-  })
 
   return (
     <div className="flex items-center gap-4">
@@ -252,7 +258,7 @@ function OccupationPieChart({ data }: { data: OccupationDistEntry[] }) {
           />
         ))}
         {hoveredIdx !== null && (
-          <text x={cx} y={cy + 4} textAnchor="middle" fontSize="12" fill="#e2e8f0" fontWeight="600">
+          <text x={SIZE / 2} y={SIZE / 2 + 4} textAnchor="middle" fontSize="12" fill="#e2e8f0" fontWeight="600">
             {slices[hoveredIdx].pct}%
           </text>
         )}

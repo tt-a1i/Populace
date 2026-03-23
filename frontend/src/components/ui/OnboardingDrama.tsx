@@ -173,7 +173,7 @@ export function OnboardingDrama({ onComplete }: OnboardingDramaProps) {
 
     const id = schedule(() => transitionTo('choice'), 10000)
     return () => clearTimeout(id)
-  }, [phase, firstResident, schedule, transitionTo])
+  }, [phase, firstResident, schedule, transitionTo, t])
 
   // ---------------------------------------------------------------------------
   // Cleanup all timers on unmount

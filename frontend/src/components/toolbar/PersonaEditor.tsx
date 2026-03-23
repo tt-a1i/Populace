@@ -69,7 +69,7 @@ export function PersonaEditor() {
     setPersonality(selectedResident.personality ?? t('persona.default_personality'))
     setMood(selectedResident.mood ?? 'neutral')
     setGoals((selectedResident.goals ?? t('persona.default_goals').split(', ')).join(', '))
-  }, [selectedResident])
+  }, [selectedResident, t])
 
   const handleSave = async () => {
     if (!residentId) {

@@ -2,7 +2,7 @@ import { Application, Container, Graphics, Rectangle, Text } from 'pixi.js'
 
 import { useSimulationStore, type ResidentPosition, type SimulationSpeed } from '../../stores/simulation'
 import type { Building } from '../../types'
-import { ResidentSprite } from './ResidentSprite'
+import { ResidentSprite, type ResidentHoverInfo } from './ResidentSprite'
 import { ResidentSpritePool } from './ResidentSpritePool'
 import { MilestoneEffect } from './effects/MilestoneEffect'
 import { CloudEffect } from './effects/CloudEffect'
@@ -26,6 +26,11 @@ import {
 type WeatherEffect = RainEffect | SnowEffect | StormEffect | CloudEffect
 
 const CAMERA_PADDING = 56
+const MOOD_EMOJI_MAP: Record<string, string> = {
+  happy: '\uD83D\uDE0A', content: '\uD83D\uDE42', sad: '\uD83D\uDE22', angry: '\uD83D\uDE20',
+  excited: '\uD83E\uDD29', fearful: '\uD83D\uDE28', neutral: '\uD83D\uDE10', calm: '\uD83D\uDE0C',
+  tired: '\uD83D\uDE34', ecstatic: '\uD83E\uDD73',
+}
 const POOLED_RESIDENT_PLACEHOLDER: ResidentPosition = {
   id: '__pool__',
   name: '',
@@ -66,6 +71,8 @@ export class TownRenderer {
       new ResidentSprite(POOLED_RESIDENT_PLACEHOLDER, {
         onFocusRequest: this.followResident,
         onSelectRequest: this.selectResident,
+        onHoverStart: this.showTooltip,
+        onHoverEnd: this.hideTooltip,
       }),
   )
   private readonly tileGraphics = new Graphics()
@@ -90,6 +97,21 @@ export class TownRenderer {
   private readonly vignetteGraphics = new Graphics()
   private readonly waterOverlay = new Graphics()
   private waterTime = 0
+  // Hover tooltip
+  private readonly tooltipContainer = new Container()
+  private readonly tooltipBg = new Graphics()
+  private readonly tooltipName: Text
+  private readonly tooltipDetails: Text
+  private readonly tooltipEnergyBar = new Graphics()
+  private tooltipVisible = false
+  // Relationship connection lines
+  private readonly relationLineGraphics = new Graphics()
+  private relationLinePulse = 0
+  // Path visualization
+  private readonly pathGraphics = new Graphics()
+  private readonly pathTargetGraphics = new Graphics()
+  private _pathPulse = 0
+  private _currentResidentPositions: ResidentPosition[] = []
 
   private dragging = false
   private dragPointerId: number | null = null
@@ -151,6 +173,28 @@ export class TownRenderer {
       this.eventRadiusGraphics, this.weatherContainer, this.vignetteGraphics,
     )
 
+    // Path + relationship lines below residents
+    this.residentLayer.addChild(this.pathGraphics, this.pathTargetGraphics, this.relationLineGraphics)
+    this.pathGraphics.zIndex = -2
+    this.pathTargetGraphics.zIndex = -2
+    this.relationLineGraphics.zIndex = -1
+
+    // Tooltip container — in uiLayer so it's above everything
+    this.tooltipName = new Text({
+      text: '',
+      style: { fill: 0xf8fafc, fontFamily: 'Avenir Next, Helvetica Neue, sans-serif', fontSize: 10, fontWeight: '700' },
+    })
+    this.tooltipDetails = new Text({
+      text: '',
+      style: { fill: 0x94a3b8, fontFamily: 'Avenir Next, Helvetica Neue, sans-serif', fontSize: 9, fontWeight: '500' },
+    })
+    this.tooltipName.position.set(8, 6)
+    this.tooltipDetails.position.set(8, 20)
+    this.tooltipEnergyBar.position.set(8, 34)
+    this.tooltipContainer.addChild(this.tooltipBg, this.tooltipName, this.tooltipDetails, this.tooltipEnergyBar)
+    this.tooltipContainer.visible = false
+    this.tooltipContainer.zIndex = 100
+
     this.tileLayer.eventMode = 'static'
     this.tileLayer.hitArea = new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
     this.tileLayer.on('pointertap', this.handleBackgroundTap)
@@ -180,7 +224,7 @@ export class TownRenderer {
       anchor: { x: 1, y: 0 },
     })
     this.hintLabel.visible = false  // Hidden — HTML HUD overlay replaces this
-    this.uiLayer.addChild(this.hudLabel, this.hintLabel)
+    this.uiLayer.addChild(this.hudLabel, this.hintLabel, this.tooltipContainer)
 
     this.drawTiles()
     this.drawBuildings()
@@ -341,6 +385,7 @@ export class TownRenderer {
   }
 
   syncResidents(residents: ResidentPosition[]): void {
+    this._currentResidentPositions = residents
     const activeIds = new Set(residents.map((resident) => resident.id))
 
     for (const resident of residents) {
@@ -358,6 +403,8 @@ export class TownRenderer {
       newSprite.reuse(resident, {
         onFocusRequest: this.followResident,
         onSelectRequest: this.selectResident,
+        onHoverStart: this.showTooltip,
+        onHoverEnd: this.hideTooltip,
       })
       newSprite.setSimulationSpeed(this.simulationMeta.speed)
       newSprite.setExternalHighlight(this.highlightedResidentIds.has(resident.id))
@@ -468,6 +515,10 @@ export class TownRenderer {
     this.milestoneEffects.push(effect)
   }
 
+  getFollowedResidentId(): string | null {
+    return this.followedResidentId
+  }
+
   setFollowTarget(residentId: string | null): void {
     this.followedResidentId = residentId
 
@@ -543,6 +594,16 @@ export class TownRenderer {
         this.milestoneEffects.splice(i, 1)
       }
     }
+
+    // Tooltip fade in/out
+    this.updateTooltip()
+
+    // Relationship line pulse
+    this.relationLinePulse += deltaMs * 0.003
+
+    // Path visualization pulse + update
+    this._pathPulse += deltaMs * 0.004
+    this.updatePathVisualization()
 
     if (this.followedResidentId) {
       this.centerOnResident(this.followedResidentId)
@@ -938,6 +999,165 @@ export class TownRenderer {
       this.vignetteGraphics.rect(cx, cy, cornerSize, cornerSize)
       this.vignetteGraphics.fill({ color, alpha: 0.1 })
     }
+  }
+
+  // ── Hover Tooltip ──────────────────────────────────────────────────────
+
+  private readonly showTooltip = (info: ResidentHoverInfo): void => {
+    this.tooltipVisible = true
+    this.tooltipName.text = info.name
+    const moodEmoji = info.mood ? (MOOD_EMOJI_MAP[info.mood] ?? '') : ''
+    const occLabel = info.occupation || 'resident'
+    this.tooltipDetails.text = `${moodEmoji} ${occLabel}`.trim()
+
+    // Energy bar
+    this.tooltipEnergyBar.clear()
+    const barW = 60
+    const barH = 4
+    this.tooltipEnergyBar.roundRect(0, 0, barW, barH, 2).fill({ color: 0x1e293b })
+    const eColor = info.energy > 0.5 ? 0x34d399 : info.energy > 0.2 ? 0xfbbf24 : 0xef4444
+    this.tooltipEnergyBar.roundRect(0, 0, barW * Math.max(0, Math.min(1, info.energy)), barH, 2).fill({ color: eColor })
+
+    // Background
+    const tw = 80
+    const th = 44
+    this.tooltipBg.clear()
+    this.tooltipBg.roundRect(0, 0, tw, th, 6).fill({ color: 0x0f172a, alpha: 0.88 })
+    this.tooltipBg.stroke({ color: 0xffffff, alpha: 0.1, width: 1 })
+
+    // Position relative to the world — offset above the sprite
+    this.tooltipContainer.position.set(
+      (info.worldX - tw / 2) * this.zoom + this.world.x,
+      (info.worldY - 40) * this.zoom + this.world.y,
+    )
+    this.tooltipContainer.visible = true
+    this.tooltipContainer.alpha = 0
+  }
+
+  private readonly hideTooltip = (): void => {
+    this.tooltipVisible = false
+  }
+
+  private updateTooltip(): void {
+    if (this.tooltipVisible && this.tooltipContainer.alpha < 1) {
+      this.tooltipContainer.alpha = Math.min(1, this.tooltipContainer.alpha + 0.12)
+    } else if (!this.tooltipVisible && this.tooltipContainer.alpha > 0) {
+      this.tooltipContainer.alpha = Math.max(0, this.tooltipContainer.alpha - 0.15)
+      if (this.tooltipContainer.alpha <= 0) {
+        this.tooltipContainer.visible = false
+      }
+    }
+  }
+
+  // ── Relationship Connection Lines ─────────────────────────────────────
+
+  private readonly RELATION_COLOR: Record<string, number> = {
+    love: 0xf472b6,
+    friendship: 0x60a5fa,
+    trust: 0x60a5fa,
+    rivalry: 0xef4444,
+    dislike: 0xef4444,
+    fear: 0xfbbf24,
+    knows: 0x94a3b8,
+  }
+
+  drawRelationshipLines(selectedId: string | null, relationships: Array<{ from_id: string; to_id: string; type: string; intensity: number }>): void {
+    this.relationLineGraphics.clear()
+    if (!selectedId) return
+
+    const fromSprite = this.residents.get(selectedId)
+    if (!fromSprite) return
+
+    const relatedEdges = relationships.filter(
+      (r) => r.from_id === selectedId || r.to_id === selectedId,
+    )
+
+    const t = this.relationLinePulse
+
+    for (const edge of relatedEdges) {
+      const otherId = edge.from_id === selectedId ? edge.to_id : edge.from_id
+      const toSprite = this.residents.get(otherId)
+      if (!toSprite) continue
+
+      const color = this.RELATION_COLOR[edge.type] ?? 0x94a3b8
+      // Pulse alpha based on intensity
+      const pulseAlpha = 0.3 + edge.intensity * 0.4 + Math.sin(t * 2.5 + edge.intensity * 3) * 0.1
+
+      // Draw dashed line
+      const dx = toSprite.x - fromSprite.x
+      const dy = toSprite.y - fromSprite.y
+      const dist = Math.hypot(dx, dy)
+      if (dist < 1) continue
+
+      const dashLen = 6
+      const gapLen = 4
+      const nx = dx / dist
+      const ny = dy / dist
+      let traveled = 0
+
+      while (traveled < dist) {
+        const segEnd = Math.min(traveled + dashLen, dist)
+        this.relationLineGraphics.moveTo(
+          fromSprite.x + nx * traveled,
+          fromSprite.y + ny * traveled,
+        )
+        this.relationLineGraphics.lineTo(
+          fromSprite.x + nx * segEnd,
+          fromSprite.y + ny * segEnd,
+        )
+        this.relationLineGraphics.stroke({ color, width: 1.5, alpha: pulseAlpha })
+        traveled = segEnd + gapLen
+      }
+    }
+  }
+
+  // ── Path Visualization ──────────────────────────────────────────────────
+
+  private updatePathVisualization(): void {
+    this.pathGraphics.clear()
+    this.pathTargetGraphics.clear()
+
+    const selectedId = useSimulationStore.getState().selectedResidentId
+    if (!selectedId) return
+
+    const sprite = this.residents.get(selectedId)
+    if (!sprite) return
+
+    const residentData = this.currentResidentPositions.find((r) => r.id === selectedId)
+    if (!residentData) return
+
+    const currentWorldX = sprite.x
+    const currentWorldY = sprite.y
+    const targetWorldX = residentData.targetX * TILE_SIZE + TILE_SIZE / 2
+    const targetWorldY = residentData.targetY * TILE_SIZE + TILE_SIZE / 2
+
+    const dx = targetWorldX - currentWorldX
+    const dy = targetWorldY - currentWorldY
+    const dist = Math.hypot(dx, dy)
+
+    if (dist < TILE_SIZE * 0.5) return
+
+    const color = residentData.color
+    const nx = dx / dist
+    const ny = dy / dist
+
+    const dashLen = 5
+    const gapLen = 4
+    let traveled = 0
+    while (traveled < dist) {
+      const segEnd = Math.min(traveled + dashLen, dist)
+      this.pathGraphics.moveTo(currentWorldX + nx * traveled, currentWorldY + ny * traveled)
+      this.pathGraphics.lineTo(currentWorldX + nx * segEnd, currentWorldY + ny * segEnd)
+      this.pathGraphics.stroke({ color, width: 1.5, alpha: 0.45 })
+      traveled = segEnd + gapLen
+    }
+
+    const pulseAlpha = 0.25 + Math.sin(this.pathPulse * 2) * 0.15
+    const pulseRadius = 6 + Math.sin(this.pathPulse * 2) * 2
+    this.pathTargetGraphics.circle(targetWorldX, targetWorldY, pulseRadius)
+    this.pathTargetGraphics.fill({ color, alpha: pulseAlpha })
+    this.pathTargetGraphics.circle(targetWorldX, targetWorldY, pulseRadius)
+    this.pathTargetGraphics.stroke({ color, width: 1.5, alpha: pulseAlpha + 0.15 })
   }
 
   private drawBuildings(): void {

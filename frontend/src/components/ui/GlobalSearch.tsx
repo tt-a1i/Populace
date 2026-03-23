@@ -136,10 +136,10 @@ export function GlobalSearch() {
     return matched.slice(0, 12)
   }, [query, residents, buildings, commands, selectResident])
 
-  // Reset selection when results change
-  useEffect(() => {
+  const handleQueryChange = (value: string) => {
+    setQuery(value)
     setSelectedIdx(0)
-  }, [results.length, query])
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
@@ -180,7 +180,7 @@ export function GlobalSearch() {
           <input
             ref={inputRef}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => handleQueryChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t('search.placeholder', { defaultValue: 'Search residents, buildings, commands...' })}
             className="flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
