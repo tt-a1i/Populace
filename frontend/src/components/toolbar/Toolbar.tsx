@@ -14,7 +14,7 @@ import { SettingsPanel } from './SettingsPanel'
 import { TimelinePanel } from './TimelinePanel'
 import { ReportsPanel } from '../report'
 import { ActivityLog } from '../ui/ActivityLog'
-
+import { DashboardView } from './DashboardView'
 const StatsPanel = lazy(() =>
   import('./StatsPanel').then((module) => ({ default: module.StatsPanel })),
 )
@@ -24,7 +24,7 @@ const HeatmapPanel = lazy(() =>
 
 const OPEN_SETTINGS_EVENT = 'populace:open-settings'
 
-type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard'
+type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard' | 'leaderboard' | 'achievements'
 
 interface ToolDef {
   key: ToolKey
@@ -47,7 +47,7 @@ function toneClass(_tone: string, active: boolean): string {
 }
 
 const SECONDARY_KEYS: ReadonlySet<ToolKey> = new Set([
-  'create', 'build', 'stats', 'dialogue', 'activity', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings', 'dashboard',
+  'create', 'build', 'stats', 'dialogue', 'activity', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings', 'dashboard', 'leaderboard', 'achievements',
 ])
 
 export function Toolbar() {
@@ -122,6 +122,8 @@ export function Toolbar() {
     { key: 'export', label: t('toolbar.export'), icon: '\uD83D\uDCE4', tone: 'cyan' },
     { key: 'settings', label: t('toolbar.settings'), icon: '\u2699\uFE0F', tone: 'cyan' },
     { key: 'dashboard', label: t('toolbar.dashboard', { defaultValue: 'Dashboard' }), icon: '\uD83D\uDCCA', tone: 'cyan' },
+    { key: 'leaderboard', label: t('toolbar.leaderboard', { defaultValue: 'Rankings' }), icon: '\uD83C\uDFC6', tone: 'amber' },
+    { key: 'achievements', label: t('toolbar.achievements', { defaultValue: 'Achievements' }), icon: '\uD83C\uDFC5', tone: 'amber' },
   ]
 
   const allTools = [...primaryTools, ...secondaryTools]
@@ -163,6 +165,8 @@ export function Toolbar() {
     if (activeTool === 'timeline') return <TimelinePanel />
     if (activeTool === 'settings') return <SettingsPanel />
     if (activeTool === 'dashboard') return <DashboardView />
+    if (activeTool === 'leaderboard') return <LeaderboardPanel />
+    if (activeTool === 'achievements') return <AchievementWall />
     return <ReportsPanel />
   }, [activeTool, t])
 
