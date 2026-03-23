@@ -3,48 +3,16 @@ import { useTranslation } from 'react-i18next'
 
 import { RelationCard } from './RelationCard'
 import { GraphRenderer } from './GraphRenderer'
+import { calculateNetworkStats, filterGraphData, type GraphFilterType } from './graphHelpers'
 import { TimelineSlider } from '../ui'
+import { getSimulationSnapshots, replaySimulationTick } from '../../services/api'
 import { useSimulationStore } from '../../stores/simulation'
 import {
   useRelationshipsStore,
   type GraphRelationship,
-  type GraphResident,
 } from '../../stores/relationships'
 
-const graphTypeOptions = ['all', 'friendship', 'rivalry', 'love', 'knows'] as const
 const graphIntensityThresholds = [0.0, 0.3, 0.5, 0.7] as const
-
-type GraphFilterType = (typeof graphTypeOptions)[number]
-
-// eslint-disable-next-line react-refresh/only-export-components
-export function filterGraphData(
-  residents: GraphResident[],
-  relationships: GraphRelationship[],
-  filter: { type: GraphFilterType; minIntensity: number },
-): { residents: GraphResident[]; relationships: GraphRelationship[] } {
-  const visibleRelationships = relationships.filter((relationship) => {
-    if (relationship.intensity < filter.minIntensity) {
-      return false
-    }
-
-    if (filter.type === 'all') {
-      return true
-    }
-
-    return relationship.type === filter.type
-  })
-
-  const visibleResidentIds = new Set<string>()
-  for (const relationship of visibleRelationships) {
-    visibleResidentIds.add(relationship.from_id)
-    visibleResidentIds.add(relationship.to_id)
-  }
-
-  return {
-    residents: residents.filter((resident) => visibleResidentIds.has(resident.id)),
-    relationships: visibleRelationships,
-  }
-}
 
 export function GraphPanel() {
   const { t } = useTranslation()
@@ -52,11 +20,14 @@ export function GraphPanel() {
   const rendererRef = useRef<GraphRenderer | null>(null)
   const residents = useRelationshipsStore((state) => state.residents)
   const relationships = useRelationshipsStore((state) => state.relationships)
-  const history = useRelationshipsStore((state) => state.history)
   const replayTick = useRelationshipsStore((state) => state.replayTick)
   const lastAppliedTick = useRelationshipsStore((state) => state.lastAppliedTick)
   const setReplayTick = useRelationshipsStore((state) => state.setReplayTick)
   const flashingEventKeys = useRelationshipsStore((state) => state.flashingEventKeys)
+  const snapshotHistory = useSimulationStore((state) => state.snapshotHistory)
+  const getSnapshotByTick = useSimulationStore((state) => state.getSnapshotByTick)
+  const setSnapshotHistory = useSimulationStore((state) => state.setSnapshotHistory)
+  const upsertReplaySnapshot = useSimulationStore((state) => state.upsertReplaySnapshot)
   const selectedResidentId = useSimulationStore((state) => state.selectedResidentId)
   const selectResident = useSimulationStore((state) => state.selectResident)
   const setHoveredPairIds = useSimulationStore((state) => state.setHoveredPairIds)
@@ -67,16 +38,41 @@ export function GraphPanel() {
   const [activeType, setActiveType] = useState<GraphFilterType>('all')
   const [minIntensity, setMinIntensity] = useState<number>(0.0)
   const replaySnapshot = useMemo(
-    () => history.find((snapshot) => snapshot.tick === replayTick) ?? null,
-    [history, replayTick],
+    () => (replayTick === null ? null : getSnapshotByTick(replayTick)),
+    [getSnapshotByTick, replayTick],
   )
-  const renderedRelationships = replaySnapshot?.relationships ?? relationships
+  const renderedRelationships = useMemo<GraphRelationship[]>(
+    () =>
+      replaySnapshot?.relationships.map((relationship) => ({
+        from_id: relationship.from_id,
+        to_id: relationship.to_id,
+        type: relationship.type as GraphRelationship['type'],
+        intensity: relationship.intensity,
+        reason: relationship.reason ?? '',
+      })) ?? relationships,
+    [relationships, replaySnapshot],
+  )
   const filteredGraph = useMemo(
-    () => filterGraphData(residents, renderedRelationships, { type: activeType, minIntensity }),
+    () =>
+      filterGraphData(
+        residents,
+        renderedRelationships.map((relationship) => ({
+          from_id: relationship.from_id,
+          to_id: relationship.to_id,
+          type: relationship.type as GraphRelationship['type'],
+          intensity: relationship.intensity,
+          reason: relationship.reason ?? '',
+        })),
+        { type: activeType, minIntensity },
+      ),
     [activeType, minIntensity, renderedRelationships, residents],
   )
   const filteredResidents = filteredGraph.residents
   const filteredRelationships = filteredGraph.relationships
+  const networkStats = useMemo(
+    () => calculateNetworkStats(filteredResidents, filteredRelationships),
+    [filteredRelationships, filteredResidents],
+  )
   const activeHoveredRelationship =
     hoveredRelationship &&
     filteredRelationships.some(
@@ -90,10 +86,18 @@ export function GraphPanel() {
   const activeCardPosition = activeHoveredRelationship ? cardPosition : null
 
   useEffect(() => {
-    if (replayTick !== null && !replaySnapshot && history.length > 0) {
-      setReplayTick(history[0]?.tick ?? null)
+    void getSimulationSnapshots()
+      .then((snapshots) => {
+        setSnapshotHistory(snapshots)
+      })
+      .catch(() => undefined)
+  }, [setSnapshotHistory])
+
+  useEffect(() => {
+    if (replayTick !== null && !replaySnapshot && snapshotHistory.length > 0) {
+      setReplayTick(snapshotHistory[0]?.tick ?? null)
     }
-  }, [history, replaySnapshot, replayTick, setReplayTick])
+  }, [replaySnapshot, replayTick, setReplayTick, snapshotHistory])
 
   useEffect(() => {
     const host = hostRef.current
@@ -145,7 +149,7 @@ export function GraphPanel() {
     }
   }, [flashingEventKeys])
 
-  const handleReplayTickChange = (tick: number | null) => {
+  const handleReplayTickChange = async (tick: number | null) => {
     if (tick === null) {
       resumeLiveFromReplay()
       setReplayTick(null)
@@ -156,7 +160,13 @@ export function GraphPanel() {
       freezeForReplay()
     }
 
-    setReplayTick(tick)
+    try {
+      const snapshot = await replaySimulationTick(tick)
+      upsertReplaySnapshot(snapshot)
+      setReplayTick(snapshot.tick)
+    } catch {
+      setReplayTick(tick)
+    }
   }
 
   return (
@@ -210,6 +220,22 @@ export function GraphPanel() {
               ))}
             </div>
           </div>
+
+          <div className="grid min-w-[13rem] gap-2 rounded-xl border border-white/8 bg-black/20 px-3 py-2 text-[11px] text-slate-300 md:max-w-[14rem]">
+            <p className="uppercase tracking-[0.22em] text-cyan-100/70">{t('graph.network_stats')}</p>
+            <div className="flex items-center justify-between gap-3">
+              <span>{t('graph.density')}</span>
+              <span className="font-mono text-white">{networkStats.density.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span>{t('graph.average_path_length')}</span>
+              <span className="font-mono text-white">{networkStats.averagePathLength.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span>{t('graph.largest_component')}</span>
+              <span className="font-mono text-white">{networkStats.largestComponentSize}</span>
+            </div>
+          </div>
         </div>
 
         <div className="pointer-events-none self-start rounded-full border border-white/10 bg-slate-950/65 px-3 py-1 text-[11px] uppercase tracking-[0.28em] text-amber-100/70">
@@ -223,7 +249,7 @@ export function GraphPanel() {
       />
       <div className="absolute bottom-4 left-4 right-4 z-10">
         <TimelineSlider
-          history={history}
+          history={snapshotHistory}
           replayTick={replayTick}
           liveTick={lastAppliedTick}
           onReplayTickChange={handleReplayTickChange}

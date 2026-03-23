@@ -46,6 +46,9 @@ vi.mock('../components/toolbar/ComparePanel', () => ({
 vi.mock('../components/toolbar/TimelinePanel', () => ({
   TimelinePanel: () => <div data-testid="timeline-panel">TimelinePanel</div>,
 }))
+vi.mock('../components/toolbar/DialogueHistory', () => ({
+  DialogueHistory: () => <div data-testid="dialogue-history-panel">DialogueHistory</div>,
+}))
 vi.mock('../components/toolbar/SettingsPanel', () => ({
   SettingsPanel: () => <div data-testid="settings-panel">SettingsPanel</div>,
 }))
@@ -111,6 +114,7 @@ describe('Toolbar', () => {
     expect(screen.getByTestId('secondary-row')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /建造模式/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /数据统计/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /对话记录/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /创建居民/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /存档管理/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /系统设置/ })).toBeInTheDocument()
@@ -179,6 +183,13 @@ describe('Toolbar', () => {
     expect(screen.getAllByText(/数据统计/).length).toBeGreaterThan(1)
     // Secondary row should remain visible
     expect(screen.getByTestId('secondary-row')).toBeInTheDocument()
+  })
+
+  it('switches to DialogueHistory when 对话记录 is clicked', async () => {
+    render(<Toolbar />)
+    await userEvent.click(screen.getByTestId('more-toggle'))
+    await userEvent.click(screen.getByRole('button', { name: /对话记录/ }))
+    expect(screen.getByTestId('dialogue-history-panel')).toBeInTheDocument()
   })
 
   // Sound toggle is now in App.tsx HUD, not in Toolbar

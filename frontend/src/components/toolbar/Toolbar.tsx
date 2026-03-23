@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { BuildPanel } from './BuildPanel'
 import { ComparePanel } from './ComparePanel'
 import { DirectorConsole } from './DirectorConsole'
+import { DialogueHistory } from './DialogueHistory'
 import { ExportPanel } from './ExportPanel'
 import { PersonaEditor } from './PersonaEditor'
 import { QuestPanel } from './QuestPanel'
@@ -22,7 +23,7 @@ const HeatmapPanel = lazy(() =>
 
 const OPEN_SETTINGS_EVENT = 'populace:open-settings'
 
-type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'stats' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings'
+type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings'
 
 interface ToolDef {
   key: ToolKey
@@ -45,7 +46,7 @@ function toneClass(_tone: string, active: boolean): string {
 }
 
 const SECONDARY_KEYS: ReadonlySet<ToolKey> = new Set([
-  'create', 'build', 'stats', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings',
+  'create', 'build', 'stats', 'dialogue', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings',
 ])
 
 export function Toolbar() {
@@ -108,6 +109,7 @@ export function Toolbar() {
     { key: 'create', label: t('toolbar.create'), icon: '\uD83E\uDDD1', tone: 'emerald' },
     { key: 'build', label: t('toolbar.build'), icon: '\uD83C\uDFD7', tone: 'emerald' },
     { key: 'stats', label: t('toolbar.stats'), icon: '\uD83D\uDCCA', tone: 'cyan' },
+    { key: 'dialogue', label: t('toolbar.dialogue_history'), icon: '\uD83D\uDCAC', tone: 'amber' },
     { key: 'saves', label: t('toolbar.saves'), icon: '\uD83D\uDCBE', tone: 'violet' },
     { key: 'heatmap', label: t('toolbar.heatmap'), icon: '\uD83D\uDFE5', tone: 'violet' },
     { key: 'compare', label: t('toolbar.compare'), icon: '\u2696\uFE0F', tone: 'amber' },
@@ -139,6 +141,7 @@ export function Toolbar() {
         </Suspense>
       )
     }
+    if (activeTool === 'dialogue') return <DialogueHistory />
     if (activeTool === 'build') return <BuildPanel />
     if (activeTool === 'create') return <ResidentCreationWizard />
     if (activeTool === 'export') return <ExportPanel />

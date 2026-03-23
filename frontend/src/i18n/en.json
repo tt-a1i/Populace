@@ -79,6 +79,7 @@
     "build": "Build",
     "create": "Add Resident",
     "stats": "Stats",
+    "dialogue_history": "Dialogue History",
     "saves": "Saves",
     "export": "Export",
     "heatmap": "Heatmap",
@@ -101,6 +102,17 @@
     "relationships": "Relationships",
     "achievements": "Achievements",
     "personality": "Personality"
+  },
+  "dialogue_history": {
+    "badge": "Dialogue Feed",
+    "title": "Dialogue History",
+    "desc": "Review the latest 50 resident exchanges and filter the feed by resident.",
+    "filter": "Filter Resident",
+    "filter_all": "All Residents",
+    "loading": "Loading dialogue history…",
+    "empty": "No dialogue records match the current filter.",
+    "load_failed": "Failed to load dialogue history.",
+    "tick": "Tick {{tick}}"
   },
   "timeline": {
     "badge": "World Timeline",
@@ -484,6 +496,7 @@
     "reconnect": "Reconnect",
     "reconnecting": "Reconnecting {{seconds}}s…",
     "conn_interrupted": "Connection interrupted, reconnecting…",
+    "online_count": "Online {{count}}",
     "toolbar_region": "Main Toolbar",
     "map_region": "Town Map",
     "graph_region": "Relationship Graph Panel",
@@ -653,6 +666,10 @@
     "intensity_above": "Intensity > {{value}}",
     "related_nodes_only": "Only related nodes",
     "intensity_threshold_aria": "Relationship intensity threshold",
+    "network_stats": "Network Stats",
+    "density": "Density",
+    "average_path_length": "Avg Path Length",
+    "largest_component": "Largest Component",
     "no_relationships": "No relationships match current filter",
     "adjust_hint": "Try adjusting the type or intensity threshold",
     "relation_detail_badge": "Relation Detail",
@@ -721,7 +738,12 @@
     "event_confession": "fell in love",
     "event_best_friends": "became best friends",
     "event_public_argument": "had a public argument",
-    "event_milestone": "{{a}} and {{b}} {{event}}!"
+    "event_milestone": "{{a}} and {{b}} {{event}}!",
+    "population_birth_title": "New resident: {{resident}}",
+    "population_birth_desc": "{{parents}} welcomed {{resident}}.",
+    "population_unknown_parents": "a town family",
+    "population_death_title": "Resident passed away: {{resident}}",
+    "population_death_desc": "{{resident}} has left the town."
   },
   "error": {
     "badge": "Application Error",

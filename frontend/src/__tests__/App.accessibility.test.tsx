@@ -61,9 +61,11 @@ vi.mock('../hooks/useWebSocket', () => ({
   useWebSocket: () => ({
     connected: true,
     disconnected: false,
+    connecting: false,
     hasInitialSnapshot: true,
     startupTimedOut: false,
     reconnectCountdown: 0,
+    connectionCount: 3,
     maxRetriesExceeded: false,
     retry: vi.fn(),
   }),
@@ -125,5 +127,16 @@ describe('App accessibility flow', () => {
 
     await user.tab()
     expect(screen.getByRole('region', { name: '工具面板' })).toHaveFocus()
+  })
+
+  it('shows active connection count in the top HUD', async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Start' }))
+    await user.click(screen.getByRole('button', { name: 'Enter' }))
+
+    expect(screen.getByText('在线 3')).toBeInTheDocument()
   })
 })

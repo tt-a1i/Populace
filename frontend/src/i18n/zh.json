@@ -79,6 +79,7 @@
     "build": "建造模式",
     "create": "创建居民",
     "stats": "数据统计",
+    "dialogue_history": "对话记录",
     "saves": "存档管理",
     "export": "数据导出",
     "heatmap": "关系热力图",
@@ -101,6 +102,17 @@
     "relationships": "关系数",
     "achievements": "成就数",
     "personality": "性格"
+  },
+  "dialogue_history": {
+    "badge": "Dialogue Feed",
+    "title": "对话记录",
+    "desc": "查看最近 50 条居民对话，并按居民快速筛选社交往来。",
+    "filter": "筛选居民",
+    "filter_all": "全部居民",
+    "loading": "正在载入对话记录…",
+    "empty": "暂无符合条件的对话记录。",
+    "load_failed": "对话记录加载失败，请稍后重试。",
+    "tick": "Tick {{tick}}"
   },
   "timeline": {
     "badge": "World Timeline",
@@ -484,6 +496,7 @@
     "reconnect": "重新连接",
     "reconnecting": "重连中 {{seconds}}s...",
     "conn_interrupted": "连接中断，正在重连...",
+    "online_count": "在线 {{count}}",
     "toolbar_region": "主工具栏",
     "map_region": "小镇地图",
     "graph_region": "关系图谱面板",
@@ -653,6 +666,10 @@
     "intensity_above": "强度 > {{value}}",
     "related_nodes_only": "仅显示相关节点",
     "intensity_threshold_aria": "关系强度阈值",
+    "network_stats": "网络统计",
+    "density": "密度",
+    "average_path_length": "平均路径长度",
+    "largest_component": "最大连通分量",
     "no_relationships": "当前筛选下暂无关系",
     "adjust_hint": "调整类型或强度阈值试试",
     "relation_detail_badge": "Relation Detail",
@@ -721,7 +738,12 @@
     "event_confession": "陷入爱河",
     "event_best_friends": "成为挚友",
     "event_public_argument": "公开争吵",
-    "event_milestone": "{{a}} 和 {{b}} {{event}}！"
+    "event_milestone": "{{a}} 和 {{b}} {{event}}！",
+    "population_birth_title": "新居民诞生：{{resident}}",
+    "population_birth_desc": "{{parents}} 迎来了 {{resident}}。",
+    "population_unknown_parents": "镇上家庭",
+    "population_death_title": "居民离世：{{resident}}",
+    "population_death_desc": "{{resident}} 离开了小镇。"
   },
   "error": {
     "badge": "应用错误",

@@ -33,7 +33,7 @@ export function createWeatherFilter(weather: string): ColorMatrixFilter | null {
       filter.matrix = [
         0.7, 0, 0.05, 0, -0.02,
         0, 0.72, 0.05, 0, -0.02,
-        0.05, 0.05, 0.9, 0, 0.02,
+        0.01, 0.03, 0.82, 0, 0.01,
         0, 0, 0, 1, 0,
       ]
       return filter

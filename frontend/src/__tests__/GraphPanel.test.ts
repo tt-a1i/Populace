@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import { calculateNetworkStats, filterGraphData } from '../components/graph/graphHelpers'
 import type { GraphRelationship, GraphResident } from '../stores/relationships'
-import * as GraphPanelModule from '../components/graph/GraphPanel'
 
 type FilterGraphData = (
   residents: GraphResident[],
@@ -25,21 +25,13 @@ const relationships: GraphRelationship[] = [
   { from_id: 'c', to_id: 'e', type: 'trust', intensity: 0.91, reason: '共同保密' },
 ]
 
-function getFilterGraphData(): FilterGraphData | undefined {
-  return (GraphPanelModule as { filterGraphData?: FilterGraphData }).filterGraphData
-}
-
 describe('GraphPanel filtering helpers', () => {
   it('exports a graph filtering helper for the panel', () => {
-    expect(getFilterGraphData()).toBeTypeOf('function')
+    expect(filterGraphData as FilterGraphData).toBeTypeOf('function')
   })
 
   it('keeps all real relationship types when the type filter is all', () => {
-    const filterGraphData = getFilterGraphData()
     expect(filterGraphData).toBeTypeOf('function')
-    if (!filterGraphData) {
-      return
-    }
 
     const result = filterGraphData(residents, relationships, { type: 'all', minIntensity: 0.3 })
 
@@ -53,11 +45,7 @@ describe('GraphPanel filtering helpers', () => {
   })
 
   it('keeps only the selected type and its related residents', () => {
-    const filterGraphData = getFilterGraphData()
     expect(filterGraphData).toBeTypeOf('function')
-    if (!filterGraphData) {
-      return
-    }
 
     const result = filterGraphData(residents, relationships, { type: 'friendship', minIntensity: 0.3 })
 
@@ -66,11 +54,7 @@ describe('GraphPanel filtering helpers', () => {
   })
 
   it('removes edges below the active intensity threshold', () => {
-    const filterGraphData = getFilterGraphData()
     expect(filterGraphData).toBeTypeOf('function')
-    if (!filterGraphData) {
-      return
-    }
 
     const result = filterGraphData(residents, relationships, { type: 'all', minIntensity: 0.7 })
 
@@ -79,5 +63,36 @@ describe('GraphPanel filtering helpers', () => {
       expect.objectContaining({ type: 'trust', intensity: 0.91 }),
     ])
     expect(result.residents.map((resident) => resident.id)).toEqual(['a', 'b', 'c', 'e'])
+  })
+
+  it('keeps deceased residents visible even after their links disappear', () => {
+    const filterGraphData = getFilterGraphData()
+    expect(filterGraphData).toBeTypeOf('function')
+    if (!filterGraphData) {
+      return
+    }
+
+    const result = filterGraphData(
+      [...residents, { id: 'ghost', name: 'Ghost', mood: 'neutral', deceased: true }],
+      [],
+      { type: 'all', minIntensity: 0 },
+    )
+
+    expect(result.residents.map((resident) => resident.id)).toContain('ghost')
+  })
+
+  it('computes network density, average path length, and largest connected component', () => {
+    expect(calculateNetworkStats).toBeTypeOf('function')
+
+    const stats = calculateNetworkStats(residents, [
+      { from_id: 'a', to_id: 'b', type: 'friendship', intensity: 0.8, reason: '' },
+      { from_id: 'b', to_id: 'c', type: 'friendship', intensity: 0.8, reason: '' },
+      { from_id: 'c', to_id: 'a', type: 'friendship', intensity: 0.8, reason: '' },
+      { from_id: 'd', to_id: 'e', type: 'knows', intensity: 0.4, reason: '' },
+    ])
+
+    expect(stats.density).toBeCloseTo(0.4, 5)
+    expect(stats.averagePathLength).toBeCloseTo(1, 5)
+    expect(stats.largestComponentSize).toBe(3)
   })
 })

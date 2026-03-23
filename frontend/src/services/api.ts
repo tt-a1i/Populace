@@ -15,6 +15,25 @@ export interface ApiResident {
   outfit_color?: string | null
   coins?: number
   occupation?: string
+  energy?: number
+}
+
+export interface ReplayRelationship {
+  from_id: string
+  to_id: string
+  type: string
+  intensity: number
+  familiarity?: number
+  reason?: string
+}
+
+export interface SimulationReplaySnapshot {
+  tick: number
+  time: string
+  weather: string
+  season: string
+  residents: ApiResident[]
+  relationships: ReplayRelationship[]
 }
 
 interface SpeedPayload {
@@ -92,9 +111,12 @@ export interface ExperimentReportPayload {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const clientId =
+    typeof window !== 'undefined' ? window.sessionStorage.getItem('populace:client-id') : null
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...(clientId ? { 'X-Populace-Client-Id': clientId } : {}),
       ...(init?.headers ?? {}),
     },
     ...init,
@@ -122,6 +144,16 @@ export function setSpeed(payload: SpeedPayload) {
   return request('/api/simulation/speed', {
     method: 'POST',
     body: JSON.stringify(payload),
+  })
+}
+
+export function getSimulationSnapshots() {
+  return request<SimulationReplaySnapshot[]>('/api/simulation/snapshots')
+}
+
+export function replaySimulationTick(tick: number) {
+  return request<SimulationReplaySnapshot>(`/api/simulation/replay/${tick}`, {
+    method: 'POST',
   })
 }
 
@@ -274,6 +306,18 @@ export interface MoodHistoryEntry {
   mood: string
 }
 
+export interface DialogueHistoryEntry {
+  id: string
+  tick: number
+  time: string
+  from_id: string
+  from_name: string
+  to_id: string
+  to_name: string
+  text: string
+  kind: 'dialogue' | 'gossip' | 'monologue'
+}
+
 export interface NetworkAnalysisEntry {
   resident_id: string
   name: string
@@ -286,6 +330,10 @@ export interface NetworkAnalysisEntry {
 
 export function getMoodHistory() {
   return request<MoodHistoryEntry[]>('/api/simulation/mood-history')
+}
+
+export function getDialogueHistory() {
+  return request<DialogueHistoryEntry[]>('/api/simulation/dialogue-history')
 }
 
 export function getNetworkAnalysis() {

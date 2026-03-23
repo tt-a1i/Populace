@@ -49,6 +49,7 @@ function SimulationView() {
   const { t } = useTranslation()
   const {
     connected,
+    connectionCount,
     disconnected,
     hasInitialSnapshot,
     startupTimedOut,
@@ -172,6 +173,8 @@ function SimulationView() {
             <span className="text-slate-600">|</span>
             <span>{weatherEmoji}</span>
             <span>{seasonEmoji} {seasonLabel}</span>
+            <span className="text-slate-600">|</span>
+            <span className="text-emerald-300/80">{t('app.online_count', { count: connectionCount })}</span>
           </div>
         </div>
       </div>

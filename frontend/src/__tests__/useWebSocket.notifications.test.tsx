@@ -7,11 +7,15 @@ const { mockPushToast, mockPlay, simState, relState } = vi.hoisted(() => ({
   simState: {
     updateFromTick: vi.fn(),
     initFromSnapshot: vi.fn(),
+    applyResidentOperation: vi.fn(),
+    applyPopulationEvents: vi.fn(),
   },
   relState: {
     updateFromTick: vi.fn(),
     initFromSnapshot: vi.fn(),
     setRelationshipsAbsolute: vi.fn(),
+    addFlashingEventKeys: vi.fn(),
+    applyPopulationEvents: vi.fn(),
   },
 }))
 
@@ -60,9 +64,13 @@ describe('useWebSocket notifications', () => {
     mockPlay.mockClear()
     simState.updateFromTick.mockClear()
     simState.initFromSnapshot.mockClear()
+    simState.applyResidentOperation.mockClear()
+    simState.applyPopulationEvents.mockClear()
     relState.updateFromTick.mockClear()
     relState.initFromSnapshot.mockClear()
     relState.setRelationshipsAbsolute.mockClear()
+    relState.addFlashingEventKeys.mockClear()
+    relState.applyPopulationEvents.mockClear()
     vi.useFakeTimers()
     FakeWebSocket.instances = []
     vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
@@ -111,6 +119,22 @@ describe('useWebSocket notifications', () => {
               tick: 3,
               dialogues: [{ from_id: 'a', to_id: 'b', text: 'hi' }],
               relationships: [{ from_id: 'a', to_id: 'b', type: 'friendship', delta: 0.2 }],
+              population_events: [
+                {
+                  event_type: 'birth',
+                  resident_id: 'c',
+                  resident_name: '小芽',
+                  resident: { id: 'c', name: '小芽', personality: '温柔', mood: 'calm', location: null, x: 1, y: 2 },
+                  parent_names: ['阿明', '小红'],
+                },
+                {
+                  event_type: 'death',
+                  resident_id: 'd',
+                  resident_name: '老秦',
+                  resident: { id: 'd', name: '老秦', personality: '沉稳', mood: 'neutral', location: null, x: 3, y: 4 },
+                  summary: '老秦 在 501 天后离世。',
+                },
+              ],
             },
           }),
         }),
@@ -125,8 +149,70 @@ describe('useWebSocket notifications', () => {
     )
     expect(mockPlay).toHaveBeenCalledWith('dialogue')
     expect(mockPlay).toHaveBeenCalledWith('relationship')
+    expect(mockPushToast).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'success', title: '新居民诞生：小芽' }),
+    )
+    expect(mockPushToast).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'warning', title: '居民离世：老秦' }),
+    )
+    expect(simState.applyPopulationEvents).toHaveBeenCalled()
+    expect(relState.applyPopulationEvents).toHaveBeenCalled()
 
     vi.useRealTimers()
+  })
+
+  it('tracks session metadata, forwards viewport events, and applies remote operations', async () => {
+    FakeWebSocket.instances = []
+    vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
+    vi.stubGlobal('requestAnimationFrame', ((callback: FrameRequestCallback) => {
+      callback(0)
+      return 1
+    }) as unknown as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', vi.fn() as unknown as typeof cancelAnimationFrame)
+
+    render(<Probe />)
+
+    const socket = FakeWebSocket.instances[0]
+    act(() => {
+      socket.onopen?.()
+      socket.onmessage?.(
+        new MessageEvent('message', {
+          data: JSON.stringify({
+            type: 'session',
+            data: { client_id: 'client-a', connection_count: 2 },
+          }),
+        }),
+      )
+      window.dispatchEvent(
+        new CustomEvent('populace:viewport-changed', {
+          detail: { centerX: 12, centerY: 9, zoom: 1.2 },
+        }),
+      )
+      socket.onmessage?.(
+        new MessageEvent('message', {
+          data: JSON.stringify({
+            type: 'operation',
+            data: {
+              operation: 'resident_teleported',
+              source_client_id: 'client-b',
+              resident: { id: 'r1', name: 'Ada', x: 10, y: 11 },
+            },
+          }),
+        }),
+      )
+    })
+
+    expect(window.sessionStorage.getItem('populace:client-id')).toBe('client-a')
+    expect(socket.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: 'viewport',
+        data: { centerX: 12, centerY: 9, zoom: 1.2 },
+      }),
+    )
+    expect(simState.applyResidentOperation).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'r1', x: 10, y: 11 }),
+      'resident_teleported',
+    )
   })
 })
 

@@ -17,7 +17,7 @@ import { useToast } from '../components/ui/ToastProvider'
 import { useRelationshipsStore } from '../stores/relationships'
 import type { SimulationSnapshot, SimulationTickState } from '../stores/simulation'
 import { useSimulationStore } from '../stores/simulation'
-import type { RelationshipDelta } from '../types'
+import type { PopulationEvent, RelationshipDelta } from '../types'
 
 /** Tick payload as received from the WebSocket (superset of SimulationTickState). */
 interface WsTickPayload extends SimulationTickState {
@@ -30,6 +30,7 @@ interface WsTickPayload extends SimulationTickState {
     event_type: string
     dialogue: string
   }>
+  population_events?: PopulationEvent[]
 }
 
 export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected'
@@ -49,6 +50,7 @@ export interface UseWebSocketReturn {
   connected: boolean
   connecting: boolean
   disconnected: boolean
+  connectionCount: number
   hasInitialSnapshot: boolean
   startupTimedOut: boolean
   reconnectCountdown: number
@@ -58,6 +60,7 @@ export interface UseWebSocketReturn {
 
 export function useWebSocket(enabled = true): UseWebSocketReturn {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
+  const [connectionCount, setConnectionCount] = useState(1)
   const [hasInitialSnapshot, setHasInitialSnapshot] = useState(false)
   const [startupTimedOut, setStartupTimedOut] = useState(false)
   const [reconnectCountdown, setReconnectCountdown] = useState(0)
@@ -79,10 +82,22 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
 
   const simUpdateFromTick = useSimulationStore((s) => s.updateFromTick)
   const simInitFromSnapshot = useSimulationStore((s) => s.initFromSnapshot)
+  const simApplyPopulationEvents = useSimulationStore(
+    ((s: SimulationSnapshot & { applyPopulationEvents?: (events: PopulationEvent[]) => void }) =>
+      s.applyPopulationEvents) as never,
+  ) as ((events: PopulationEvent[]) => void) | undefined
   const relUpdateFromTick = useRelationshipsStore((s) => s.updateFromTick)
   const relInitFromSnapshot = useRelationshipsStore((s) => s.initFromSnapshot)
   const relSetAbsolute = useRelationshipsStore((s) => s.setRelationshipsAbsolute)
   const relAddFlashingKeys = useRelationshipsStore((s) => s.addFlashingEventKeys)
+  const relApplyPopulationEvents = useRelationshipsStore(
+    ((s: { applyPopulationEvents?: (events: PopulationEvent[]) => void }) => s.applyPopulationEvents) as never,
+  ) as ((events: PopulationEvent[]) => void) | undefined
+  const simApplyResidentOperation = useSimulationStore(
+    ((s: SimulationSnapshot & { applyResidentOperation?: (resident: unknown, operation: string) => void }) =>
+      s.applyResidentOperation) as never,
+  ) as ((resident: unknown, operation: string) => void) | undefined
+  const clientIdRef = useRef<string | null>(null)
 
   // -------------------------------------------------------------------------
   // Message handler
@@ -120,6 +135,7 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
             const relationships = queuedTick.relationships ?? []
             const achievementUnlocks = queuedTick.achievement_unlocks ?? []
             const relationshipEvents = queuedTick.relationship_events ?? []
+            const populationEvents = queuedTick.population_events ?? []
             sawDialogue = sawDialogue || dialogues.length > 0
             sawRelationshipDelta = sawRelationshipDelta || relationships.length > 0
             simUpdateFromTick(queuedTick)
@@ -127,6 +143,12 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
               tick: queuedTick.tick,
               relationships: relationships as Array<RelationshipDelta & { reason?: string }>,
             })
+            if (typeof simApplyPopulationEvents === 'function') {
+              simApplyPopulationEvents(populationEvents)
+            }
+            if (typeof relApplyPopulationEvents === 'function') {
+              relApplyPopulationEvents(populationEvents)
+            }
             if (playSounds) {
               for (const unlock of achievementUnlocks) {
                 pushToast({
@@ -154,6 +176,32 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
                 window.dispatchEvent(new CustomEvent('populace:milestone', {
                   detail: { fromId: ev.from_id, toId: ev.to_id, eventType: ev.event_type },
                 }))
+              }
+              for (const populationEvent of populationEvents) {
+                if (populationEvent.event_type === 'birth') {
+                  pushToast({
+                    type: 'success',
+                    category: 'default',
+                    title: i18n.t('ws.population_birth_title', { resident: populationEvent.resident_name }),
+                    description:
+                      populationEvent.summary ||
+                      i18n.t('ws.population_birth_desc', {
+                        resident: populationEvent.resident_name,
+                        parents: (populationEvent.parent_names ?? []).join('、') || i18n.t('ws.population_unknown_parents'),
+                      }),
+                  })
+                  play('achievement')
+                } else if (populationEvent.event_type === 'death') {
+                  pushToast({
+                    type: 'warning',
+                    category: 'default',
+                    title: i18n.t('ws.population_death_title', { resident: populationEvent.resident_name }),
+                    description:
+                      populationEvent.summary ||
+                      i18n.t('ws.population_death_desc', { resident: populationEvent.resident_name }),
+                  })
+                  play('event')
+                }
               }
             }
             if (relationshipEvents.length > 0) {
@@ -195,9 +243,37 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
       } else if (type === 'tick') {
         // Incremental diff
         commitTick(data as WsTickPayload)
+      } else if (type === 'session') {
+        const session = (data ?? {}) as { client_id?: string; connection_count?: number }
+        if (session.client_id) {
+          clientIdRef.current = session.client_id
+          window.sessionStorage.setItem('populace:client-id', session.client_id)
+        }
+        if (typeof session.connection_count === 'number') {
+          setConnectionCount(session.connection_count)
+        }
+      } else if (type === 'connections') {
+        const payload = (data ?? {}) as { count?: number }
+        if (typeof payload.count === 'number') {
+          setConnectionCount(payload.count)
+        }
+      } else if (type === 'operation') {
+        const payload = (data ?? {}) as {
+          operation?: string
+          source_client_id?: string
+          resident?: unknown
+        }
+        if (
+          payload.operation &&
+          payload.resident &&
+          payload.source_client_id !== clientIdRef.current &&
+          typeof simApplyResidentOperation === 'function'
+        ) {
+          simApplyResidentOperation(payload.resident, payload.operation)
+        }
       }
     },
-    [play, pushToast, relAddFlashingKeys, relInitFromSnapshot, relSetAbsolute, relUpdateFromTick, simInitFromSnapshot, simUpdateFromTick],
+    [play, pushToast, relAddFlashingKeys, relApplyPopulationEvents, relInitFromSnapshot, relSetAbsolute, relUpdateFromTick, simApplyPopulationEvents, simApplyResidentOperation, simInitFromSnapshot, simUpdateFromTick],
   )
 
   // -------------------------------------------------------------------------
@@ -339,9 +415,7 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
       }
     }
 
-    timerRef.current = setTimeout(() => {
-      connectRef.current()
-    }, 0)
+    connectRef.current()
 
     return () => {
       mountedRef.current = false
@@ -371,11 +445,36 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
     }
   }, [enabled, hasInitialSnapshot])
 
+  useEffect(() => {
+    if (!enabled) {
+      return undefined
+    }
+
+    const handleViewportChanged = (event: Event) => {
+      if (!wsRef.current || typeof wsRef.current.send !== 'function') {
+        return
+      }
+      const detail = (event as CustomEvent).detail
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'viewport',
+          data: detail,
+        }),
+      )
+    }
+
+    window.addEventListener('populace:viewport-changed', handleViewportChanged)
+    return () => {
+      window.removeEventListener('populace:viewport-changed', handleViewportChanged)
+    }
+  }, [enabled])
+
   return {
     status,
     connected: status === 'connected',
     connecting: status === 'connecting',
     disconnected: status === 'disconnected',
+    connectionCount,
     hasInitialSnapshot,
     startupTimedOut,
     reconnectCountdown,
