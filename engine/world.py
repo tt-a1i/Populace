@@ -279,6 +279,7 @@ class World:
         building = self.get_building(building_id)
         if building is None:
             return
+        from engine.lifecycle import is_elderly
 
         _OCCUPATION_MAP = {
             "cafe": ("barista", 3),
@@ -289,7 +290,8 @@ class World:
             agent.resident.mood = "neutral"
             agent.resident.occupation = "unemployed"
             # Recover energy at home
-            agent.resident.energy = min(1.0, agent.resident.energy + 0.05)
+            recovery = 0.025 if is_elderly(agent.resident) else 0.05
+            agent.resident.energy = min(1.0, agent.resident.energy + recovery)
         elif building.type in _OCCUPATION_MAP:
             occupation, income = _OCCUPATION_MAP[building.type]
             agent.resident.occupation = occupation

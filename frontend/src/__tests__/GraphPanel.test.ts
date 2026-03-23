@@ -66,19 +66,13 @@ describe('GraphPanel filtering helpers', () => {
   })
 
   it('keeps deceased residents visible even after their links disappear', () => {
-    const filterGraphData = getFilterGraphData()
-    expect(filterGraphData).toBeTypeOf('function')
-    if (!filterGraphData) {
-      return
-    }
-
     const result = filterGraphData(
       [...residents, { id: 'ghost', name: 'Ghost', mood: 'neutral', deceased: true }],
       [],
       { type: 'all', minIntensity: 0 },
     )
 
-    expect(result.residents.map((resident) => resident.id)).toContain('ghost')
+    expect(result.residents.map((resident: GraphResident) => resident.id)).toContain('ghost')
   })
 
   it('computes network density, average path length, and largest connected component', () => {

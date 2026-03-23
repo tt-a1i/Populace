@@ -37,6 +37,36 @@ export interface EnergyUpdate {
   energy: number
 }
 
+export interface PopulationResidentSnapshot {
+  id: string
+  name: string
+  personality: string
+  mood: string
+  location: string | null
+  x: number
+  y: number
+  home_building_id?: string | null
+  skin_color?: string | null
+  hair_style?: string | null
+  hair_color?: string | null
+  outfit_color?: string | null
+  coins?: number
+  occupation?: string
+  energy?: number
+  age_days?: number
+  goals?: string[]
+}
+
+export interface PopulationEvent {
+  event_type: 'birth' | 'death'
+  resident_id: string
+  resident_name: string
+  resident: PopulationResidentSnapshot
+  parent_ids?: string[]
+  parent_names?: string[]
+  summary?: string
+}
+
 export interface TickState {
   tick: number
   time: string
@@ -48,6 +78,7 @@ export interface TickState {
   season?: string
   energy_updates?: EnergyUpdate[]
   gossips?: GossipUpdate[]
+  population_events?: PopulationEvent[]
 }
 
 export interface Resident {
@@ -64,6 +95,9 @@ export interface Resident {
   hair_color?: string | null
   outfit_color?: string | null
   coins?: number
+  occupation?: string
+  energy?: number
+  age_days?: number
 }
 
 export interface Building {

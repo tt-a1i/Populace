@@ -1,7 +1,16 @@
 import { create } from 'zustand'
 
 import i18n from '../i18n/config'
-import type { Building, DialogueUpdate, EnergyUpdate, MovementUpdate, Resident, TickState } from '../types'
+import type { SimulationReplaySnapshot } from '../services/api'
+import type {
+  Building,
+  DialogueUpdate,
+  EnergyUpdate,
+  MovementUpdate,
+  PopulationEvent,
+  Resident,
+  TickState,
+} from '../types'
 
 export type SimulationSpeed = 0 | 1 | 2 | 5 | 10 | 50
 
@@ -44,6 +53,7 @@ export interface ResidentPosition {
   coins?: number
   occupation?: string
   energy?: number
+  ageDays?: number
 }
 
 export interface TickMovement extends Omit<MovementUpdate, 'action'> {
@@ -61,6 +71,8 @@ export interface FrozenSimulationFrame {
     tick: number
     tickPerDay: number
     time: string
+    weather: string
+    season: string
   }
 }
 
@@ -95,6 +107,10 @@ export interface SimulationSnapshot {
     hair_style?: string | null
     hair_color?: string | null
     outfit_color?: string | null
+    coins?: number
+    occupation?: string
+    energy?: number
+    age_days?: number
   }>
   last_tick?: SimulationTickState | null
 }
@@ -110,6 +126,7 @@ interface SimulationState {
   season: string
   residents: ResidentPosition[]
   history: SimulationHistoryFrame[]
+  snapshotHistory: SimulationReplaySnapshot[]
   buildings: Array<Building & { occupants: number }>
   replayFrozenFrame: FrozenSimulationFrame | null
   messageFeed: FeedMessage[]
@@ -120,11 +137,19 @@ interface SimulationState {
   setBuildings: (buildings: Array<Building & { occupants: number }>) => void
   selectResident: (residentId: string | null) => void
   setHoveredPairIds: (pairIds: [string, string] | null) => void
+  applyResidentOperation: (
+    resident: Partial<ResidentPosition> & { id: string; name?: string },
+    operation: 'resident_updated' | 'resident_teleported',
+  ) => void
   freezeForReplay: () => void
   resumeLiveFromReplay: () => void
   getFrameByTick: (tick: number) => SimulationHistoryFrame | null
+  getSnapshotByTick: (tick: number) => SimulationReplaySnapshot | null
+  setSnapshotHistory: (snapshots: SimulationReplaySnapshot[]) => void
+  upsertReplaySnapshot: (snapshot: SimulationReplaySnapshot) => void
   updateFromTick: (tickState: SimulationTickState) => void
   initFromSnapshot: (snapshot: SimulationSnapshot) => void
+  applyPopulationEvents: (events: PopulationEvent[]) => void
 }
 
 const palette = [0xf97316, 0x38bdf8, 0x34d399, 0xf59e0b, 0xe879f9, 0xfb7185]
@@ -206,6 +231,37 @@ function inferBuildingId(
   return building?.id ?? null
 }
 
+function residentPositionFromPopulationSnapshot(
+  resident: PopulationEvent['resident'],
+  previous?: ResidentPosition,
+): ResidentPosition {
+  const x = clampTilePosition(resident.x ?? 0, 39)
+  const y = clampTilePosition(resident.y ?? 0, 29)
+  return {
+    id: resident.id,
+    name: resident.name,
+    x,
+    y,
+    targetX: x,
+    targetY: y,
+    color: previous?.color ?? colorForResident(resident.id),
+    status: previous?.status ?? 'idle',
+    currentBuildingId: resident.location ?? null,
+    skinColor: resident.skin_color ?? previous?.skinColor ?? null,
+    hairStyle: resident.hair_style ?? previous?.hairStyle ?? null,
+    hairColor: resident.hair_color ?? previous?.hairColor ?? null,
+    outfitColor: resident.outfit_color ?? previous?.outfitColor ?? null,
+    personality: resident.personality ?? previous?.personality,
+    mood: resident.mood ?? previous?.mood ?? 'neutral',
+    goals: resident.goals ?? previous?.goals ?? [],
+    dialogueText: previous?.dialogueText ?? null,
+    coins: resident.coins ?? previous?.coins ?? 100,
+    occupation: resident.occupation ?? previous?.occupation ?? 'unemployed',
+    energy: resident.energy ?? previous?.energy ?? 1.0,
+    ageDays: resident.age_days ?? previous?.ageDays ?? 0,
+  }
+}
+
 export const useSimulationStore = create<SimulationState>((set, get) => ({
   tick: 16,
   tickPerDay: 48,
@@ -217,6 +273,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   season: 'spring',
   residents: [],
   history: [],
+  snapshotHistory: [],
   buildings: [],
   replayFrozenFrame: null,
   messageFeed: [
@@ -230,6 +287,42 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   setBuildings: (buildings) => set({ buildings }),
   selectResident: (residentId) => set({ selectedResidentId: residentId }),
   setHoveredPairIds: (pairIds) => set({ hoveredPairIds: pairIds }),
+  applyResidentOperation: (resident, operation) =>
+    set((state) => {
+      const nextResidents = state.residents.map((currentResident) => {
+        if (currentResident.id !== resident.id) {
+          return currentResident
+        }
+
+        const nextX = clampTilePosition(resident.x ?? currentResident.targetX, 39)
+        const nextY = clampTilePosition(resident.y ?? currentResident.targetY, 29)
+
+        return {
+          ...currentResident,
+          name: resident.name ?? currentResident.name,
+          targetX: nextX,
+          targetY: nextY,
+          x: operation === 'resident_teleported' ? nextX : currentResident.x,
+          y: operation === 'resident_teleported' ? nextY : currentResident.y,
+          personality: resident.personality ?? currentResident.personality,
+          mood: resident.mood ?? currentResident.mood,
+          goals: resident.goals ?? currentResident.goals,
+          occupation: resident.occupation ?? currentResident.occupation,
+          energy: resident.energy ?? currentResident.energy,
+          ageDays: resident.ageDays ?? currentResident.ageDays,
+          currentBuildingId:
+            resident.currentBuildingId ??
+            ((resident as { location?: string | null }).location !== undefined
+              ? (resident as { location?: string | null }).location
+              : currentResident.currentBuildingId),
+        }
+      })
+
+      return {
+        residents: nextResidents,
+        buildings: recomputeBuildingOccupancy(state.buildings, nextResidents),
+      }
+    }),
   freezeForReplay: () =>
     set((state) => ({
       replayFrozenFrame: {
@@ -240,11 +333,26 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           tick: state.tick,
           tickPerDay: state.tickPerDay,
           time: state.time,
+          weather: state.weather,
+          season: state.season,
         },
       },
     })),
   resumeLiveFromReplay: () => set({ replayFrozenFrame: null }),
   getFrameByTick: (tick) => get().history.find((frame) => frame.tick === tick) ?? null,
+  getSnapshotByTick: (tick) => get().snapshotHistory.find((snapshot) => snapshot.tick === tick) ?? null,
+  setSnapshotHistory: (snapshots) =>
+    set({
+      snapshotHistory: [...snapshots]
+        .sort((a, b) => a.tick - b.tick)
+        .filter((snapshot, index, items) => index === items.findIndex((item) => item.tick === snapshot.tick)),
+    }),
+  upsertReplaySnapshot: (snapshot) =>
+    set((state) => ({
+      snapshotHistory: [...state.snapshotHistory.filter((item) => item.tick !== snapshot.tick), snapshot]
+        .sort((a, b) => a.tick - b.tick)
+        .slice(-50),
+    })),
   updateFromTick: (tickState) => {
     set((state) => {
       const residentMap = new Map(state.residents.map((resident) => [resident.id, resident]))
@@ -304,6 +412,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           dialogueKind,
           currentGoal: existingResident?.currentGoal ?? null,
           coins: existingResident?.coins ?? 100,
+          occupation: existingResident?.occupation ?? 'unemployed',
+          energy: existingResident?.energy ?? 1.0,
+          ageDays: existingResident?.ageDays ?? 0,
         })
       }
 
@@ -403,6 +514,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           coins: (r as { coins?: number }).coins ?? prev?.coins ?? 100,
           occupation: (r as { occupation?: string }).occupation ?? prev?.occupation ?? 'unemployed',
           energy: (r as { energy?: number }).energy ?? prev?.energy ?? 1.0,
+          ageDays: (r as { age_days?: number }).age_days ?? prev?.ageDays ?? 0,
         }
       })
 
@@ -429,6 +541,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         time: snapshot.time ?? state.time,
         running: snapshot.running ?? state.running,
         lastAppliedTick: snapshot.tick ?? state.lastAppliedTick,
+        weather: (snapshot as { weather?: string }).weather ?? state.weather,
+        season: (snapshot as { season?: string }).season ?? state.season,
         history,
         buildings,
         replayFrozenFrame: state.replayFrozenFrame,
@@ -437,6 +551,29 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
             ? appendRecentMessages(state.messageFeed, [{ id: _feedId(), kind: 'system', text: i18n.t('message_bar.snapshot_arrived') }])
             : appendRecentMessages(state.messageFeed, [{ id: _feedId(), kind: 'system', text: i18n.t('message_bar.snapshot_empty') }]),
         residents,
+      }
+    })
+  },
+  applyPopulationEvents: (events) => {
+    if (events.length === 0) {
+      return
+    }
+    set((state) => {
+      const residentMap = new Map(state.residents.map((resident) => [resident.id, resident]))
+      for (const event of events) {
+        if (event.event_type === 'death') {
+          residentMap.delete(event.resident_id)
+          continue
+        }
+        residentMap.set(
+          event.event_type === 'birth' ? event.resident_id : event.resident.id,
+          residentPositionFromPopulationSnapshot(event.resident, residentMap.get(event.resident_id)),
+        )
+      }
+      const nextResidents = Array.from(residentMap.values())
+      return {
+        residents: nextResidents,
+        buildings: recomputeBuildingOccupancy(state.buildings, nextResidents),
       }
     })
   },

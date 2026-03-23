@@ -75,6 +75,7 @@ def _step_astar(agent: "Agent", target: tuple, world: "World") -> None:
     within the same tick.
     """
     from engine.pathfinding import astar
+    from engine.lifecycle import is_elderly
 
     res = agent.resident
     pos = (res.x, res.y)
@@ -103,8 +104,9 @@ def _step_astar(agent: "Agent", target: tuple, world: "World") -> None:
         # Exclude the starting tile — agent is already there
         agent.current_path = new_path[1:]
 
-    # Advance up to 2 steps along the path (spec §10: 1-2 步/tick)
-    steps = min(2, len(agent.current_path))
+    # Advance up to 2 steps along the path; elderly residents move at half speed.
+    max_steps = 1 if is_elderly(res) else 2
+    steps = min(max_steps, len(agent.current_path))
     for _ in range(steps):
         if not agent.current_path:
             break

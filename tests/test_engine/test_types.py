@@ -26,6 +26,7 @@ def test_resident_defaults():
     assert r.hair_style is None
     assert r.hair_color is None
     assert r.outfit_color is None
+    assert r.age_days == 0
 
 
 def test_resident_serialisation():
@@ -85,3 +86,4 @@ def test_tick_state_empty():
     assert ts.movements == []
     assert ts.dialogues == []
     assert ts.relationships == []
+    assert ts.population_events == []

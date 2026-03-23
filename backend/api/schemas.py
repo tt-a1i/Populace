@@ -128,6 +128,46 @@ class ResidentResponse(BaseModel):
     coins: int = 100
     occupation: str = "unemployed"
     energy: float = 1.0
+    age_days: int = 0
+
+
+class PopulationResidentResponse(BaseModel):
+    id: str
+    name: str
+    personality: str
+    mood: str = "neutral"
+    location: str | None = None
+    x: int = 0
+    y: int = 0
+    home_building_id: str | None = None
+    skin_color: str | None = None
+    hair_style: str | None = None
+    hair_color: str | None = None
+    outfit_color: str | None = None
+    coins: int = 100
+    occupation: str = "unemployed"
+    energy: float = 1.0
+    age_days: int = 0
+    goals: list[str] = Field(default_factory=list)
+
+
+class PopulationEventResponse(BaseModel):
+    event_type: str
+    resident_id: str
+    resident_name: str
+    resident: PopulationResidentResponse
+    parent_ids: list[str] = Field(default_factory=list)
+    parent_names: list[str] = Field(default_factory=list)
+    summary: str = ""
+
+
+class PopulationHistoryEntryResponse(BaseModel):
+    tick: int
+    time: str
+    population: int
+    births: int = 0
+    deaths: int = 0
+    summary: str = ""
 
 
 class DiaryEntryResponse(BaseModel):
@@ -224,6 +264,18 @@ class GeneratedReportResponse(BaseModel):
     sections: list[ReportSectionResponse]
     generated_at: str
     tick: int
+
+
+class DialogueHistoryEntryResponse(BaseModel):
+    id: str
+    tick: int
+    time: str
+    from_id: str
+    from_name: str
+    to_id: str
+    to_name: str
+    text: str
+    kind: str = "dialogue"
 
 
 class ExperimentHotspotResponse(BaseModel):

@@ -85,6 +85,7 @@ else:
         coins: int = 100
         occupation: str = "unemployed"
         energy: float = 1.0
+        age_days: int = 0
         diary: List["DiaryEntry"] = field(default_factory=list)
 
 
@@ -221,6 +222,42 @@ else:
 
 
     @dataclass
+    class PopulationResidentSnapshot:
+        """Resident data embedded in birth/death events for the frontend."""
+
+        id: str
+        name: str
+        personality: str
+        mood: str = "neutral"
+        location: Optional[str] = None
+        x: int = 0
+        y: int = 0
+        home_building_id: Optional[str] = None
+        skin_color: Optional[str] = None
+        hair_style: Optional[str] = None
+        hair_color: Optional[str] = None
+        outfit_color: Optional[str] = None
+        coins: int = 100
+        occupation: str = "unemployed"
+        energy: float = 1.0
+        age_days: int = 0
+        goals: List[str] = field(default_factory=list)
+
+
+    @dataclass
+    class PopulationEvent:
+        """Birth/death event surfaced to the frontend and history timeline."""
+
+        event_type: str
+        resident_id: str
+        resident_name: str
+        resident: "PopulationResidentSnapshot"
+        parent_ids: List[str] = field(default_factory=list)
+        parent_names: List[str] = field(default_factory=list)
+        summary: str = ""
+
+
+    @dataclass
     class TickState:
         """Complete diff pushed to the frontend each tick."""
 
@@ -237,6 +274,7 @@ else:
         season: str = "spring"
         energy_updates: List["EnergyUpdate"] = field(default_factory=list)
         gossips: List["GossipUpdate"] = field(default_factory=list)
+        population_events: List["PopulationEvent"] = field(default_factory=list)
 
 
     # ---------------------------------------------------------------------------

@@ -133,6 +133,38 @@ def test_get_stats_returns_aggregate_fields(client):
         state._total_relationship_change_count = original_relationship_change_count
 
 
+def test_get_population_history_returns_timeline(client):
+    state = client.app.state.simulation_state
+    original_history = list(getattr(state, "_population_history", []))
+
+    try:
+        state._population_history = [
+            {
+                "tick": 48,
+                "time": "Day 2, 00:00",
+                "population": 8,
+                "births": 1,
+                "deaths": 0,
+                "summary": "人口 8，新增 1，逝去 0",
+            },
+            {
+                "tick": 96,
+                "time": "Day 3, 00:00",
+                "population": 7,
+                "births": 0,
+                "deaths": 1,
+                "summary": "人口 7，新增 0，逝去 1",
+            },
+        ]
+
+        response = client.get("/api/simulation/population-history")
+
+        assert response.status_code == 200
+        assert response.json() == state._population_history
+    finally:
+        state._population_history = original_history
+
+
 def test_start_simulation(client):
     response = client.post("/api/simulation/start")
     assert response.status_code == 200
@@ -157,6 +189,40 @@ def test_set_speed_valid(client, speed):
 def test_set_speed_invalid(client):
     response = client.post("/api/simulation/speed", json={"speed": 3})
     assert response.status_code in (400, 422)  # Pydantic Literal validation returns 422
+
+
+def test_get_dialogue_history_returns_latest_50_sorted_desc(client):
+    state = client.app.state.simulation_state
+    original_history = list(getattr(state, "_dialogue_history", []))
+
+    try:
+        state._dialogue_history = [
+            {
+                "id": f"dlg-{index}",
+                "tick": index,
+                "time": f"Day 1, {index:02d}:00",
+                "from_id": "a1",
+                "from_name": "小明",
+                "to_id": "a2",
+                "to_name": "小红",
+                "text": f"对话 {index}",
+                "kind": "dialogue",
+            }
+            for index in range(1, 61)
+        ]
+
+        response = client.get("/api/simulation/dialogue-history")
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert len(payload) == 50
+        assert payload[0]["id"] == "dlg-60"
+        assert payload[-1]["id"] == "dlg-11"
+        assert payload[0]["from_name"] == "小明"
+        assert payload[0]["to_name"] == "小红"
+        assert payload[0]["text"] == "对话 60"
+    finally:
+        state._dialogue_history = original_history
 
 
 def test_snapshot_contains_residents(client):

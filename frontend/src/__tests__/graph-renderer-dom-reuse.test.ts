@@ -106,6 +106,35 @@ describe('GraphRenderer incremental DOM updates', () => {
     root.remove()
   })
 
+  it('grays out deceased nodes instead of removing them', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+
+    const renderer = new GraphRenderer(root, {
+      onHoverLink: () => undefined,
+      onHoverPair: () => undefined,
+      onSelectResident: () => undefined,
+    })
+
+    renderer.resize(640, 480)
+    renderer.render(
+      [{ id: 'elder', name: 'Elder', mood: 'neutral', deceased: true }],
+      [],
+      null,
+    )
+
+    const node = root.querySelector<SVGGElement>('g.graph-node')
+    const ring = root.querySelector<SVGCircleElement>('circle.graph-node-ring')
+    const avatar = root.querySelector<SVGImageElement>('image.graph-node-avatar')
+
+    expect(node?.getAttribute('opacity')).toBe('0.5')
+    expect(ring?.getAttribute('stroke')).toBe('#64748b')
+    expect(avatar?.style.filter).toContain('grayscale')
+
+    renderer.destroy()
+    root.remove()
+  })
+
   it('scales edge width by intensity', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)

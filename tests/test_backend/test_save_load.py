@@ -46,6 +46,14 @@ async def test_save_load_energy(state):
     assert abs(r0.energy - 0.37) < 1e-6
 
 
+async def test_save_load_age_days(state):
+    agent = state.world.agents[0]
+    agent.resident.age_days = 412
+    saved = state.save_state()
+    await state.load_state(saved)
+    assert state.world.agents[0].resident.age_days == 412
+
+
 async def test_save_load_coins(state):
     agent = state.world.agents[0]
     agent.resident.coins = 999
@@ -113,6 +121,15 @@ async def test_save_load_world_timeline(state):
     assert len(state._world_timeline) == 1
     assert state._world_timeline[0]["id"] == "t1"
     assert state._timeline_id_counter == 7
+
+
+async def test_save_load_population_history(state):
+    state._population_history = [
+        {"tick": 48, "time": "Day 2, 00:00", "population": 9, "births": 1, "deaths": 0, "summary": "人口 9，新增 1，逝去 0"},
+    ]
+    saved = state.save_state()
+    await state.load_state(saved)
+    assert state._population_history[0]["population"] == 9
 
 
 async def test_save_load_rel_events_fired(state):

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 import i18n from '../i18n/config'
-import type { RelationshipDelta } from '../types'
+import type { PopulationEvent, RelationshipDelta } from '../types'
 
 export type ResidentMood = 'happy' | 'sad' | 'angry' | 'neutral'
 export type RelationshipType =
@@ -17,10 +17,13 @@ export interface GraphResident {
   id: string
   name: string
   mood: ResidentMood
+  personality?: string
   skinColor?: string | null
   hairStyle?: string | null
   hairColor?: string | null
   outfitColor?: string | null
+  deceased?: boolean
+  ageDays?: number
 }
 
 export interface GraphRelationship {
@@ -49,14 +52,17 @@ interface RelationshipsState {
   replayTick: number | null
   flashingEventKeys: Set<string>
   updateFromTick: (tickState: RelationshipTickState) => void
+  applyPopulationEvents: (events: PopulationEvent[]) => void
   initFromSnapshot: (residents: Array<{
     id: string
     name: string
     mood?: string
+    personality?: string
     skin_color?: string | null
     hair_style?: string | null
     hair_color?: string | null
     outfit_color?: string | null
+    age_days?: number
   }>) => void
   setRelationshipsAbsolute: (
     rels: Array<{ from_id: string; to_id: string; type: string; intensity: number; reason?: string }>,
@@ -101,6 +107,46 @@ function normalizeType(value: string): RelationshipType {
 
 function relationshipKey(fromId: string, toId: string): string {
   return `${fromId}::${toId}`
+}
+
+function normalizeMood(value?: string): ResidentMood {
+  switch (value) {
+    case 'happy':
+    case 'sad':
+    case 'angry':
+    case 'neutral':
+      return value
+    default:
+      return 'neutral'
+  }
+}
+
+function toGraphResident(
+  resident: PopulationEvent['resident'] | {
+    id: string
+    name: string
+    mood?: string
+    personality?: string
+    skin_color?: string | null
+    hair_style?: string | null
+    hair_color?: string | null
+    outfit_color?: string | null
+    age_days?: number
+  },
+  previous?: GraphResident,
+): GraphResident {
+  return {
+    id: resident.id,
+    name: resident.name,
+    mood: normalizeMood(resident.mood ?? previous?.mood ?? 'neutral'),
+    personality: resident.personality ?? previous?.personality,
+    skinColor: resident.skin_color ?? previous?.skinColor ?? null,
+    hairStyle: resident.hair_style ?? previous?.hairStyle ?? null,
+    hairColor: resident.hair_color ?? previous?.hairColor ?? null,
+    outfitColor: resident.outfit_color ?? previous?.outfitColor ?? null,
+    ageDays: resident.age_days ?? previous?.ageDays ?? 0,
+    deceased: previous?.deceased ?? false,
+  }
 }
 
 export const useRelationshipsStore = create<RelationshipsState>((set) => ({
@@ -182,18 +228,51 @@ export const useRelationshipsStore = create<RelationshipsState>((set) => ({
       }
     })
   },
+  applyPopulationEvents: (events) => {
+    if (events.length === 0) {
+      return
+    }
+    set((state) => {
+      const residentsById = new Map(state.residents.map((resident) => [resident.id, resident]))
+      let nextRelationships = state.relationships
+      for (const event of events) {
+        const previous = residentsById.get(event.resident_id)
+        if (event.event_type === 'death') {
+          if (previous) {
+            residentsById.set(event.resident_id, { ...previous, deceased: true })
+          } else {
+            residentsById.set(event.resident_id, {
+              ...toGraphResident(event.resident),
+              deceased: true,
+            })
+          }
+          nextRelationships = nextRelationships.filter(
+            (relationship) =>
+              relationship.from_id !== event.resident_id && relationship.to_id !== event.resident_id,
+          )
+          continue
+        }
+        residentsById.set(
+          event.resident_id,
+          {
+            ...toGraphResident(event.resident, previous),
+            deceased: false,
+          },
+        )
+      }
+      return {
+        residents: Array.from(residentsById.values()),
+        relationships: nextRelationships,
+      }
+    })
+  },
 
   initFromSnapshot: (residents) => {
     set({
       // Replace mock residents with the authoritative backend list
       residents: residents.map((r) => ({
-        id: r.id,
-        name: r.name,
-        mood: (r.mood ?? 'neutral') as ResidentMood,
-        skinColor: r.skin_color ?? null,
-        hairStyle: r.hair_style ?? null,
-        hairColor: r.hair_color ?? null,
-        outfitColor: r.outfit_color ?? null,
+        ...toGraphResident(r),
+        deceased: false,
       })),
       // Clear mock relationships; real ones accumulate via tick deltas
       relationships: [],

@@ -258,7 +258,8 @@ export class GraphRenderer {
   private influenceByNode = new Map<string, number>()
   private readonly reducedMotion =
     typeof window !== 'undefined' &&
-    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ||
+      window.navigator.userAgent.includes('jsdom'))
 
   constructor(root: HTMLDivElement, options: GraphRendererOptions) {
     this.root = root
@@ -563,7 +564,12 @@ export class GraphRenderer {
       .attr('fill', (node) => (node.deceased ? '#475569' : moodColorScale(node.mood)))
 
     nodeEnter.each((node, index, elements) => {
-      if (existingNodeIds.has(node.id) || this.reducedMotion) {
+      const element = elements[index] as SVGGElement & { transform?: { baseVal?: unknown } }
+      const canAnimateTransform = element.transform?.baseVal !== undefined
+      if (existingNodeIds.has(node.id) || this.reducedMotion || !canAnimateTransform) {
+        select(elements[index] as SVGGElement)
+          .attr('opacity', node.deceased ? 0.5 : 1)
+          .attr('transform', `translate(${node.x ?? 0}, ${node.y ?? 0})`)
         return
       }
       select(elements[index] as SVGGElement)

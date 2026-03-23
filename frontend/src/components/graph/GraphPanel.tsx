@@ -3,7 +3,12 @@ import { useTranslation } from 'react-i18next'
 
 import { RelationCard } from './RelationCard'
 import { GraphRenderer } from './GraphRenderer'
-import { calculateNetworkStats, filterGraphData, type GraphFilterType } from './graphHelpers'
+import {
+  calculateNetworkStats,
+  filterGraphData,
+  graphTypeOptions,
+  type GraphFilterType,
+} from './graphHelpers'
 import { TimelineSlider } from '../ui'
 import { getSimulationSnapshots, replaySimulationTick } from '../../services/api'
 import { useSimulationStore } from '../../stores/simulation'
@@ -185,7 +190,7 @@ export function GraphPanel() {
                   key={type}
                   type="button"
                   aria-pressed={activeType === type}
-                  aria-label={type === 'all' ? t('graph.all') : t(`graph.rel_${type}`, type)}
+                  aria-label={type === 'all' ? String(t('graph.all')) : String(t(`graph.rel_${type}`))}
                   onClick={() => setActiveType(type)}
                   className={`rounded-full border px-3 py-1.5 text-xs transition duration-200 active:scale-95 ${
                     activeType === type
@@ -193,7 +198,7 @@ export function GraphPanel() {
                       : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
                   }`}
                 >
-                  {type === 'all' ? t('graph.all') : t(`graph.rel_${type}`, type)}
+                  {type === 'all' ? String(t('graph.all')) : String(t(`graph.rel_${type}`))}
                 </button>
               ))}
             </div>

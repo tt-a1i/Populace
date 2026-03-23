@@ -20,8 +20,10 @@ def _log_task_exception(task: asyncio.Task) -> None:  # type: ignore[type-arg]
         _log.warning("Background task %s failed: %s", task.get_name(), exc)
 
 from backend.api.schemas import (
+    DialogueHistoryEntryResponse,
     EconomyStatsResponse,
     OccupationDistEntry,
+    PopulationHistoryEntryResponse,
     ScenarioDataResponse,
     SimulationStatsResponse,
     SimulationStatusResponse,
@@ -86,6 +88,7 @@ class SimulationState:
         self._active_events: list[dict[str, Any]] = []
         self._total_dialogue_count = 0
         self._total_relationship_change_count = 0
+        self._dialogue_history: list[dict[str, Any]] = []
         # Mood history: list of {tick, resident_id, resident_name, mood} (max 100 ticks)
         self._mood_history: list[dict[str, Any]] = []
         # Achievement tracking
@@ -94,10 +97,12 @@ class SimulationState:
         self._rel_events_fired: set = set()
         # World timeline: list of timeline event dicts (max 500)
         self._world_timeline: list[dict[str, Any]] = []
+        self._population_history: list[dict[str, Any]] = []
         self._timeline_id_counter: int = 0
         # Quest system
         self._active_quests: list[dict[str, Any]] = []
         self._completed_quests: list[str] = []
+        self._replay_snapshots: list[dict[str, Any]] = []
         self._state_lock: asyncio.Lock = asyncio.Lock()
 
     async def restore_from_neo4j(self) -> None:
@@ -234,13 +239,16 @@ class SimulationState:
         self._mood_history = []
         self._total_dialogue_count = 0
         self._total_relationship_change_count = 0
+        self._dialogue_history = []
         self._achievements_store = {}
         self._buildings_visited = {}
         self._rel_events_fired = set()
         self._world_timeline = []
+        self._population_history = []
         self._timeline_id_counter = 0
         self._active_quests = []
         self._completed_quests = []
+        self._replay_snapshots = []
 
     async def reset_with_scene(self, scene_slug: str) -> None:
         """Stop simulation and reload a named preset template.
@@ -323,15 +331,18 @@ class SimulationState:
             "running": self.loop.running,
             "total_dialogue_count": getattr(self, "_total_dialogue_count", 0),
             "total_relationship_change_count": getattr(self, "_total_relationship_change_count", 0),
+            "dialogue_history": list(getattr(self, "_dialogue_history", [])),
             "achievements": {k: list(v) for k, v in getattr(self, "_achievements_store", {}).items()},
             "mood_history": list(getattr(self, "_mood_history", [])),
             "active_events": list(getattr(self, "_active_events", [])),
             "world_timeline": list(getattr(self, "_world_timeline", [])),
+            "population_history": list(getattr(self, "_population_history", [])),
             "timeline_id_counter": getattr(self, "_timeline_id_counter", 0),
             "rel_events_fired": [list(x) for x in getattr(self, "_rel_events_fired", set())],
             "buildings_visited": {k: list(v) for k, v in getattr(self, "_buildings_visited", {}).items()},
             "active_quests": list(getattr(self, "_active_quests", [])),
             "completed_quests": list(getattr(self, "_completed_quests", [])),
+            "replay_snapshots": list(getattr(self, "_replay_snapshots", [])),
         }
 
     async def load_state(self, data: dict[str, Any]) -> None:
@@ -355,10 +366,12 @@ class SimulationState:
         self._mood_history = []
         self._total_dialogue_count = 0
         self._total_relationship_change_count = 0
+        self._dialogue_history = []
         self._achievements_store = {}
         self._buildings_visited = {}
         self._rel_events_fired = set()
         self._world_timeline = []
+        self._population_history = []
         self._timeline_id_counter = 0
         self._active_quests = []
         self._completed_quests = []
@@ -402,6 +415,7 @@ class SimulationState:
                 coins=res_data.get("coins", 100),
                 occupation=res_data.get("occupation", "unemployed"),
                 energy=float(res_data.get("energy", 1.0)),
+                age_days=int(res_data.get("age_days", 0)),
             )
             for d in res_data.get("diary", []):
                 resident.diary.append(DiaryEntry(
@@ -449,15 +463,18 @@ class SimulationState:
         # Restore simulation counters and per-session state
         self._total_dialogue_count = data.get("total_dialogue_count", 0)
         self._total_relationship_change_count = data.get("total_relationship_change_count", 0)
+        self._dialogue_history = list(data.get("dialogue_history", []))
         self._achievements_store = {k: set(v) for k, v in data.get("achievements", {}).items()}
         self._mood_history = list(data.get("mood_history", []))
         self._active_events = list(data.get("active_events", []))
         self._world_timeline = list(data.get("world_timeline", []))
+        self._population_history = list(data.get("population_history", []))
         self._timeline_id_counter = data.get("timeline_id_counter", 0)
         self._rel_events_fired = {tuple(x) for x in data.get("rel_events_fired", [])}
         self._buildings_visited = {k: set(v) for k, v in data.get("buildings_visited", {}).items()}
         self._active_quests = list(data.get("active_quests", []))
         self._completed_quests = list(data.get("completed_quests", []))
+        self._replay_snapshots = list(data.get("replay_snapshots", []))
 
         # Restore loop with saved speed/running state
         saved_speed = float(data.get("clock_speed", 1.0))
@@ -484,6 +501,8 @@ class SimulationState:
             self._total_dialogue_count = 0
         if not hasattr(self, "_total_relationship_change_count"):
             self._total_relationship_change_count = 0
+        if not hasattr(self, "_dialogue_history"):
+            self._dialogue_history = []
 
     def get_stats(self) -> dict[str, Any]:
         self._ensure_stats_counters()
@@ -573,6 +592,8 @@ class SimulationState:
             "tick": self.world.current_tick,
             "running": self.loop.running,
             "speed": int(self.loop.clock.speed) if self.loop.clock.speed else 0,
+            "weather": self.world.weather.value if hasattr(self.world.weather, "value") else str(self.world.weather),
+            "season": self.world.season,
             "residents": [asdict(agent.resident) for agent in self.world.agents],
             "buildings": [
                 {
@@ -597,6 +618,51 @@ class SimulationState:
             ],
         }
 
+    def _build_replay_snapshot(self) -> dict[str, Any]:
+        return {
+            "tick": self.world.current_tick,
+            "time": self.world.simulation_time(),
+            "weather": self.world.weather.value if hasattr(self.world.weather, "value") else str(self.world.weather),
+            "season": self.world.season,
+            "residents": [asdict(agent.resident) for agent in self.world.agents],
+            "relationships": [
+                {
+                    "from_id": rel.from_id,
+                    "to_id": rel.to_id,
+                    "type": rel.type.value if hasattr(rel.type, "value") else str(rel.type),
+                    "intensity": rel.intensity,
+                    "familiarity": rel.familiarity,
+                    "reason": rel.reason,
+                }
+                for rel in self.world.relationships.values()
+            ],
+        }
+
+    def _maybe_record_replay_snapshot(self) -> dict[str, Any] | None:
+        if self.world.current_tick <= 0 or self.world.current_tick % 100 != 0:
+            return None
+
+        snapshot = self._build_replay_snapshot()
+        existing_index = next(
+            (index for index, item in enumerate(self._replay_snapshots) if item["tick"] == snapshot["tick"]),
+            None,
+        )
+        if existing_index is None:
+            self._replay_snapshots.append(snapshot)
+        else:
+            self._replay_snapshots[existing_index] = snapshot
+        self._replay_snapshots = self._replay_snapshots[-50:]
+        return snapshot
+
+    def get_replay_snapshots(self) -> list[dict[str, Any]]:
+        return list(self._replay_snapshots[-50:])
+
+    def get_replay_snapshot(self, tick: int) -> dict[str, Any] | None:
+        for snapshot in self._replay_snapshots:
+            if snapshot["tick"] == tick:
+                return snapshot
+        return None
+
     def _add_timeline_event(
         self,
         event_type: str,
@@ -620,6 +686,31 @@ class SimulationState:
         # Keep only the most recent 500 events
         if len(self._world_timeline) > 500:
             self._world_timeline = self._world_timeline[-500:]
+
+    def _record_dialogue_history(self, dialogue_updates: list, agents_by_id: dict[str, Any]) -> None:
+        if not dialogue_updates:
+            return
+
+        self._ensure_stats_counters()
+        for dialogue in dialogue_updates:
+            from_agent = agents_by_id.get(dialogue.from_id)
+            to_agent = agents_by_id.get(dialogue.to_id)
+            self._dialogue_history.append(
+                {
+                    "id": f"dlg-{self.world.current_tick}-{len(self._dialogue_history) + 1}",
+                    "tick": self.world.current_tick,
+                    "time": self.world.simulation_time(),
+                    "from_id": dialogue.from_id,
+                    "from_name": from_agent.resident.name if from_agent is not None else dialogue.from_id,
+                    "to_id": dialogue.to_id,
+                    "to_name": to_agent.resident.name if to_agent is not None else dialogue.to_id,
+                    "text": dialogue.text,
+                    "kind": dialogue.kind,
+                }
+            )
+
+        if len(self._dialogue_history) > 500:
+            self._dialogue_history = self._dialogue_history[-500:]
 
     def enqueue_event(self, event: dict[str, Any]) -> dict[str, Any]:
         self._events.append(event)
@@ -915,9 +1006,45 @@ class SimulationState:
 
         # Advance tick counter and collect movements
         tick_state = self.world.tick()
+        if self.world.current_tick % self.world.config.tick_per_day == 0:
+            from engine.lifecycle import process_daily_population
+
+            if not hasattr(self, "_population_history"):
+                self._population_history = []
+            population_events, population_relationship_deltas, population_summary = process_daily_population(
+                self.world
+            )
+            relationship_deltas.extend(population_relationship_deltas)
+            tick_state.population_events.extend(population_events)
+            self._population_history.append(
+                {
+                    "tick": tick_state.tick,
+                    "time": tick_state.time,
+                    "population": len(self.world.agents),
+                    "births": population_summary["births"],
+                    "deaths": population_summary["deaths"],
+                    "summary": (
+                        f"人口 {len(self.world.agents)}，新增 {population_summary['births']}，逝去 {population_summary['deaths']}"
+                    ),
+                }
+            )
+            self._population_history = self._population_history[-365:]
+            for population_event in population_events:
+                self._add_timeline_event(
+                    f"population_{population_event.event_type}",
+                    population_event.summary or population_event.resident_name,
+                    {
+                        "resident_id": population_event.resident_id,
+                        "resident_name": population_event.resident_name,
+                        "event_type": population_event.event_type,
+                        "parent_ids": list(population_event.parent_ids),
+                        "parent_names": list(population_event.parent_names),
+                    },
+                )
         tick_state.dialogues.extend(dialogue_updates)
         tick_state.relationships.extend(relationship_deltas)
         tick_state.gossips.extend(gossip_updates)
+        self._record_dialogue_history(dialogue_updates, agents_by_id)
         self._ensure_stats_counters()
         self._total_dialogue_count += len(tick_state.dialogues)
         self._total_relationship_change_count += len(tick_state.relationships)
@@ -1032,6 +1159,7 @@ class SimulationState:
         # --- Redis cache (spec §4.1 + §12) ---
         asyncio.create_task(self._redis_tick(tick_state)).add_done_callback(_log_task_exception)
         self._record_experiment_frame(tick_state)
+        self._maybe_record_replay_snapshot()
 
         return tick_state
 
@@ -1243,11 +1371,46 @@ async def get_simulation_stats(request: Request) -> SimulationStatsResponse:
     return SimulationStatsResponse(**state.get_stats())
 
 
+@router.get(
+    "/dialogue-history",
+    response_model=list[DialogueHistoryEntryResponse],
+    responses=error_responses(503),
+)
+async def get_dialogue_history(request: Request) -> list[DialogueHistoryEntryResponse]:
+    state = get_simulation_state(request)
+    history = sorted(
+        getattr(state, "_dialogue_history", []),
+        key=lambda entry: (entry["tick"], entry["id"]),
+        reverse=True,
+    )[:50]
+    return [DialogueHistoryEntryResponse(**entry) for entry in history]
+
+
+@router.get("/connections", responses=error_responses(503))
+async def get_simulation_connections(request: Request) -> dict[str, int]:
+    """Return the current number of active WebSocket clients."""
+    get_simulation_state(request)
+    from backend.api.ws import manager
+
+    return {"count": manager.count}
+
+
 @router.get("/mood-history", responses=error_responses(503))
 async def get_mood_history(request: Request) -> list[dict[str, Any]]:
     """Return mood snapshots for the last 100 ticks across all residents."""
     state = get_simulation_state(request)
     return getattr(state, "_mood_history", [])
+
+
+@router.get(
+    "/population-history",
+    response_model=list[PopulationHistoryEntryResponse],
+    responses=error_responses(503),
+)
+async def get_population_history(request: Request) -> list[PopulationHistoryEntryResponse]:
+    """Return the recorded day-level population timeline."""
+    state = get_simulation_state(request)
+    return [PopulationHistoryEntryResponse(**entry) for entry in getattr(state, "_population_history", [])]
 
 
 @router.get("/network-analysis", responses=error_responses(503))
@@ -1314,3 +1477,18 @@ async def get_world_timeline(request: Request) -> list[TimelineEventResponse]:
     timeline = getattr(state, "_world_timeline", [])
     sorted_timeline = sorted(timeline, key=lambda e: e["tick"], reverse=True)[:200]
     return [TimelineEventResponse(**entry) for entry in sorted_timeline]
+
+
+@router.get("/snapshots", responses=error_responses(503))
+async def get_simulation_snapshots(request: Request) -> list[dict[str, Any]]:
+    state = get_simulation_state(request)
+    return state.get_replay_snapshots()
+
+
+@router.post("/replay/{tick}", responses=error_responses(404, 503))
+async def replay_simulation_tick(tick: int, request: Request) -> dict[str, Any]:
+    state = get_simulation_state(request)
+    snapshot = state.get_replay_snapshot(tick)
+    if snapshot is None:
+        raise api_error(404, f"snapshot for tick {tick} not found", "snapshot_not_found")
+    return snapshot
