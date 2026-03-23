@@ -76,6 +76,13 @@ async def update_resident(
                 if field_name not in _PATCHABLE_FIELDS:
                     continue
                 setattr(agent.resident, field_name, value)
+            from backend.api.ws import manager
+
+            await manager.broadcast_operation(
+                "resident_updated",
+                resident=asdict(agent.resident),
+                source_client_id=request.headers.get("x-populace-client-id"),
+            )
             return ResidentResponse(**asdict(agent.resident))
 
     raise _NOT_FOUND
@@ -170,6 +177,13 @@ async def update_resident_attributes(
         raise _NOT_FOUND
     for field_name, value in payload.model_dump(exclude_unset=True).items():
         setattr(agent.resident, field_name, value)
+    from backend.api.ws import manager
+
+    await manager.broadcast_operation(
+        "resident_updated",
+        resident=asdict(agent.resident),
+        source_client_id=request.headers.get("x-populace-client-id"),
+    )
     return ResidentResponse(**asdict(agent.resident))
 
 
@@ -239,6 +253,13 @@ async def teleport_resident(
     agent.resident.y = payload.y
     agent.current_path = []
     state.world.mark_grid_index_dirty()
+    from backend.api.ws import manager
+
+    await manager.broadcast_operation(
+        "resident_teleported",
+        resident=asdict(agent.resident),
+        source_client_id=request.headers.get("x-populace-client-id"),
+    )
     return ResidentResponse(**asdict(agent.resident))
 
 
