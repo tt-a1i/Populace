@@ -80,6 +80,20 @@ export function getSeasonTilePalette(
     }
   }
 
+  if (kind === 'mountain') {
+    const bySeason: Record<string, number[]> = {
+      spring: [0x6b7280, 0x78716c, 0x71717a, 0x64748b],
+      summer: [0x6b7280, 0x737373, 0x7a7a7a, 0x64748b],
+      autumn: [0x8b7355, 0x7a6b50, 0x806850, 0x8f7d60],
+      winter: [0xd1d5db, 0xc4c8cf, 0xe5e7eb, 0xcfd3da],
+    }
+    const rocks = bySeason[activeSeason] ?? bySeason.spring
+    return {
+      fillColor: rocks[Math.floor(h * rocks.length)],
+      strokeColor: activeSeason === 'winter' ? 0xf3f4f6 : 0x9ca3af,
+    }
+  }
+
   const grassBySeason: Record<string, number[]> = {
     spring: [0x3f9d48, 0x48ad50, 0x5cb85c, 0x43a047, 0x4caf50, 0x57b95a],
     summer: [0x2d7a3a, 0x348a42, 0x3b9348, 0x2e8040, 0x38863e, 0x2a7236],
@@ -99,4 +113,55 @@ export function getSeasonTilePalette(
     fillColor: grass[Math.floor(h * grass.length)],
     strokeColor: strokeBySeason[activeSeason] ?? strokeBySeason.spring,
   }
+}
+
+// ── Grass decoration data (deterministic per tile) ────────────────────────
+
+export interface GrassDecoration {
+  /** Relative positions (0-1) of small dots/patches within the tile */
+  dots: Array<{ rx: number; ry: number; size: number; darken: boolean }>
+}
+
+export function getGrassDecoration(x: number, y: number): GrassDecoration {
+  const h1 = ((x * 31 + y * 17) & 0xff)
+  const h2 = ((x * 11 + y * 23) & 0xff)
+  const h3 = ((x * 41 + y * 7) & 0xff)
+
+  const dots: GrassDecoration['dots'] = []
+
+  // ~60% of tiles get 1-3 small detail dots
+  if (h1 > 100) {
+    dots.push({ rx: (h1 & 0x1f) / 31, ry: (h2 & 0x1f) / 31, size: 1 + (h3 % 2), darken: (h1 & 1) === 0 })
+  }
+  if (h2 > 140) {
+    dots.push({ rx: (h3 & 0x1f) / 31, ry: (h1 & 0x1f) / 31, size: 1, darken: (h2 & 1) === 0 })
+  }
+  if (h3 > 180) {
+    dots.push({ rx: (h2 & 0x1f) / 31, ry: (h3 & 0x1f) / 31, size: 1.5, darken: true })
+  }
+
+  return { dots }
+}
+
+// ── Occupation color map ──────────────────────────────────────────────────
+
+export const OCCUPATION_OUTLINE_COLOR: Record<string, number> = {
+  barista: 0x92400e,
+  teacher: 0xca8a04,
+  shopkeeper: 0x1d4ed8,
+  doctor: 0xbe123c,
+  librarian: 0x0369a1,
+}
+
+// ── Building shape helpers ────────────────────────────────────────────────
+
+export const BUILDING_SHAPE: Record<string, 'rect' | 'arch' | 'peaked' | 'round'> = {
+  cafe: 'arch',
+  park: 'round',
+  school: 'peaked',
+  shop: 'rect',
+  home: 'rect',
+  gym: 'peaked',
+  library: 'arch',
+  hospital: 'peaked',
 }

@@ -53,7 +53,7 @@ function toneClass(_tone: string, active: boolean): string {
 }
 
 const SECONDARY_KEYS: ReadonlySet<ToolKey> = new Set([
-  'create', 'build', 'stats', 'dialogue', 'activity', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings', 'dashboard', 'leaderboard', 'achievements', 'newspaper', 'whatif',
+  'create', 'build', 'stats', 'dialogue', 'activity', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings', 'dashboard', 'leaderboard', 'achievements', 'newspaper', 'whatif', 'mapeditor',
 ])
 
 export function Toolbar() {
@@ -132,6 +132,7 @@ export function Toolbar() {
     { key: 'achievements', label: t('toolbar.achievements', { defaultValue: 'Achievements' }), icon: '\uD83C\uDFC5', tone: 'amber' },
     { key: 'newspaper', label: t('toolbar.newspaper', { defaultValue: 'Gazette' }), icon: '\uD83D\uDCF0', tone: 'rose' },
     { key: 'whatif', label: t('toolbar.whatif', { defaultValue: 'What-If' }), icon: '\uD83D\uDD2E', tone: 'violet' },
+    { key: 'mapeditor', label: t('toolbar.mapeditor', { defaultValue: '\u5730\u56FE\u7F16\u8F91' }), icon: '\u{1F5FA}\uFE0F', tone: 'emerald' },
   ]
 
   const allTools = [...primaryTools, ...secondaryTools]
@@ -176,6 +177,8 @@ export function Toolbar() {
     if (activeTool === 'leaderboard') return <LeaderboardPanel />
     if (activeTool === 'achievements') return <AchievementWall />
     if (activeTool === 'newspaper') return <NewspaperPanel />
+    if (activeTool === 'whatif') return <WhatIfPanel />
+    if (activeTool === 'mapeditor') return <MapEditor onTilesChanged={() => window.dispatchEvent(new CustomEvent('populace:tiles-changed'))} onClose={() => { setActiveTool('director'); setShowSecondary(false) }} />
     return <ReportsPanel />
   }, [activeTool, t])
 

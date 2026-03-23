@@ -78,6 +78,16 @@ export class TownRenderer {
   private readonly tileGraphics = new Graphics()
   private readonly buildingGraphics = new Graphics()
   private readonly buildingLabelLayer = new Container()
+  private readonly buildingCapacityLayer = new Container()
+  private readonly buildingHoverTooltip = new Container()
+  private readonly buildingHoverBg = new Graphics()
+  private readonly buildingHoverTitle: Text
+  private readonly buildingHoverType: Text = null!
+  private readonly buildingHoverOccupancy: Text = null!
+  // @ts-expect-error Reserved for building hover feature
+  private hoveredBuildingId: string | null = null
+  // @ts-expect-error Reserved for building hover feature
+  private buildingHoverAlpha = 0
   private readonly placeholderGraphics = new Graphics()
   private readonly placeholderLabelLayer = new Container()
   private readonly ambientAccent = new Graphics()
@@ -110,8 +120,14 @@ export class TownRenderer {
   // Path visualization
   private readonly pathGraphics = new Graphics()
   private readonly pathTargetGraphics = new Graphics()
-  private _pathPulse = 0
-  private _currentResidentPositions: ResidentPosition[] = []
+  private pathPulse = 0
+  private currentResidentPositions: ResidentPosition[] = []
+  // Heatmap
+  private readonly heatmapGraphics = new Graphics()
+  private heatmapEnabled = false
+  private heatmapFilterResidentId: string | null = null
+  private readonly heatmapHistory: Array<{ id: string; x: number; y: number }[]> = []
+  private readonly MAX_HEATMAP_TICKS = 100
 
   private dragging = false
   private dragPointerId: number | null = null
@@ -164,13 +180,14 @@ export class TownRenderer {
     this.buildingLayer.addChild(
       this.buildingGraphics,
       this.placeholderGraphics,
+      this.buildingCapacityLayer,
       this.buildingLabelLayer,
       this.placeholderLabelLayer,
     )
     this.tileLayer.addChild(this.waterOverlay)
     this.effectLayer.addChild(
       this.ambientAccent, this.sunnyGlow, this.dayNightOverlay,
-      this.eventRadiusGraphics, this.weatherContainer, this.vignetteGraphics,
+      this.eventRadiusGraphics, this.heatmapGraphics, this.weatherContainer, this.vignetteGraphics,
     )
 
     // Path + relationship lines below residents
@@ -194,6 +211,28 @@ export class TownRenderer {
     this.tooltipContainer.addChild(this.tooltipBg, this.tooltipName, this.tooltipDetails, this.tooltipEnergyBar)
     this.tooltipContainer.visible = false
     this.tooltipContainer.zIndex = 100
+
+    // Building hover tooltip — in uiLayer above world
+    this.buildingHoverTitle = new Text({
+      text: '',
+      style: { fill: 0xf8fafc, fontFamily: 'Avenir Next, Helvetica Neue, sans-serif', fontSize: 11, fontWeight: '700' },
+    })
+    this.buildingHoverType = new Text({
+      text: '',
+      style: { fill: 0x94a3b8, fontFamily: 'Avenir Next, Helvetica Neue, sans-serif', fontSize: 9, fontWeight: '500' },
+    })
+    this.buildingHoverOccupancy = new Text({
+      text: '',
+      style: { fill: 0xfbbf24, fontFamily: 'Avenir Next, Helvetica Neue, sans-serif', fontSize: 9, fontWeight: '600' },
+    })
+    this.buildingHoverTitle.position.set(10, 8)
+    this.buildingHoverType.position.set(10, 24)
+    this.buildingHoverOccupancy.position.set(10, 38)
+    this.buildingHoverTooltip.addChild(
+      this.buildingHoverBg, this.buildingHoverTitle, this.buildingHoverType, this.buildingHoverOccupancy,
+    )
+    this.buildingHoverTooltip.visible = false
+    this.buildingHoverTooltip.zIndex = 101
 
     this.tileLayer.eventMode = 'static'
     this.tileLayer.hitArea = new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
@@ -224,7 +263,7 @@ export class TownRenderer {
       anchor: { x: 1, y: 0 },
     })
     this.hintLabel.visible = false  // Hidden — HTML HUD overlay replaces this
-    this.uiLayer.addChild(this.hudLabel, this.hintLabel, this.tooltipContainer)
+    this.uiLayer.addChild(this.hudLabel, this.hintLabel, this.tooltipContainer, this.buildingHoverTooltip)
 
     this.drawTiles()
     this.drawBuildings()
@@ -256,8 +295,20 @@ export class TownRenderer {
     }
 
     this.hintLabel.position.set(width - 16, 16)
+    this.updateBuildingLabelsForZoom()
     this.renderHud()
     this.emitViewportChange()
+  }
+
+  private static readonly BUILDING_TYPE_COLOR: Record<string, number> = {
+    cafe: 0xb45309, park: 0x15803d, school: 0x7c3aed, shop: 0xdc2626,
+    home: 0x1e40af, gym: 0xea580c, library: 0x0369a1, hospital: 0xbe123c, default: 0x475569,
+  }
+
+  private static readonly BUILDING_TYPE_ICON: Record<string, string> = {
+    cafe: '☕', park: '🌳', school: '📖',
+    shop: '🛍️', home: '🏠', gym: '🏋',
+    library: '📚', hospital: '🏥',
   }
 
   syncBuildings(buildings: Array<Building & { occupants?: number }>): void {
@@ -268,6 +319,11 @@ export class TownRenderer {
       this.buildingLabelLayer.removeChild(child)
       child.destroy()
     }
+    while (this.buildingCapacityLayer.children.length > 0) {
+      const child = this.buildingCapacityLayer.children[0]
+      this.buildingCapacityLayer.removeChild(child)
+      child.destroy()
+    }
 
     this.buildingGraphics.clear()
 
@@ -276,45 +332,21 @@ export class TownRenderer {
       return
     }
 
-    const typeColor: Record<string, number> = {
-      cafe: 0xb45309,
-      park: 0x15803d,
-      school: 0x7c3aed,
-      shop: 0xdc2626,
-      home: 0x1e40af,
-      gym: 0xea580c,
-      library: 0x0369a1,
-      hospital: 0xbe123c,
-      default: 0x475569,
-    }
-    const typeIcon: Record<string, string> = {
-      cafe: '\u2615',
-      park: '\uD83C\uDF33',
-      school: '\uD83C\uDFEB',
-      shop: '\uD83D\uDED2',
-      home: '\uD83C\uDFE0',
-      gym: '\uD83C\uDFCB',
-      library: '\uD83D\uDCDA',
-      hospital: '\uD83C\uDFE5',
-    }
-
     for (const b of buildings) {
       const [bx, by] = b.position
       const x = bx * TILE_SIZE
       const y = by * TILE_SIZE
-      const color = typeColor[b.type] ?? typeColor.default
+      const color = TownRenderer.BUILDING_TYPE_COLOR[b.type] ?? TownRenderer.BUILDING_TYPE_COLOR.default
       const width = TILE_SIZE * 2
       const height = TILE_SIZE * 3
-
       const shape = BUILDING_SHAPE[b.type] ?? 'rect'
 
       // Building shadow
       this.buildingGraphics.roundRect(x + 2, y + 2, width, height, 6)
       this.buildingGraphics.fill({ color: 0x000000, alpha: 0.25 })
 
-      // Building body — shape varies by type
+      // Building body
       if (shape === 'peaked') {
-        // Peaked roof top
         this.buildingGraphics.moveTo(x, y + 10)
         this.buildingGraphics.lineTo(x + width / 2, y)
         this.buildingGraphics.lineTo(x + width, y + 10)
@@ -324,12 +356,10 @@ export class TownRenderer {
         this.buildingGraphics.fill({ color, alpha: 0.88 })
         this.buildingGraphics.stroke({ color: 0xffffff, alpha: 0.12, width: 1.5 })
       } else if (shape === 'arch') {
-        // Arched top
         this.buildingGraphics.roundRect(x, y, width, height, 16)
         this.buildingGraphics.fill({ color, alpha: 0.88 })
         this.buildingGraphics.stroke({ color: 0xffffff, alpha: 0.12, width: 1.5 })
       } else if (shape === 'round') {
-        // Rounded/oval (parks)
         this.buildingGraphics.ellipse(x + width / 2, y + height / 2, width / 2, height / 2)
         this.buildingGraphics.fill({ color, alpha: 0.72 })
         this.buildingGraphics.stroke({ color: 0xffffff, alpha: 0.12, width: 1.5 })
@@ -339,7 +369,7 @@ export class TownRenderer {
         this.buildingGraphics.stroke({ color: 0xffffff, alpha: 0.12, width: 1.5 })
       }
 
-      // Entrance marker — small triangle at bottom center
+      // Entrance marker
       const entranceX = x + width / 2
       const entranceY = y + height
       this.buildingGraphics.moveTo(entranceX - 4, entranceY)
@@ -348,44 +378,167 @@ export class TownRenderer {
       this.buildingGraphics.closePath()
       this.buildingGraphics.fill({ color: 0xfbbf24, alpha: 0.7 })
 
-      const icon = typeIcon[b.type] ?? ''
-      const label = new Text({
-        text: icon ? `${icon}\n${b.name}` : b.name,
-        style: {
-          fill: 0xf8fafc,
-          fontFamily: 'Avenir Next, Helvetica Neue, sans-serif',
-          fontSize: 10,
-          fontWeight: '700',
-          stroke: { color: 0x020617, width: 3 },
-          wordWrap: true,
-          wordWrapWidth: width - 4,
-          align: 'center',
-        },
-        anchor: { x: 0.5, y: 0.5 },
-      })
-      label.position.set(x + width / 2, y + height / 2 - 4)
-      this.buildingLabelLayer.addChild(label)
+      // POI label (icon + name) above building
+      const icon = TownRenderer.BUILDING_TYPE_ICON[b.type] ?? ''
+      const labelContainer = new Container()
+      labelContainer.label = b.id
 
-      const occupantLabel = new Text({
-        text: `${b.occupants ?? 0}/${b.type === 'park' ? '∞' : b.capacity}`,
-        style: {
-          fill: 0xfef3c7,
-          fontFamily: 'Avenir Next, Helvetica Neue, sans-serif',
-          fontSize: 10,
-          fontWeight: '700',
-          stroke: { color: 0x020617, width: 3 },
-        },
+      const iconText = new Text({
+        text: icon || '?',
+        style: { fill: 0xffffff, fontFamily: 'Avenir Next, Helvetica Neue, sans-serif', fontSize: 14, align: 'center' },
         anchor: { x: 0.5, y: 0.5 },
       })
-      occupantLabel.position.set(x + width / 2, y + height - 10)
-      this.buildingLabelLayer.addChild(occupantLabel)
+      iconText.label = 'poi-icon'
+
+      const nameText = new Text({
+        text: b.name,
+        style: {
+          fill: 0xf8fafc, fontFamily: 'Avenir Next, Helvetica Neue, sans-serif',
+          fontSize: 9, fontWeight: '700', wordWrap: true, wordWrapWidth: width + 20, align: 'center',
+        },
+        anchor: { x: 0.5, y: 0 },
+      })
+      nameText.label = 'poi-name'
+
+      const labelCenterX = x + width / 2
+      const labelTopY = y - 16
+      iconText.position.set(labelCenterX, labelTopY)
+      nameText.position.set(labelCenterX, labelTopY + 10)
+
+      const bgGraphics = new Graphics()
+      bgGraphics.label = 'poi-bg'
+      labelContainer.addChild(bgGraphics, iconText, nameText)
+      this.buildingLabelLayer.addChild(labelContainer)
+
+      // Capacity progress bar at entrance
+      const occupants = b.occupants ?? 0
+      const cap = b.type === 'park' ? 0 : b.capacity
+      const barWidth = width - 8
+      const barHeight = 3
+      const barX = x + 4
+      const barY = entranceY + 6
+      const barContainer = new Container()
+      barContainer.label = b.id
+      const barGraphics = new Graphics()
+
+      barGraphics.roundRect(barX, barY, barWidth, barHeight, 1.5)
+      barGraphics.fill({ color: 0x1e293b, alpha: 0.7 })
+
+      if (cap > 0) {
+        const fillRatio = Math.min(occupants / cap, 1)
+        const fillWidth = Math.max(fillRatio * barWidth, fillRatio > 0 ? 2 : 0)
+        const fillColor = fillRatio >= 0.9 ? 0xef4444 : fillRatio >= 0.6 ? 0xfbbf24 : 0x22c55e
+        if (fillWidth > 0) {
+          barGraphics.roundRect(barX, barY, fillWidth, barHeight, 1.5)
+          barGraphics.fill({ color: fillColor, alpha: 0.9 })
+        }
+      }
+
+      const countText = new Text({
+        text: cap > 0 ? `${occupants}/${cap}` : `${occupants}`,
+        style: { fill: 0xcbd5e1, fontFamily: 'Avenir Next, Helvetica Neue, sans-serif', fontSize: 7, fontWeight: '600' },
+        anchor: { x: 0.5, y: 0 },
+      })
+      countText.position.set(x + width / 2, barY + barHeight + 1)
+      barContainer.addChild(barGraphics, countText)
+      this.buildingCapacityLayer.addChild(barContainer)
     }
 
+    this.updateBuildingLabelsForZoom()
     this.drawPlaceholderBuildings()
   }
 
+  /** Adapt building POI labels to current zoom level */
+  private updateBuildingLabelsForZoom(): void {
+    const showName = this.zoom >= 0.75
+
+    for (const child of this.buildingLabelLayer.children) {
+      if (!(child instanceof Container) || !child.label) continue
+
+      let iconNode: Text | null = null
+      let nameNode: Text | null = null
+      let bgNode: Graphics | null = null
+
+      for (const sub of child.children) {
+        if (sub.label === 'poi-icon' && sub instanceof Text) iconNode = sub
+        if (sub.label === 'poi-name' && sub instanceof Text) nameNode = sub
+        if (sub.label === 'poi-bg' && sub instanceof Graphics) bgNode = sub
+      }
+
+      if (nameNode) nameNode.visible = showName
+      if (iconNode) {
+        iconNode.style.fontSize = showName ? 14 : 18
+      }
+
+      // Draw semi-transparent background pill
+      if (bgNode && iconNode) {
+        bgNode.clear()
+        const pad = 4
+        const tw = showName && nameNode?.visible ? Math.max(iconNode.width, nameNode?.width ?? 0) : iconNode.width
+        const th = showName && nameNode?.visible
+          ? (iconNode.height + (nameNode?.height ?? 0) + 2)
+          : iconNode.height
+        const bx = iconNode.x - tw / 2 - pad
+        const by = iconNode.y - iconNode.height / 2 - pad
+        bgNode.roundRect(bx, by, tw + pad * 2, th + pad * 2, 6)
+        bgNode.fill({ color: 0x0f172a, alpha: 0.65 })
+      }
+    }
+
+    // Show/hide capacity bars based on zoom
+    this.buildingCapacityLayer.visible = this.zoom >= 0.6
+  }
+
+  /** Check if a screen coordinate hits a building, returns the building or null */
+  private getBuildingAtScreen(screenX: number, screenY: number): (Building & { occupants?: number }) | null {
+    const worldX = (screenX - this.world.x) / this.zoom
+    const worldY = (screenY - this.world.y) / this.zoom
+
+    for (const b of this.currentBuildings) {
+      const [bx, by] = b.position
+      const x = bx * TILE_SIZE
+      const y = by * TILE_SIZE
+      const w = TILE_SIZE * 2
+      const h = TILE_SIZE * 3
+      if (worldX >= x && worldX <= x + w && worldY >= y && worldY <= y + h) {
+        return b
+      }
+    }
+    return null
+  }
+
+  /** Update building hover tooltip position and visibility */
+  private updateBuildingHover(): void {
+    if (!this.hoveredBuildingId) {
+      this.buildingHoverAlpha = Math.max(0, this.buildingHoverAlpha - 0.1)
+      if (this.buildingHoverAlpha <= 0) {
+        this.buildingHoverTooltip.visible = false
+      } else {
+        this.buildingHoverTooltip.alpha = this.buildingHoverAlpha
+      }
+      // Reset label scale for previously hovered buildings
+      for (const child of this.buildingLabelLayer.children) {
+        if (child instanceof Container) {
+          child.scale.set(1)
+        }
+      }
+      return
+    }
+
+    this.buildingHoverAlpha = Math.min(1, this.buildingHoverAlpha + 0.15)
+    this.buildingHoverTooltip.visible = true
+    this.buildingHoverTooltip.alpha = this.buildingHoverAlpha
+
+    // Enlarge hovered building's label
+    for (const child of this.buildingLabelLayer.children) {
+      if (child instanceof Container) {
+        child.scale.set(child.label === this.hoveredBuildingId ? 1.25 : 1)
+      }
+    }
+  }
+
   syncResidents(residents: ResidentPosition[]): void {
-    this._currentResidentPositions = residents
+    this.currentResidentPositions = residents
     const activeIds = new Set(residents.map((resident) => resident.id))
 
     for (const resident of residents) {
@@ -505,6 +658,68 @@ export class TownRenderer {
     }
   }
 
+  // ── Heatmap API ──────────────────────────────────────────────
+
+  setHeatmapEnabled(enabled: boolean): void {
+    this.heatmapEnabled = enabled
+    if (!enabled) {
+      this.heatmapGraphics.clear()
+    } else {
+      this.renderHeatmap()
+    }
+  }
+
+  setHeatmapFilter(residentId: string | null): void {
+    this.heatmapFilterResidentId = residentId
+    if (this.heatmapEnabled) this.renderHeatmap()
+  }
+
+  recordHeatmapTick(residents: ResidentPosition[]): void {
+    const snapshot = residents.map((r) => ({ id: r.id, x: r.targetX, y: r.targetY }))
+    this.heatmapHistory.push(snapshot)
+    if (this.heatmapHistory.length > this.MAX_HEATMAP_TICKS) {
+      this.heatmapHistory.shift()
+    }
+    if (this.heatmapEnabled) this.renderHeatmap()
+  }
+
+  private renderHeatmap(): void {
+    this.heatmapGraphics.clear()
+    if (!this.heatmapEnabled || this.heatmapHistory.length === 0) return
+
+    const grid = new Float32Array(MAP_WIDTH * MAP_HEIGHT)
+    let maxDensity = 0
+
+    for (const snap of this.heatmapHistory) {
+      for (const pos of snap) {
+        if (this.heatmapFilterResidentId && pos.id !== this.heatmapFilterResidentId) continue
+        const gx = clampTileCoordinate(pos.x, MAP_WIDTH - 1)
+        const gy = clampTileCoordinate(pos.y, MAP_HEIGHT - 1)
+        const idx = gy * MAP_WIDTH + gx
+        grid[idx] += 1
+        if (grid[idx] > maxDensity) maxDensity = grid[idx]
+      }
+    }
+
+    if (maxDensity === 0) return
+
+    for (let y = 0; y < MAP_HEIGHT; y++) {
+      for (let x = 0; x < MAP_WIDTH; x++) {
+        const density = grid[y * MAP_WIDTH + x]
+        if (density === 0) continue
+        const intensity = density / maxDensity
+        const r = intensity > 0.5 ? 1 : intensity * 2
+        const g = intensity < 0.5 ? intensity * 2 : 2 - intensity * 2
+        const b = intensity < 0.3 ? 1 - intensity * 3 : 0
+        const color = (Math.round(r * 255) << 16) | (Math.round(g * 255) << 8) | Math.round(b * 255)
+        const alpha = 0.08 + intensity * 0.35
+        this.heatmapGraphics
+          .rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+          .fill({ color, alpha })
+      }
+    }
+  }
+
   triggerMilestone(fromId: string, toId: string, eventType: string): void {
     const fromSprite = this.residents.get(fromId)
     const toSprite = this.residents.get(toId)
@@ -538,6 +753,10 @@ export class TownRenderer {
     }
   }
 
+  redrawTiles(): void {
+    this.drawTiles()
+  }
+
   destroy(): void {
     this.app.ticker.remove(this.animate)
 
@@ -545,6 +764,8 @@ export class TownRenderer {
 
     canvas.removeEventListener('wheel', this.onWheel)
     canvas.removeEventListener('pointerdown', this.onPointerDown)
+    canvas.removeEventListener('mousemove', this.onCanvasMouseMove)
+    canvas.removeEventListener('mouseleave', this.onCanvasMouseLeave)
     canvas.removeEventListener('touchstart', this.onTouchStart)
     canvas.removeEventListener('touchmove', this.onTouchMove)
     canvas.removeEventListener('touchend', this.onTouchEnd)
@@ -598,11 +819,14 @@ export class TownRenderer {
     // Tooltip fade in/out
     this.updateTooltip()
 
+    // Building hover tooltip fade
+    this.updateBuildingHover()
+
     // Relationship line pulse
     this.relationLinePulse += deltaMs * 0.003
 
     // Path visualization pulse + update
-    this._pathPulse += deltaMs * 0.004
+    this.pathPulse += deltaMs * 0.004
     this.updatePathVisualization()
 
     if (this.followedResidentId) {
@@ -617,6 +841,8 @@ export class TownRenderer {
     canvas.style.touchAction = 'none'
     canvas.addEventListener('wheel', this.onWheel, { passive: false })
     canvas.addEventListener('pointerdown', this.onPointerDown)
+    canvas.addEventListener('mousemove', this.onCanvasMouseMove)
+    canvas.addEventListener('mouseleave', this.onCanvasMouseLeave)
     canvas.addEventListener('touchstart', this.onTouchStart, { passive: false })
     canvas.addEventListener('touchmove', this.onTouchMove, { passive: false })
     canvas.addEventListener('touchend', this.onTouchEnd, { passive: false })
@@ -707,6 +933,52 @@ export class TownRenderer {
     }
 
     this.cancelDrag(event.pointerId)
+  }
+
+  private readonly onCanvasMouseMove = (event: MouseEvent): void => {
+    if (this.dragging) return
+
+    const rect = this.app.canvas.getBoundingClientRect()
+    const sx = event.clientX - rect.left
+    const sy = event.clientY - rect.top
+    const building = this.getBuildingAtScreen(sx, sy)
+
+    if (building) {
+      if (this.hoveredBuildingId !== building.id) {
+        this.hoveredBuildingId = building.id
+        const icon = TownRenderer.BUILDING_TYPE_ICON[building.type] ?? ''
+        const cap = building.type === 'park' ? 0 : building.capacity
+        const occ = building.occupants ?? 0
+        this.buildingHoverTitle.text = `${icon} ${building.name}`
+        this.buildingHoverType.text = `Type: ${building.type}`
+        this.buildingHoverOccupancy.text = cap > 0 ? `Occupancy: ${occ}/${cap}` : `Visitors: ${occ}`
+
+        // Size background
+        const w = Math.max(this.buildingHoverTitle.width, this.buildingHoverType.width, this.buildingHoverOccupancy.width) + 20
+        const h = 56
+        this.buildingHoverBg.clear()
+        this.buildingHoverBg.roundRect(0, 0, w, h, 8)
+        this.buildingHoverBg.fill({ color: 0x0f172a, alpha: 0.88 })
+        this.buildingHoverBg.stroke({ color: 0x334155, width: 1, alpha: 0.6 })
+      }
+
+      // Position tooltip near cursor (screen space, in uiLayer)
+      this.buildingHoverTooltip.position.set(
+        Math.min(sx + 16, this.viewportWidth - 160),
+        Math.max(sy - 64, 8),
+      )
+      this.app.canvas.style.cursor = 'pointer'
+    } else {
+      if (this.hoveredBuildingId) {
+        this.hoveredBuildingId = null
+        this.app.canvas.style.cursor = this.dragging ? 'grabbing' : 'grab'
+      }
+    }
+  }
+
+  private readonly onCanvasMouseLeave = (): void => {
+    this.hoveredBuildingId = null
+    this.app.canvas.style.cursor = 'grab'
   }
 
   private readonly onTouchStart = (event: TouchEvent): void => {
@@ -891,6 +1163,7 @@ export class TownRenderer {
     this.world.scale.set(nextZoom)
     this.world.position.set(pointerX - worldX * nextZoom, pointerY - worldY * nextZoom)
     this.clampPan()
+    this.updateBuildingLabelsForZoom()
     this.emitViewportChange()
     this.renderHud()
   }

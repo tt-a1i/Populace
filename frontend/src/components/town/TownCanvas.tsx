@@ -95,6 +95,21 @@ export function TownCanvas() {
   const [contextMenu, setContextMenu] = useState<TownContextMenuState | null>(null)
   const [inspection, setInspection] = useState<TownInspectionState | null>(null)
   const [placeholders, setPlaceholders] = useState<TownPlaceholder[]>([])
+  const [followedResidentId, setFollowedResidentId] = useState<string | null>(null)
+  const [heatmapOn, setHeatmapOn] = useState(false)
+  const lastRecordedTick = useRef(0)
+
+  // Sync follow state from renderer on each animation frame
+  useEffect(() => {
+    let raf: number
+    const sync = () => {
+      const rid = rendererRef.current?.getFollowedResidentId() ?? null
+      setFollowedResidentId((prev) => (prev !== rid ? rid : prev))
+      raf = requestAnimationFrame(sync)
+    }
+    raf = requestAnimationFrame(sync)
+    return () => cancelAnimationFrame(raf)
+  }, [])
 
   const replayFrame = useMemo(
     () => (replayTick === null ? null : getFrameByTick(replayTick)),
@@ -157,6 +172,31 @@ export function TownCanvas() {
 
   const closeContextMenu = useCallback(() => {
     setContextMenu(null)
+  }, [])
+
+  const handleCanvasClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    const renderer = rendererRef.current
+    const shell = shellRef.current
+    if (!renderer || !shell) return
+
+    const bounds = shell.getBoundingClientRect()
+    const tile = renderer.screenToTile(event.clientX - bounds.left, event.clientY - bounds.top)
+    if (!tile) return
+
+    window.dispatchEvent(new CustomEvent('populace:map-editor-paint', { detail: { tileX: tile.tileX, tileY: tile.tileY } }))
+  }, [])
+
+  const handleCanvasPointerMove = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    if (!(window as unknown as Record<string, unknown>).__mapEditorPainting) return
+    const renderer = rendererRef.current
+    const shell = shellRef.current
+    if (!renderer || !shell) return
+
+    const bounds = shell.getBoundingClientRect()
+    const tile = renderer.screenToTile(event.clientX - bounds.left, event.clientY - bounds.top)
+    if (!tile) return
+
+    window.dispatchEvent(new CustomEvent('populace:map-editor-paint', { detail: { tileX: tile.tileX, tileY: tile.tileY } }))
   }, [])
 
   const handleContextMenu = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
@@ -376,7 +416,8 @@ export function TownCanvas() {
 
   useEffect(() => {
     rendererRef.current?.setFollowTarget(selectedResidentId)
-  }, [selectedResidentId])
+    rendererRef.current?.drawRelationshipLines(selectedResidentId, liveRelationships)
+  }, [selectedResidentId, liveRelationships])
 
   useEffect(() => {
     rendererRef.current?.setHighlightedResidents(hoveredPairIds)
@@ -385,6 +426,19 @@ export function TownCanvas() {
   useEffect(() => {
     rendererRef.current?.updateWeather(simulationMeta.weather)
   }, [simulationMeta.weather])
+
+  // Heatmap: toggle on/off
+  useEffect(() => {
+    rendererRef.current?.setHeatmapEnabled(heatmapOn)
+  }, [heatmapOn])
+
+  // Heatmap: record tick positions
+  useEffect(() => {
+    if (simulationMeta.tick > lastRecordedTick.current && residents.length > 0) {
+      lastRecordedTick.current = simulationMeta.tick
+      rendererRef.current?.recordHeatmapTick(residents)
+    }
+  }, [simulationMeta.tick, residents])
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -442,10 +496,21 @@ export function TownCanvas() {
     }
   }, [contextMenu])
 
+  // Listen for tile override changes (map editor) and redraw tiles
+  useEffect(() => {
+    const handler = () => {
+      rendererRef.current?.redrawTiles?.()
+    }
+    window.addEventListener('populace:tiles-changed', handler)
+    return () => window.removeEventListener('populace:tiles-changed', handler)
+  }, [])
+
   return (
     <div
       ref={shellRef}
       data-testid="town-canvas-shell"
+      onClick={handleCanvasClick}
+      onPointerMove={handleCanvasPointerMove}
       onContextMenu={handleContextMenu}
       role="region"
       aria-label={t('app.map_region')}
@@ -458,6 +523,7 @@ export function TownCanvas() {
         buildings={buildings}
         relationships={relationships}
         selectedResidentId={selectedResident?.id ?? null}
+        followedResidentId={followedResidentId}
         currentTime={simulationMeta.time}
         messageFeed={messageFeed}
         contextMenu={contextMenu}
@@ -471,7 +537,27 @@ export function TownCanvas() {
         onPlacePlaceholder={handlePlacePlaceholder}
         onClearResidentSelection={() => selectResident(null)}
         onDismissInspection={() => setInspection(null)}
+        onCancelFollow={() => {
+          rendererRef.current?.setFollowTarget(null)
+          selectResident(null)
+        }}
       />
+      {/* Heatmap toggle */}
+      <div className="pointer-events-auto absolute right-3 top-3 z-20">
+        <button
+          type="button"
+          onClick={() => setHeatmapOn((v) => !v)}
+          title={t('canvas.heatmap_toggle')}
+          className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium backdrop-blur-sm transition duration-200 active:scale-95 ${
+            heatmapOn
+              ? 'border-orange-400/40 bg-orange-400/15 text-orange-200'
+              : 'border-white/10 bg-slate-950/50 text-slate-400 hover:bg-white/10 hover:text-white'
+          }`}
+        >
+          <span aria-hidden="true">🔥</span>
+          {heatmapOn ? 'ON' : 'OFF'}
+        </button>
+      </div>
       {residents.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/45 backdrop-blur-[2px]">
           <div className="rounded-xl border border-cyan-300/15 bg-slate-950/80 px-6 py-5 text-center shadow-[0_18px_44px_rgba(8,15,31,0.4)]">
