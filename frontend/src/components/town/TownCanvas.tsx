@@ -14,10 +14,58 @@ import { useSound } from '../../audio'
 import { getActiveEvents, injectEvent, type ActiveEvent } from '../../services/api'
 import { useToast } from '../ui/ToastProvider'
 import { useRelationshipsStore } from '../../stores/relationships'
-import { useSimulationStore } from '../../stores/simulation'
+import {
+  useSimulationStore,
+  type ResidentPosition,
+  type ResidentStatus,
+} from '../../stores/simulation'
 import { TownChrome, type TownContextMenuState, type TownInspectionState, type TownPlaceholder } from './TownChrome'
 import { TownRenderer } from './TownRenderer'
 import { inspectTile } from './townMap'
+
+function toReplayResident(
+  resident: {
+    id: string
+    name: string
+    x?: number
+    y?: number
+    location?: string | null
+    skin_color?: string | null
+    hair_style?: string | null
+    hair_color?: string | null
+    outfit_color?: string | null
+    personality?: string
+    mood?: string
+    goals?: string[]
+    coins?: number
+    occupation?: string
+    energy?: number
+  },
+  liveResidents: ResidentPosition[],
+): ResidentPosition {
+  return {
+    id: resident.id,
+    name: resident.name,
+    x: resident.x ?? 0,
+    y: resident.y ?? 0,
+    targetX: resident.x ?? 0,
+    targetY: resident.y ?? 0,
+    color: liveResidents.find((item) => item.id === resident.id)?.color ?? 0xf97316,
+    status: 'idle' as ResidentStatus,
+    currentBuildingId: resident.location ?? null,
+    skinColor: resident.skin_color ?? null,
+    hairStyle: resident.hair_style ?? null,
+    hairColor: resident.hair_color ?? null,
+    outfitColor: resident.outfit_color ?? null,
+    personality: resident.personality,
+    mood: resident.mood,
+    goals: resident.goals,
+    dialogueText: null,
+    coins: resident.coins,
+    occupation: resident.occupation,
+    energy: resident.energy,
+  }
+}
 
 export function TownCanvas() {
   const { t } = useTranslation()
@@ -38,11 +86,11 @@ export function TownCanvas() {
   const messageFeed = useSimulationStore((state) => state.messageFeed)
   const replayFrozenFrame = useSimulationStore((state) => state.replayFrozenFrame)
   const getFrameByTick = useSimulationStore((state) => state.getFrameByTick)
+  const getSnapshotByTick = useSimulationStore((state) => state.getSnapshotByTick)
   const selectResident = useSimulationStore((state) => state.selectResident)
   const { play } = useSound()
   const { pushToast } = useToast()
   const liveRelationships = useRelationshipsStore((state) => state.relationships)
-  const relationshipHistory = useRelationshipsStore((state) => state.history)
   const replayTick = useRelationshipsStore((state) => state.replayTick)
   const [contextMenu, setContextMenu] = useState<TownContextMenuState | null>(null)
   const [inspection, setInspection] = useState<TownInspectionState | null>(null)
@@ -52,12 +100,9 @@ export function TownCanvas() {
     () => (replayTick === null ? null : getFrameByTick(replayTick)),
     [getFrameByTick, replayTick],
   )
-  const replayRelationshipSnapshot = useMemo(
-    () =>
-      replayTick === null
-        ? null
-        : relationshipHistory.find((snapshot) => snapshot.tick === replayTick) ?? null,
-    [relationshipHistory, replayTick],
+  const replaySnapshot = useMemo(
+    () => (replayTick === null ? null : getSnapshotByTick(replayTick)),
+    [getSnapshotByTick, replayTick],
   )
   const liveMeta = useMemo(
     () => ({
@@ -66,19 +111,30 @@ export function TownCanvas() {
       tick: liveTick,
       tickPerDay,
       time: liveTime,
+      weather,
       season,
     }),
-    [liveRunning, speed, liveTick, tickPerDay, liveTime, season],
+    [liveRunning, speed, liveTick, tickPerDay, liveTime, weather, season],
   )
 
-  const residents = useMemo(
+  const residents = useMemo<ResidentPosition[]>(
     () =>
       replayTick !== null
-        ? replayFrame?.residents ?? replayFrozenFrame?.residents ?? liveResidents
+        ? replaySnapshot?.residents.map((resident) => toReplayResident(resident, liveResidents)) ??
+          replayFrame?.residents ??
+          replayFrozenFrame?.residents ??
+          liveResidents
         : liveResidents,
-    [liveResidents, replayFrame, replayFrozenFrame, replayTick],
+    [liveResidents, replayFrame, replayFrozenFrame, replaySnapshot, replayTick],
   )
-  const relationships = replayRelationshipSnapshot?.relationships ?? liveRelationships
+  const relationships =
+    replaySnapshot?.relationships.map((relationship) => ({
+      from_id: relationship.from_id,
+      to_id: relationship.to_id,
+      type: relationship.type as (typeof liveRelationships)[number]['type'],
+      intensity: relationship.intensity,
+      reason: relationship.reason ?? '',
+    })) ?? liveRelationships
   const selectedResident = useMemo(
     () => residents.find((resident) => resident.id === selectedResidentId) ?? null,
     [residents, selectedResidentId],
@@ -91,11 +147,12 @@ export function TownCanvas() {
             speed: replayFrozenFrame?.meta.speed ?? liveMeta.speed,
             tick: replayFrame?.tick ?? replayFrozenFrame?.meta.tick ?? liveMeta.tick,
             tickPerDay: replayFrozenFrame?.meta.tickPerDay ?? liveMeta.tickPerDay,
-            time: replayFrame?.time ?? replayFrozenFrame?.meta.time ?? liveMeta.time,
-            season: liveMeta.season,
+            time: replaySnapshot?.time ?? replayFrame?.time ?? replayFrozenFrame?.meta.time ?? liveMeta.time,
+            weather: replaySnapshot?.weather ?? replayFrozenFrame?.meta.weather ?? liveMeta.weather,
+            season: replaySnapshot?.season ?? replayFrozenFrame?.meta.season ?? liveMeta.season,
           }
         : liveMeta,
-    [liveMeta, replayFrame, replayFrozenFrame, replayTick],
+    [liveMeta, replayFrame, replayFrozenFrame, replaySnapshot, replayTick],
   )
 
   const closeContextMenu = useCallback(() => {
@@ -103,6 +160,10 @@ export function TownCanvas() {
   }, [])
 
   const handleContextMenu = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    if (replayTick !== null) {
+      return
+    }
+
     const renderer = rendererRef.current
     const shell = shellRef.current
 
@@ -128,7 +189,7 @@ export function TownCanvas() {
       tileY: tile.tileY,
       tileKind: tile.tileKind,
     })
-  }, [])
+  }, [replayTick])
 
   const handleInspectTile = useCallback(() => {
     if (!contextMenu) {
@@ -247,7 +308,11 @@ export function TownCanvas() {
       canvas.style.width = '100%'
       host.replaceChildren(canvas)
 
-      const renderer = new TownRenderer(app)
+      const renderer = new TownRenderer(app, {
+        onViewportChange: (viewport) => {
+          window.dispatchEvent(new CustomEvent('populace:viewport-changed', { detail: viewport }))
+        },
+      })
       rendererRef.current = renderer
 
       const state = useSimulationStore.getState()
@@ -318,8 +383,8 @@ export function TownCanvas() {
   }, [hoveredPairIds])
 
   useEffect(() => {
-    rendererRef.current?.updateWeather(weather)
-  }, [weather])
+    rendererRef.current?.updateWeather(simulationMeta.weather)
+  }, [simulationMeta.weather])
 
   useEffect(() => {
     const handler = (e: Event) => {

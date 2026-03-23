@@ -180,7 +180,7 @@ export function getPresetEvents() {
 }
 
 export function getResidents() {
-  return request('/api/residents')
+  return request<ApiResident[]>('/api/residents')
 }
 
 export function updateResident(id: string, payload: ResidentUpdatePayload) {

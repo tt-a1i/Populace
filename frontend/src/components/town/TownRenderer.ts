@@ -5,10 +5,12 @@ import type { Building } from '../../types'
 import { ResidentSprite } from './ResidentSprite'
 import { ResidentSpritePool } from './ResidentSpritePool'
 import { MilestoneEffect } from './effects/MilestoneEffect'
+import { CloudEffect } from './effects/CloudEffect'
 import { RainEffect } from './effects/RainEffect'
 import { SnowEffect } from './effects/SnowEffect'
 import { StormEffect } from './effects/StormEffect'
 import { createWeatherFilter } from './effects/WeatherFilter'
+import { getDayLightingFromTime, getSeasonTilePalette } from './visuals'
 import {
   MAP_HEIGHT,
   MAP_WIDTH,
@@ -21,7 +23,7 @@ import {
   type TileKind,
 } from './townMap'
 
-type WeatherEffect = RainEffect | SnowEffect | StormEffect
+type WeatherEffect = RainEffect | SnowEffect | StormEffect | CloudEffect
 
 const CAMERA_PADDING = 56
 const POOLED_RESIDENT_PLACEHOLDER: ResidentPosition = {
@@ -46,29 +48,8 @@ interface SimulationMeta {
   season?: string
 }
 
-interface OverlayStyle {
-  alpha: number
-  color: number | null
-}
-
-function dayOverlayForTick(tick: number, tickPerDay: number): OverlayStyle {
-  const safeTickPerDay = Math.max(1, tickPerDay)
-  const tickInDay = ((tick % safeTickPerDay) + safeTickPerDay) % safeTickPerDay
-  const hour = (tickInDay / safeTickPerDay) * 24
-
-  if (hour >= 6 && hour < 9) {
-    return { color: 0xffa500, alpha: 0.1 }
-  }
-
-  if (hour >= 9 && hour < 17) {
-    return { color: null, alpha: 0 }
-  }
-
-  if (hour >= 17 && hour < 20) {
-    return { color: 0xff6b35, alpha: 0.15 }
-  }
-
-  return { color: 0x1a1a4e, alpha: 0.3 }
+interface TownRendererOptions {
+  onViewportChange?: (viewport: { centerX: number; centerY: number; zoom: number }) => void
 }
 
 export class TownRenderer {
@@ -93,10 +74,12 @@ export class TownRenderer {
   private readonly placeholderGraphics = new Graphics()
   private readonly placeholderLabelLayer = new Container()
   private readonly ambientAccent = new Graphics()
+  private readonly sunnyGlow = new Graphics()
   private readonly dayNightOverlay = new Graphics()
   private readonly weatherContainer = new Container()
   private currentWeatherEffect: WeatherEffect | null = null
   private currentWeather = 'sunny'
+  private readonly onViewportChange?: TownRendererOptions['onViewportChange']
   private milestoneEffects: MilestoneEffect[] = []
   private readonly eventRadiusGraphics = new Graphics()
   private readonly hudLabel: Text
@@ -129,8 +112,9 @@ export class TownRenderer {
     time: 'Day 1, 08:00',
   }
 
-  constructor(app: Application) {
+  constructor(app: Application, options: TownRendererOptions = {}) {
     this.app = app
+    this.onViewportChange = options.onViewportChange
 
     this.app.stage.sortableChildren = true
     this.app.stage.addChild(this.world, this.uiLayer)
@@ -153,7 +137,7 @@ export class TownRenderer {
       this.placeholderLabelLayer,
     )
     this.effectLayer.addChild(
-      this.ambientAccent, this.dayNightOverlay,
+      this.ambientAccent, this.sunnyGlow, this.dayNightOverlay,
       this.eventRadiusGraphics, this.weatherContainer,
     )
 
@@ -218,6 +202,7 @@ export class TownRenderer {
 
     this.hintLabel.position.set(width - 16, 16)
     this.renderHud()
+    this.emitViewportChange()
   }
 
   syncBuildings(buildings: Array<Building & { occupants?: number }>): void {
@@ -359,6 +344,7 @@ export class TownRenderer {
       sprite.setSimulationSpeed(meta.speed)
     }
     this.updateWeather('sunny')
+    this.drawTiles()
     this.updateDayNightOverlay()
     this.renderHud()
   }
@@ -382,6 +368,8 @@ export class TownRenderer {
       effect = new SnowEffect()
     } else if (weather === 'stormy') {
       effect = new StormEffect()
+    } else if (weather === 'cloudy') {
+      effect = new CloudEffect()
     }
 
     if (effect) {
@@ -392,6 +380,7 @@ export class TownRenderer {
     // Apply color tint filter for the weather
     const weatherFilter = createWeatherFilter(weather)
     this.world.filters = weatherFilter ? [weatherFilter] : []
+    this.drawAmbientAccent()
   }
 
   tickWeatherEffect(deltaMs: number): void {
@@ -543,6 +532,7 @@ export class TownRenderer {
     const nextZoom = this.clamp(this.zoom * scaleFactor, this.minZoom, this.maxZoom)
 
     this.zoomToPoint(pointerX, pointerY, nextZoom)
+    this.emitViewportChange()
   }
 
   private readonly onPointerDown = (event: PointerEvent): void => {
@@ -580,6 +570,7 @@ export class TownRenderer {
 
     this.world.position.set(this.worldStartX + deltaX, this.worldStartY + deltaY)
     this.clampPan()
+    this.emitViewportChange()
   }
 
   private readonly onPointerUp = (event: PointerEvent): void => {
@@ -720,6 +711,7 @@ export class TownRenderer {
     }
 
     this.clampPan()
+    this.emitViewportChange()
   }
 
   private zoomToPoint(pointerX: number, pointerY: number, nextZoom: number): void {
@@ -734,6 +726,7 @@ export class TownRenderer {
     this.world.scale.set(nextZoom)
     this.world.position.set(pointerX - worldX * nextZoom, pointerY - worldY * nextZoom)
     this.clampPan()
+    this.emitViewportChange()
     this.renderHud()
   }
 
@@ -839,26 +832,37 @@ export class TownRenderer {
 
   private drawAmbientAccent(): void {
     this.ambientAccent.clear()
+    this.sunnyGlow.clear()
+
     this.ambientAccent.rect(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
     this.ambientAccent.stroke({ color: 0xe2e8f0, alpha: 0.08, width: 4 })
     this.ambientAccent.circle(23 * TILE_SIZE, 10 * TILE_SIZE, 90)
-    this.ambientAccent.fill({ color: 0x38bdf8, alpha: 0.05 })
+    this.ambientAccent.fill({ color: 0x38bdf8, alpha: this.simulationMeta.season === 'winter' ? 0.04 : 0.05 })
+
+    if (this.currentWeather === 'sunny') {
+      this.sunnyGlow.circle(7 * TILE_SIZE, 5 * TILE_SIZE, 140)
+      this.sunnyGlow.fill({ color: 0xfbbf24, alpha: 0.08 })
+      this.sunnyGlow.circle(7 * TILE_SIZE, 5 * TILE_SIZE, 90)
+      this.sunnyGlow.fill({ color: 0xfef08a, alpha: 0.1 })
+    }
   }
 
   private updateDayNightOverlay(): void {
-    const { alpha, color } = dayOverlayForTick(
-      this.simulationMeta.tick,
-      this.simulationMeta.tickPerDay,
-    )
+    const lighting = getDayLightingFromTime(this.simulationMeta.time)
 
     this.dayNightOverlay.clear()
+    this.tileLayer.alpha = lighting.brightness
+    this.buildingLayer.alpha = Math.max(0.72, lighting.brightness)
+    this.residentLayer.alpha = Math.max(0.82, lighting.brightness)
+    this.ambientAccent.alpha = lighting.accentAlpha
+    this.sunnyGlow.alpha = lighting.accentAlpha
 
-    if (!color || alpha <= 0) {
+    if (!lighting.overlayColor || lighting.overlayAlpha <= 0) {
       return
     }
 
     this.dayNightOverlay.rect(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
-    this.dayNightOverlay.fill({ color, alpha })
+    this.dayNightOverlay.fill({ color: lighting.overlayColor, alpha: lighting.overlayAlpha })
   }
 
   private getTileKind(x: number, y: number): TileKind {
@@ -869,33 +873,7 @@ export class TownRenderer {
     fillColor: number
     strokeColor: number
   } {
-    // Simple hash for natural-looking variation
-    const h = ((x * 7 + y * 13) & 0xff) / 255
-
-    if (kind === 'water') {
-      // Deep blue with subtle wave-like variation
-      const blues = [0x1e40af, 0x1d4ed8, 0x2563eb, 0x1e3a8a]
-      return {
-        fillColor: blues[Math.floor(h * blues.length)],
-        strokeColor: 0x3b82f6,
-      }
-    }
-
-    if (kind === 'road') {
-      // Warm gray stone road
-      const grays = [0x57534e, 0x4a4542, 0x52504c, 0x5c5955]
-      return {
-        fillColor: grays[Math.floor(h * grays.length)],
-        strokeColor: 0x78716c,
-      }
-    }
-
-    // Grass — multiple greens for a lush, natural look
-    const greens = [0x2d7a3a, 0x348a42, 0x3b9348, 0x2e8040, 0x38863e, 0x2a7236]
-    return {
-      fillColor: greens[Math.floor(h * greens.length)],
-      strokeColor: 0x1a5c28,
-    }
+    return getSeasonTilePalette(kind, x, y, this.simulationMeta.season)
   }
 
   private renderHud(): void {
@@ -935,6 +913,7 @@ export class TownRenderer {
       (this.viewportWidth - scaledWidth) / 2,
       (this.viewportHeight - scaledHeight) / 2,
     )
+    this.emitViewportChange()
   }
 
   private clampPan(): void {
@@ -960,5 +939,16 @@ export class TownRenderer {
 
   private clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(value, max))
+  }
+
+  private emitViewportChange(): void {
+    if (!this.onViewportChange || !this.viewportWidth || !this.viewportHeight) {
+      return
+    }
+    this.onViewportChange({
+      centerX: Number((((this.viewportWidth / 2) - this.world.x) / this.zoom / TILE_SIZE).toFixed(2)),
+      centerY: Number((((this.viewportHeight / 2) - this.world.y) / this.zoom / TILE_SIZE).toFixed(2)),
+      zoom: Number(this.zoom.toFixed(3)),
+    })
   }
 }
