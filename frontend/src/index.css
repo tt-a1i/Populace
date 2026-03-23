@@ -6,9 +6,52 @@
   font-family: 'Avenir Next', 'Helvetica Neue', Helvetica, sans-serif;
   color: #e2e8f0;
   background: #020617;
+
+  /* ── Color tokens ─────────────────────────────────────────────── */
   --primary-color: #3b82f6;
   --primary-color-rgb: 59 130 246;
   --primary-color-soft-text: #dbeafe;
+  --secondary-color: #14b8a6;
+  --secondary-color-rgb: 20 184 166;
+  --accent-color: #f59e0b;
+  --accent-color-rgb: 245 158 11;
+  --success-color: #22c55e;
+  --success-color-rgb: 34 197 94;
+  --warning-color: #f59e0b;
+  --warning-color-rgb: 245 158 11;
+  --error-color: #ef4444;
+  --error-color-rgb: 239 68 68;
+
+  /* ── Spacing tokens ───────────────────────────────────────────── */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+
+  /* ── Radius tokens ────────────────────────────────────────────── */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* ── Shadow tokens ────────────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-glow: 0 0 12px rgba(var(--primary-color-rgb), 0.3);
+
+  /* ── Font size tokens ─────────────────────────────────────────── */
+  --text-xs: 0.625rem;
+  --text-sm: 0.6875rem;
+  --text-base: 0.8125rem;
+  --text-md: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
