@@ -16,6 +16,8 @@ import {
 import { SplitPane } from './components/ui/SplitPane'
 import { OnboardingDrama } from './components/ui/OnboardingDrama'
 import { TutorialOverlay } from './components/ui/TutorialOverlay'
+import { KeyboardShortcutsPanel } from './components/ui/KeyboardShortcutsPanel'
+import { GlobalSearch } from './components/ui/GlobalSearch'
 import { NotificationCenter } from './components/ui/NotificationCenter'
 import { SoundToggleButton } from './components/toolbar/SoundToggleButton'
 import { SpeedControl } from './components/toolbar/SpeedControl'
@@ -359,6 +361,8 @@ function SimulationView() {
       )}
       {!showOnboarding && <FirstRunGuide enabled={hasInitialSnapshot} />}
       {!showOnboarding && hasInitialSnapshot && <TutorialOverlay />}
+      {hasInitialSnapshot && <KeyboardShortcutsPanel />}
+      {hasInitialSnapshot && <GlobalSearch />}
     </div>
   )
 }
