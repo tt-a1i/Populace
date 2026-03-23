@@ -158,11 +158,31 @@ def test_get_population_history_returns_timeline(client):
         ]
 
         response = client.get("/api/simulation/population-history")
-
         assert response.status_code == 200
         assert response.json() == state._population_history
     finally:
         state._population_history = original_history
+
+
+def test_get_market_stats_returns_trade_summary(client):
+    state = client.app.state.simulation_state
+    original_history = list(getattr(state, "_trade_history", []))
+    try:
+        state._trade_history = [
+            {"seller_id": "a", "buyer_id": "b", "item_name": "coffee", "quantity": 2, "total_price": 10},
+            {"seller_id": "b", "buyer_id": "c", "item_name": "book", "quantity": 1, "total_price": 7},
+            {"seller_id": "a", "buyer_id": "c", "item_name": "coffee", "quantity": 1, "total_price": 5},
+        ]
+        response = client.get("/api/simulation/market-stats")
+        assert response.status_code == 200
+        assert response.json() == {
+            "trade_volume": 3,
+            "total_items_traded": 4,
+            "hottest_item": "coffee",
+            "most_active_trader": "a",
+        }
+    finally:
+        state._trade_history = original_history
 
 
 def test_start_simulation(client):

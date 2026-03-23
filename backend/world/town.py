@@ -14,7 +14,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 from engine.generative_agent import GenerativeAgent
-from engine.types import Building, Resident, WorldConfig
+from engine.types import Building, Item, Resident, WorldConfig, Zone, ZoneAtmosphere, ZoneBounds
 from engine.world import World
 
 # Default template bundled with the backend
@@ -69,6 +69,18 @@ def _resolve_appearance_fields(resident_data: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def _starter_inventory_for_resident(resident_data: dict[str, Any]) -> list[Item]:
+    """Seed a small starter item so trades are possible before the first work cycle."""
+    resident_id = str(resident_data.get("id", ""))
+    starter_items = (
+        Item(name="goods", quantity=1, value=6),
+        Item(name="book", quantity=1, value=7),
+        Item(name="goods", quantity=1, value=6),
+    )
+    varied_item = starter_items[sum(ord(char) for char in resident_id) % len(starter_items)] if resident_id else starter_items[0]
+    return [Item(name="coffee", quantity=1, value=12), varied_item]
+
+
 def load_scenario(
     template_path: str | pathlib.Path = DEFAULT_TEMPLATE,
     config: WorldConfig | None = None,
@@ -107,6 +119,7 @@ def load_scenario(
         data: dict[str, Any] = json.load(fh)
 
     world = World(config=config)
+    _load_zones(world, data)
 
     # -------------------------------------------------------------------------
     # Buildings (must come before residents so enter_building can find them)
@@ -148,6 +161,7 @@ def load_scenario(
             hair_color=appearance["hair_color"],
             outfit_color=appearance["outfit_color"],
             home_building_id=home_id,
+            inventory=_starter_inventory_for_resident(r),
         )
         agent = GenerativeAgent(resident)
         world.add_agent(agent)
@@ -188,6 +202,41 @@ def _load_initial_relationships(world: World, data: dict[str, Any]) -> None:
             logger.warning("Skipping malformed relationship entry: %s", exc)
 
 
+def _load_zones(world: World, data: dict[str, Any]) -> None:
+    zone_payload = data.get("zones", [])
+    if not zone_payload:
+        return
+
+    zones: list[Zone] = []
+    for zone_data in zone_payload:
+        try:
+            bounds = zone_data["bounds"]
+            atmosphere = zone_data["atmosphere"]
+            zones.append(
+                Zone(
+                    id=zone_data["id"],
+                    name=zone_data["name"],
+                    type=zone_data["type"],
+                    bounds=ZoneBounds(
+                        x=int(bounds["x"]),
+                        y=int(bounds["y"]),
+                        width=int(bounds["width"]),
+                        height=int(bounds["height"]),
+                    ),
+                    atmosphere=ZoneAtmosphere(
+                        noise=float(atmosphere["noise"]),
+                        safety=float(atmosphere["safety"]),
+                        beauty=float(atmosphere["beauty"]),
+                    ),
+                )
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.warning("Skipping malformed zone entry: %s", exc)
+
+    if zones:
+        world.set_zones(zones)
+
+
 def load_scenario_from_dict(
     data: dict[str, Any],
     config: WorldConfig | None = None,
@@ -221,6 +270,7 @@ def load_scenario_from_dict(
         )
 
     world = World(config=config)
+    _load_zones(world, data)
 
     for b in data.get("buildings", []):
         pos = tuple(b["position"])
@@ -253,6 +303,7 @@ def load_scenario_from_dict(
             hair_color=appearance["hair_color"],
             outfit_color=appearance["outfit_color"],
             home_building_id=home_id,
+            inventory=_starter_inventory_for_resident(r),
         )
         agent = GenerativeAgent(resident)
         world.add_agent(agent)

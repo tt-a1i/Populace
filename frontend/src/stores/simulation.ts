@@ -10,6 +10,7 @@ import type {
   PopulationEvent,
   Resident,
   TickState,
+  VoteRecord,
 } from '../types'
 
 export type SimulationSpeed = 0 | 1 | 2 | 5 | 10 | 50
@@ -54,6 +55,8 @@ export interface ResidentPosition {
   occupation?: string
   energy?: number
   ageDays?: number
+  skills?: Record<string, number>
+  inventory?: Resident['inventory']
 }
 
 export interface TickMovement extends Omit<MovementUpdate, 'action'> {
@@ -109,10 +112,14 @@ export interface SimulationSnapshot {
     outfit_color?: string | null
     coins?: number
     occupation?: string
+    skills?: Record<string, number>
+    inventory?: Resident['inventory']
     energy?: number
     age_days?: number
   }>
   last_tick?: SimulationTickState | null
+  active_votes?: VoteRecord[]
+  vote_history?: VoteRecord[]
 }
 
 interface SimulationState {
@@ -130,6 +137,8 @@ interface SimulationState {
   buildings: Array<Building & { occupants: number }>
   replayFrozenFrame: FrozenSimulationFrame | null
   messageFeed: FeedMessage[]
+  activeVotes: VoteRecord[]
+  voteHistory: VoteRecord[]
   selectedResidentId: string | null
   hoveredPairIds: [string, string] | null
   setRunning: (running: boolean) => void
@@ -137,6 +146,9 @@ interface SimulationState {
   setBuildings: (buildings: Array<Building & { occupants: number }>) => void
   selectResident: (residentId: string | null) => void
   setHoveredPairIds: (pairIds: [string, string] | null) => void
+  setActiveVotes: (votes: VoteRecord[]) => void
+  setVoteHistory: (votes: VoteRecord[]) => void
+  applyVoteTick: (votes: VoteRecord[], announcements: VoteRecord[]) => void
   applyResidentOperation: (
     resident: Partial<ResidentPosition> & { id: string; name?: string },
     operation: 'resident_updated' | 'resident_teleported',
@@ -257,6 +269,7 @@ function residentPositionFromPopulationSnapshot(
     dialogueText: previous?.dialogueText ?? null,
     coins: resident.coins ?? previous?.coins ?? 100,
     occupation: resident.occupation ?? previous?.occupation ?? 'unemployed',
+    inventory: resident.inventory ?? previous?.inventory ?? [],
     energy: resident.energy ?? previous?.energy ?? 1.0,
     ageDays: resident.age_days ?? previous?.ageDays ?? 0,
   }
@@ -280,6 +293,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     { id: 'init-1', kind: 'system' as FeedMessageKind, text: i18n.t('message_bar.init_1') },
     { id: 'init-2', kind: 'system' as FeedMessageKind, text: i18n.t('message_bar.init_2') },
   ],
+  activeVotes: [],
+  voteHistory: [],
   selectedResidentId: null,
   hoveredPairIds: null,
   setRunning: (running) => set({ running }),
@@ -287,6 +302,13 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   setBuildings: (buildings) => set({ buildings }),
   selectResident: (residentId) => set({ selectedResidentId: residentId }),
   setHoveredPairIds: (pairIds) => set({ hoveredPairIds: pairIds }),
+  setActiveVotes: (votes) => set({ activeVotes: votes }),
+  setVoteHistory: (votes) => set({ voteHistory: votes }),
+  applyVoteTick: (votes, announcements) =>
+    set((state) => ({
+      activeVotes: votes,
+      voteHistory: [...announcements, ...state.voteHistory.filter((item) => !announcements.some((entry) => entry.id === item.id))].slice(0, 20),
+    })),
   applyResidentOperation: (resident, operation) =>
     set((state) => {
       const nextResidents = state.residents.map((currentResident) => {
@@ -308,6 +330,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           mood: resident.mood ?? currentResident.mood,
           goals: resident.goals ?? currentResident.goals,
           occupation: resident.occupation ?? currentResident.occupation,
+          inventory: resident.inventory ?? currentResident.inventory,
           energy: resident.energy ?? currentResident.energy,
           ageDays: resident.ageDays ?? currentResident.ageDays,
           currentBuildingId:
@@ -413,6 +436,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           currentGoal: existingResident?.currentGoal ?? null,
           coins: existingResident?.coins ?? 100,
           occupation: existingResident?.occupation ?? 'unemployed',
+          inventory: existingResident?.inventory ?? [],
           energy: existingResident?.energy ?? 1.0,
           ageDays: existingResident?.ageDays ?? 0,
         })
@@ -480,6 +504,11 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         weather: tickState.weather ?? state.weather,
         season: tickState.season ?? state.season,
         history,
+        activeVotes: tickState.vote_updates ?? state.activeVotes,
+        voteHistory:
+          tickState.vote_announcements && tickState.vote_announcements.length > 0
+            ? [...tickState.vote_announcements, ...state.voteHistory.filter((item) => !tickState.vote_announcements?.some((entry) => entry.id === item.id))].slice(0, 20)
+            : state.voteHistory,
         buildings: recomputeBuildingOccupancy(state.buildings, nextResidents),
         messageFeed: appendRecentMessages(state.messageFeed, freshMessages),
         residents: nextResidents,
@@ -513,6 +542,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           dialogueText: prev?.dialogueText ?? null,
           coins: (r as { coins?: number }).coins ?? prev?.coins ?? 100,
           occupation: (r as { occupation?: string }).occupation ?? prev?.occupation ?? 'unemployed',
+          skills: (r as { skills?: Record<string, number> }).skills ?? prev?.skills ?? {},
+          inventory: (r as { inventory?: Resident['inventory'] }).inventory ?? prev?.inventory ?? [],
           energy: (r as { energy?: number }).energy ?? prev?.energy ?? 1.0,
           ageDays: (r as { age_days?: number }).age_days ?? prev?.ageDays ?? 0,
         }
@@ -545,6 +576,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         season: (snapshot as { season?: string }).season ?? state.season,
         history,
         buildings,
+        activeVotes: snapshot.active_votes ?? state.activeVotes,
+        voteHistory: snapshot.vote_history ?? state.voteHistory,
         replayFrozenFrame: state.replayFrozenFrame,
         messageFeed:
           residents.length > 0

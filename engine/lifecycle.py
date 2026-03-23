@@ -95,6 +95,7 @@ def snapshot_resident(resident: Resident) -> PopulationResidentSnapshot:
         outfit_color=resident.outfit_color,
         coins=resident.coins,
         occupation=resident.occupation,
+        inventory=list(resident.inventory),
         energy=resident.energy,
         age_days=resident.age_days,
         goals=list(resident.goals),

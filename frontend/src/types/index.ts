@@ -32,6 +32,12 @@ export interface EventUpdate {
   description: string
 }
 
+export interface Item {
+  name: string
+  quantity: number
+  value: number
+}
+
 export interface EnergyUpdate {
   id: string
   energy: number
@@ -52,6 +58,8 @@ export interface PopulationResidentSnapshot {
   outfit_color?: string | null
   coins?: number
   occupation?: string
+  skills?: Record<string, number>
+  inventory?: Item[]
   energy?: number
   age_days?: number
   goals?: string[]
@@ -67,6 +75,20 @@ export interface PopulationEvent {
   summary?: string
 }
 
+export interface VoteRecord {
+  id: string
+  issue: string
+  options: string[]
+  counts: Record<string, number>
+  status: 'active' | 'completed'
+  start_tick: number
+  end_tick: number
+  winning_option: string | null
+  result_announced: boolean
+  total_votes: number
+  effects?: string[]
+}
+
 export interface TickState {
   tick: number
   time: string
@@ -79,6 +101,8 @@ export interface TickState {
   energy_updates?: EnergyUpdate[]
   gossips?: GossipUpdate[]
   population_events?: PopulationEvent[]
+  vote_updates?: VoteRecord[]
+  vote_announcements?: VoteRecord[]
 }
 
 export interface Resident {
@@ -96,6 +120,8 @@ export interface Resident {
   outfit_color?: string | null
   coins?: number
   occupation?: string
+  skills?: Record<string, number>
+  inventory?: Item[]
   energy?: number
   age_days?: number
 }
@@ -107,6 +133,30 @@ export interface Building {
   capacity: number
   position: [number, number]
   occupants?: number
+}
+
+export interface ZoneBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface ZoneAtmosphere {
+  noise: number
+  safety: number
+  beauty: number
+}
+
+export interface Zone {
+  id: string
+  name: string
+  type: 'residential' | 'commercial' | 'leisure' | 'education' | string
+  bounds: ZoneBounds
+  atmosphere: ZoneAtmosphere
+  resident_count: number
+  building_count: number
+  dominant_building_types?: string[]
 }
 
 export interface ResidentMovement extends MovementUpdate {
