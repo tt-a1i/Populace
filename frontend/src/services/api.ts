@@ -295,6 +295,25 @@ export function getResidentDiary(id: string) {
   return request<ResidentDiaryEntry[]>(`/api/residents/${id}/diary`)
 }
 
+export interface FamilyMember {
+  id: string
+  name: string
+  age_days: number
+  deceased: boolean
+  relation: string
+}
+
+export interface FamilyTree {
+  root: FamilyMember
+  parents: FamilyMember[]
+  spouse: FamilyMember | null
+  children: FamilyMember[]
+}
+
+export function getResidentFamilyTree(id: string) {
+  return request<FamilyTree>(`/api/residents/${id}/family-tree`)
+}
+
 export function getSimulationStats() {
   return request<SimulationStats>('/api/simulation/stats')
 }
@@ -369,6 +388,36 @@ export function addBuilding(payload: AddBuildingPayload) {
 
 export function removeBuilding(id: string) {
   return request<void>(`/api/world/buildings/${id}`, { method: 'DELETE' })
+}
+
+export interface BuildingOccupantInfo {
+  id: string
+  name: string
+  occupation: string
+  mood: string
+  status: string
+}
+
+export interface BuildingVisitRecord {
+  resident_id: string
+  resident_name: string
+  action: string
+  tick: number
+}
+
+export interface BuildingDetailData {
+  id: string
+  type: string
+  name: string
+  capacity: number
+  position: [number, number]
+  occupants: number
+  current_residents: BuildingOccupantInfo[]
+  recent_visits: BuildingVisitRecord[]
+}
+
+export function getBuildingDetails(id: string) {
+  return request<BuildingDetailData>(`/api/world/buildings/${id}/details`)
 }
 
 export function generateReport() {
@@ -525,6 +574,21 @@ export function getEconomyStats() {
   return request<EconomyStats>('/api/simulation/economy-stats')
 }
 
+export interface PerformanceMetrics {
+  avg_tick_duration_ms: number
+  max_tick_duration_ms: number
+  active_agents_count: number
+  pending_llm_calls: number
+  memory_usage_mb: number
+  websocket_connections: number
+  adaptive_throttle_active: boolean
+  tick_history: number[]
+}
+
+export function getPerformanceMetrics() {
+  return request<PerformanceMetrics>('/api/simulation/performance')
+}
+
 export interface MemoirPayload {
   resident_id: string
   resident_name: string
@@ -654,5 +718,18 @@ export function getActiveQuests() {
 export function abandonQuest(questId: string) {
   return request<{ ok: boolean; quest_id: string; message: string }>(`/api/quests/${questId}/abandon`, {
     method: 'POST',
+  })
+}
+
+export interface ChatReply {
+  reply: string
+  resident_id: string
+  resident_name: string
+}
+
+export function chatWithResident(residentId: string, message: string) {
+  return request<ChatReply>(`/api/residents/${residentId}/chat`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
   })
 }

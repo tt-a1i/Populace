@@ -98,12 +98,18 @@ class SimulationState:
         # World timeline: list of timeline event dicts (max 500)
         self._world_timeline: list[dict[str, Any]] = []
         self._population_history: list[dict[str, Any]] = []
+        self.building_visit_log: list[dict[str, Any]] = []
         self._timeline_id_counter: int = 0
         # Quest system
         self._active_quests: list[dict[str, Any]] = []
         self._completed_quests: list[str] = []
         self._replay_snapshots: list[dict[str, Any]] = []
         self._state_lock: asyncio.Lock = asyncio.Lock()
+        # Performance monitoring
+        self._tick_durations: list[float] = []  # last N tick durations in ms
+        self._max_tick_history = 50
+        self._pending_llm_count = 0
+        self._adaptive_throttle_active = False
 
     async def restore_from_neo4j(self) -> None:
         """Restore prior session state at startup.
@@ -762,9 +768,12 @@ class SimulationState:
     async def _tick(self) -> Any:
         import inspect
         import random
+        import time
         import uuid
 
         from engine.types import Event as EngineEvent, WeatherType
+
+        tick_start = time.monotonic()
 
         queued_events = list(self._events)
         weather = self.world.weather
@@ -1161,6 +1170,25 @@ class SimulationState:
         self._record_experiment_frame(tick_state)
         self._maybe_record_replay_snapshot()
 
+        # Performance: record tick duration and apply adaptive throttling
+        tick_duration_ms = (time.monotonic() - tick_start) * 1000
+        self._tick_durations.append(tick_duration_ms)
+        if len(self._tick_durations) > self._max_tick_history:
+            self._tick_durations = self._tick_durations[-self._max_tick_history:]
+        self._pending_llm_count = len(self._pending_dialogues)
+
+        # Adaptive throttle: slow down tick rate when too many active agents
+        active_agents = len(self.world.agents)
+        if active_agents > 20 and not self.loop.clock.is_paused():
+            # Scale tick interval: add 50ms per agent above 20
+            extra_delay = (active_agents - 20) * 0.05
+            if not self._adaptive_throttle_active:
+                self._log.info("Adaptive throttle: %d agents, adding %.1fs delay", active_agents, extra_delay)
+                self._adaptive_throttle_active = True
+            await asyncio.sleep(extra_delay)
+        elif self._adaptive_throttle_active:
+            self._adaptive_throttle_active = False
+
         return tick_state
 
     def _record_experiment_frame(self, tick_state: Any) -> None:
@@ -1467,6 +1495,55 @@ async def get_economy_stats(request: Request) -> EconomyStatsResponse:
         richest=richest,
         poorest=poorest,
         occupation_distribution=dist,
+    )
+
+
+class PerformanceResponse(BaseModel):
+    avg_tick_duration_ms: float = 0.0
+    max_tick_duration_ms: float = 0.0
+    active_agents_count: int = 0
+    pending_llm_calls: int = 0
+    memory_usage_mb: float = 0.0
+    websocket_connections: int = 0
+    adaptive_throttle_active: bool = False
+    tick_history: list[float] = []
+
+
+@router.get("/performance", response_model=PerformanceResponse, responses=error_responses(503))
+async def get_performance(request: Request) -> PerformanceResponse:
+    """Return real-time performance metrics for the simulation."""
+    import os
+    state = get_simulation_state(request)
+    durations = getattr(state, "_tick_durations", [])
+    avg_ms = sum(durations) / len(durations) if durations else 0.0
+    max_ms = max(durations) if durations else 0.0
+
+    # Memory usage of current process
+    try:
+        import psutil
+        process = psutil.Process(os.getpid())
+        mem_mb = process.memory_info().rss / (1024 * 1024)
+    except Exception:
+        # Fallback if psutil not available
+        try:
+            import resource
+            mem_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 * 1024)
+        except Exception:
+            mem_mb = 0.0
+
+    # WebSocket connection count
+    from backend.api.ws import manager
+    ws_count = manager.count
+
+    return PerformanceResponse(
+        avg_tick_duration_ms=round(avg_ms, 2),
+        max_tick_duration_ms=round(max_ms, 2),
+        active_agents_count=len(state.world.agents),
+        pending_llm_calls=getattr(state, "_pending_llm_count", 0),
+        memory_usage_mb=round(mem_mb, 1),
+        websocket_connections=ws_count,
+        adaptive_throttle_active=getattr(state, "_adaptive_throttle_active", False),
+        tick_history=[round(d, 1) for d in durations[-20:]],
     )
 
 
