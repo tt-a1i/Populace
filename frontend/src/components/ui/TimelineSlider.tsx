@@ -1,9 +1,12 @@
 import { useTranslation } from 'react-i18next'
 
-import type { RelationshipSnapshot } from '../../stores/relationships'
+export interface TimelinePoint {
+  tick: number
+  time?: string
+}
 
 interface TimelineSliderProps {
-  history: RelationshipSnapshot[]
+  history: TimelinePoint[]
   replayTick: number | null
   liveTick: number
   onReplayTickChange: (tick: number | null) => void
