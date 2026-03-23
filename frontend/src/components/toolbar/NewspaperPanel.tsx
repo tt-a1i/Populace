@@ -1,0 +1,132 @@
+import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
+import { type NewspaperData, getNewspaper } from '../../services/api'
+import { useSimulationStore } from '../../stores/simulation'
+import { PanelShell } from '../ui/PanelShell'
+
+const SECTION_STYLES: Record<string, { bg: string; border: string; text: string }> = {
+  '头条': { bg: 'bg-amber-400/8', border: 'border-amber-400/20', text: 'text-amber-200' },
+  '社会': { bg: 'bg-blue-400/8', border: 'border-blue-400/20', text: 'text-blue-200' },
+  '经济': { bg: 'bg-emerald-400/8', border: 'border-emerald-400/20', text: 'text-emerald-200' },
+  '天气': { bg: 'bg-cyan-400/8', border: 'border-cyan-400/20', text: 'text-cyan-200' },
+  '人口': { bg: 'bg-violet-400/8', border: 'border-violet-400/20', text: 'text-violet-200' },
+  '民情': { bg: 'bg-pink-400/8', border: 'border-pink-400/20', text: 'text-pink-200' },
+}
+
+const DEFAULT_STYLE = { bg: 'bg-white/[0.03]', border: 'border-white/[0.06]', text: 'text-slate-200' }
+
+export function NewspaperPanel() {
+  const { t } = useTranslation()
+  const tickPerDay = 48 // matches backend config default
+  const currentTick = useSimulationStore((s) => {
+    const latest = s.residents[0] // just need current tick approximation
+    return latest ? Math.max(0, s.residents.length) : 0
+  })
+
+  // Compute current day from world tick (we'll use the API to get the actual day)
+  const [day, setDay] = useState(0)
+  const [newspaper, setNewspaper] = useState<NewspaperData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  const fetchNewspaper = useCallback(async (d: number) => {
+    setLoading(true)
+    setError(false)
+    try {
+      const data = await getNewspaper(d)
+      setNewspaper(data)
+    } catch {
+      setError(true)
+      setNewspaper(null)
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    void fetchNewspaper(day)
+  }, [day, fetchNewspaper])
+
+  const goToPrev = () => setDay((d) => Math.max(0, d - 1))
+  const goToNext = () => setDay((d) => d + 1)
+
+  return (
+    <PanelShell
+      icon="📰"
+      title={t('newspaper.title', { defaultValue: 'Town Gazette' })}
+      badge={t('newspaper.badge', { defaultValue: 'Daily News' })}
+      headerRight={
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={goToPrev}
+            disabled={day <= 0}
+            className="btn-secondary rounded-lg px-2 py-1 text-xs transition duration-200 active:scale-95 disabled:opacity-30"
+          >
+            ← {t('newspaper.prev', { defaultValue: 'Prev' })}
+          </button>
+          <span className="min-w-[3.5rem] text-center text-xs font-medium text-slate-300">
+            Day {day + 1}
+          </span>
+          <button
+            type="button"
+            onClick={goToNext}
+            className="btn-secondary rounded-lg px-2 py-1 text-xs transition duration-200 active:scale-95"
+          >
+            {t('newspaper.next', { defaultValue: 'Next' })} →
+          </button>
+        </div>
+      }
+    >
+      {loading ? (
+        <div className="py-8 text-center text-sm text-slate-500">{t('stats.loading', { defaultValue: 'Loading...' })}</div>
+      ) : error ? (
+        <div className="py-8 text-center text-sm text-slate-500">{t('newspaper.no_data', { defaultValue: 'No data for this day yet.' })}</div>
+      ) : newspaper ? (
+        <>
+          {/* Newspaper masthead */}
+          <div className="rounded-xl border border-amber-400/15 bg-amber-400/[0.04] px-4 py-3 text-center">
+            <p className="text-[9px] uppercase tracking-[0.4em] text-amber-300/60">
+              ✦ POPULACE GAZETTE ✦
+            </p>
+            <h2 className="mt-1 font-display text-lg leading-snug text-white">
+              {newspaper.headline}
+            </h2>
+            <p className="mt-1 text-[10px] text-slate-500">
+              {newspaper.date_label}
+            </p>
+          </div>
+
+          {/* Articles */}
+          <div className="grid gap-2">
+            {newspaper.articles.map((article, i) => {
+              const style = SECTION_STYLES[article.section] ?? DEFAULT_STYLE
+              return (
+                <article
+                  key={i}
+                  className={`rounded-xl border ${style.border} ${style.bg} px-4 py-3`}
+                >
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <span className="text-base">{article.icon}</span>
+                    <span className={`text-[9px] font-semibold uppercase tracking-[0.2em] ${style.text}`}>
+                      {article.section}
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-semibold text-white">{article.headline}</h3>
+                  <p className="mt-1 whitespace-pre-line text-xs leading-5 text-slate-300">
+                    {article.content}
+                  </p>
+                </article>
+              )
+            })}
+          </div>
+
+          {/* Footer */}
+          <p className="text-center text-[9px] text-slate-600">
+            {t('newspaper.footer', { defaultValue: 'Auto-generated by Populace simulation engine' })}
+          </p>
+        </>
+      ) : null}
+    </PanelShell>
+  )
+}

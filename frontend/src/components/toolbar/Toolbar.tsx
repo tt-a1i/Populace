@@ -15,6 +15,12 @@ import { TimelinePanel } from './TimelinePanel'
 import { ReportsPanel } from '../report'
 import { ActivityLog } from '../ui/ActivityLog'
 import { DashboardView } from './DashboardView'
+import { LeaderboardPanel } from './LeaderboardPanel'
+import { AchievementWall } from './AchievementWall'
+import { NewspaperPanel } from './NewspaperPanel'
+import { WhatIfPanel } from './WhatIfPanel'
+import { MapEditor } from '../town/MapEditor'
+
 const StatsPanel = lazy(() =>
   import('./StatsPanel').then((module) => ({ default: module.StatsPanel })),
 )
@@ -24,7 +30,7 @@ const HeatmapPanel = lazy(() =>
 
 const OPEN_SETTINGS_EVENT = 'populace:open-settings'
 
-type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard' | 'leaderboard' | 'achievements'
+type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard' | 'leaderboard' | 'achievements' | 'newspaper' | 'whatif' | 'mapeditor'
 
 interface ToolDef {
   key: ToolKey
@@ -47,7 +53,7 @@ function toneClass(_tone: string, active: boolean): string {
 }
 
 const SECONDARY_KEYS: ReadonlySet<ToolKey> = new Set([
-  'create', 'build', 'stats', 'dialogue', 'activity', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings', 'dashboard', 'leaderboard', 'achievements',
+  'create', 'build', 'stats', 'dialogue', 'activity', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings', 'dashboard', 'leaderboard', 'achievements', 'newspaper', 'whatif',
 ])
 
 export function Toolbar() {
@@ -124,6 +130,8 @@ export function Toolbar() {
     { key: 'dashboard', label: t('toolbar.dashboard', { defaultValue: 'Dashboard' }), icon: '\uD83D\uDCCA', tone: 'cyan' },
     { key: 'leaderboard', label: t('toolbar.leaderboard', { defaultValue: 'Rankings' }), icon: '\uD83C\uDFC6', tone: 'amber' },
     { key: 'achievements', label: t('toolbar.achievements', { defaultValue: 'Achievements' }), icon: '\uD83C\uDFC5', tone: 'amber' },
+    { key: 'newspaper', label: t('toolbar.newspaper', { defaultValue: 'Gazette' }), icon: '\uD83D\uDCF0', tone: 'rose' },
+    { key: 'whatif', label: t('toolbar.whatif', { defaultValue: 'What-If' }), icon: '\uD83D\uDD2E', tone: 'violet' },
   ]
 
   const allTools = [...primaryTools, ...secondaryTools]
@@ -167,6 +175,7 @@ export function Toolbar() {
     if (activeTool === 'dashboard') return <DashboardView />
     if (activeTool === 'leaderboard') return <LeaderboardPanel />
     if (activeTool === 'achievements') return <AchievementWall />
+    if (activeTool === 'newspaper') return <NewspaperPanel />
     return <ReportsPanel />
   }, [activeTool, t])
 

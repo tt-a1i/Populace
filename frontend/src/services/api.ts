@@ -604,6 +604,25 @@ export function getSocialIndicators() {
   return request<SocialIndicators>('/api/simulation/social-indicators')
 }
 
+export interface NewspaperArticle {
+  section: string
+  headline: string
+  content: string
+  icon: string
+}
+
+export interface NewspaperData {
+  day: number
+  date_label: string
+  headline: string
+  articles: NewspaperArticle[]
+  generated_at: string
+}
+
+export function getNewspaper(day: number) {
+  return request<NewspaperData>(`/api/report/newspaper/${day}`)
+}
+
 export interface MemoirPayload {
   resident_id: string
   resident_name: string
@@ -733,6 +752,67 @@ export function getActiveQuests() {
 export function abandonQuest(questId: string) {
   return request<{ ok: boolean; quest_id: string; message: string }>(`/api/quests/${questId}/abandon`, {
     method: 'POST',
+  })
+}
+
+// ---------------------------------------------------------------------------
+// What-If Analysis
+// ---------------------------------------------------------------------------
+
+export interface WhatIfEventParam {
+  description: string
+}
+
+export interface WhatIfResidentMod {
+  resident_id: string
+  mood?: string
+  energy?: number
+  coins?: number
+}
+
+export interface WhatIfResidentSnapshot {
+  id: string
+  name: string
+  mood: string
+  coins: number
+  energy: number
+  occupation: string
+  x: number
+  y: number
+}
+
+export interface WhatIfRelationshipSnapshot {
+  from_id: string
+  to_id: string
+  type: string
+  intensity: number
+}
+
+export interface WhatIfStateSnapshot {
+  tick: number
+  population: number
+  avg_mood_score: number
+  total_coins: number
+  total_relationships: number
+  gini_coefficient: number
+  residents: WhatIfResidentSnapshot[]
+  relationships: WhatIfRelationshipSnapshot[]
+}
+
+export interface WhatIfResponse {
+  ticks_simulated: number
+  current: WhatIfStateSnapshot
+  predicted: WhatIfStateSnapshot
+}
+
+export function runWhatIf(params: {
+  ticks?: number
+  events?: WhatIfEventParam[]
+  resident_mods?: WhatIfResidentMod[]
+}) {
+  return request<WhatIfResponse>('/api/simulation/what-if', {
+    method: 'POST',
+    body: JSON.stringify(params),
   })
 }
 

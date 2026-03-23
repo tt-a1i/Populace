@@ -511,3 +511,165 @@ async def generate_memoir(resident_id: str, request: Request) -> MemoirResponse:
         content=content or fallback_content,
         generated_at=datetime.now(timezone.utc).isoformat(),
     )
+
+
+# ---------------------------------------------------------------------------
+# Newspaper — auto-generated daily gazette
+# ---------------------------------------------------------------------------
+
+class NewspaperArticle(BaseModel):
+    section: str
+    headline: str
+    content: str
+    icon: str = ""
+
+
+class NewspaperResponse(BaseModel):
+    day: int
+    date_label: str
+    headline: str
+    articles: list[NewspaperArticle]
+    generated_at: str
+
+
+def _generate_newspaper(state: Any, day: int) -> NewspaperResponse:
+    """Build a newspaper for the given simulation day from cached experiment history."""
+    from backend.api.simulation import _mood_score
+
+    tick_per_day = state.world.config.tick_per_day
+    day_start = day * tick_per_day
+    day_end = day_start + tick_per_day
+
+    history = list(getattr(state, "_experiment_history", []))
+    day_frames = [f for f in history if day_start <= f.get("tick", 0) < day_end]
+
+    agents = state.world.agents
+    agent_names = {a.resident.id: a.resident.name for a in agents}
+
+    articles: list[NewspaperArticle] = []
+
+    # ── Headline: biggest relationship event ──
+    biggest_delta = None
+    biggest_delta_mag = 0.0
+    for frame in day_frames:
+        for rd in frame.get("relationship_deltas", []):
+            mag = abs(float(rd.get("delta", 0)))
+            if mag > biggest_delta_mag:
+                biggest_delta_mag = mag
+                biggest_delta = rd
+
+    if biggest_delta:
+        from_name = agent_names.get(biggest_delta["from_id"], biggest_delta["from_id"])
+        to_name = agent_names.get(biggest_delta["to_id"], biggest_delta["to_id"])
+        delta_val = float(biggest_delta.get("delta", 0))
+        direction = "升温" if delta_val > 0 else "降温"
+        headline = f"{from_name}与{to_name}的关系发生重大{direction}！"
+        articles.append(NewspaperArticle(
+            section="头条",
+            headline=headline,
+            content=f"{from_name}和{to_name}之间的{biggest_delta.get('type', '关系')}在今日发生了 {delta_val:+.2f} 的变化，成为全镇最受关注的话题。",
+            icon="📰",
+        ))
+    else:
+        headline = "小镇风平浪静，居民们安居乐业"
+        articles.append(NewspaperArticle(
+            section="头条",
+            headline=headline,
+            content="今天小镇一切太平，没有重大事件发生，居民们享受着平静的生活。",
+            icon="📰",
+        ))
+
+    # ── Social: dialogue highlights ──
+    all_dialogues = []
+    for frame in day_frames:
+        all_dialogues.extend(frame.get("dialogues", []))
+    if all_dialogues:
+        sample = all_dialogues[:3]
+        lines = []
+        for d in sample:
+            fn = agent_names.get(d.get("from_id", ""), "???")
+            tn = agent_names.get(d.get("to_id", ""), "???")
+            lines.append(f"「{fn}」对「{tn}」说：{d.get('text', '...')[:40]}")
+        articles.append(NewspaperArticle(
+            section="社会",
+            headline="今日对话亮点",
+            content="\n".join(lines),
+            icon="💬",
+        ))
+
+    # ── Economy: coin changes / occupations ──
+    if agents:
+        richest = max(agents, key=lambda a: a.resident.coins)
+        poorest = min(agents, key=lambda a: a.resident.coins)
+        total_coins = sum(a.resident.coins for a in agents)
+        occ_count: dict[str, int] = {}
+        for a in agents:
+            occ = getattr(a.resident, "occupation", "unemployed")
+            occ_count[occ] = occ_count.get(occ, 0) + 1
+        top_occ = max(occ_count.items(), key=lambda x: x[1])[0] if occ_count else "无"
+        articles.append(NewspaperArticle(
+            section="经济",
+            headline="经济日报",
+            content=f"全镇金币总量 {total_coins}，首富「{richest.resident.name}」({richest.resident.coins} 金币)。最热门职业：{top_occ}（{occ_count.get(top_occ, 0)} 人）。",
+            icon="🪙",
+        ))
+
+    # ── Weather ──
+    weather = state.world.weather
+    season = getattr(state.world, "season", None)
+    weather_name = weather.value if hasattr(weather, "value") else str(weather)
+    season_name = season.value if hasattr(season, "value") else str(season) if season else "未知"
+    articles.append(NewspaperArticle(
+        section="天气",
+        headline="天气预报",
+        content=f"当前季节：{season_name}。天气：{weather_name}。请居民们注意出行安全。",
+        icon="🌤️",
+    ))
+
+    # ── Population ──
+    pop_history = getattr(state, "_population_history", [])
+    day_pop = [p for p in pop_history if day_start <= p.get("tick", 0) < day_end]
+    births = sum(1 for p in day_pop if p.get("type") == "birth")
+    deaths = sum(1 for p in day_pop if p.get("type") == "death")
+    if births or deaths:
+        articles.append(NewspaperArticle(
+            section="人口",
+            headline="人口动态",
+            content=f"今日新增 {births} 位居民" + (f"，{deaths} 位居民离开了小镇" if deaths else "") + "。",
+            icon="👥",
+        ))
+
+    # ── Mood summary ──
+    mood_counts: Counter[str] = Counter()
+    for frame in day_frames:
+        for m in frame.get("moods", []):
+            mood_counts[m.get("mood", "neutral")] += 1
+    if mood_counts:
+        dominant = mood_counts.most_common(1)[0][0]
+        articles.append(NewspaperArticle(
+            section="民情",
+            headline="居民情绪速览",
+            content=f"今日主流情绪为「{dominant}」，全镇情绪整体{'积极' if _mood_score(dominant) > 0 else '消极' if _mood_score(dominant) < 0 else '平稳'}。",
+            icon="😊",
+        ))
+
+    time_label = state.world.simulation_time() if hasattr(state.world, "simulation_time") else f"Day {day + 1}"
+
+    return NewspaperResponse(
+        day=day,
+        date_label=f"Day {day + 1}" if isinstance(time_label, str) and "Day" not in time_label else str(time_label),
+        headline=headline,
+        articles=articles,
+        generated_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+
+@router.get(
+    "/newspaper/{day}",
+    response_model=NewspaperResponse,
+    responses=error_responses(503),
+)
+async def get_newspaper(day: int, request: Request) -> NewspaperResponse:
+    """Generate a newspaper for the given simulation day."""
+    state = get_simulation_state(request)
+    return _generate_newspaper(state, day)
