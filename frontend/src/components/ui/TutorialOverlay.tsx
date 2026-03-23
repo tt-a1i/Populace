@@ -23,17 +23,26 @@ interface StepDef {
   titleKey: string
   descKey: string
   icon: string
+  gesture: 'click' | 'scroll' | 'drag' | 'dblclick' | null
   selector: string | null
   tooltipSide: 'below' | 'above' | 'center'
 }
 
 const STEP_DEFS: StepDef[] = [
-  { titleKey: 'tutorial.step1_title', descKey: 'tutorial.step1_desc', icon: '\uD83D\uDDFA\uFE0F', selector: '[data-testid="town-canvas-shell"]', tooltipSide: 'below' },
-  { titleKey: 'tutorial.step2_title', descKey: 'tutorial.step2_desc', icon: '\uD83D\uDC64', selector: '[data-testid="town-minimap"]', tooltipSide: 'above' },
-  { titleKey: 'tutorial.step3_title', descKey: 'tutorial.step3_desc', icon: '\u26A1', selector: null, tooltipSide: 'center' },
-  { titleKey: 'tutorial.step4_title', descKey: 'tutorial.step4_desc', icon: '\uD83D\uDD78\uFE0F', selector: null, tooltipSide: 'center' },
-  { titleKey: 'tutorial.step5_title', descKey: 'tutorial.step5_desc', icon: '\u23E9', selector: null, tooltipSide: 'center' },
+  { titleKey: 'tutorial.step1_title', descKey: 'tutorial.step1_desc', icon: '\uD83D\uDDFA\uFE0F', gesture: 'scroll', selector: '[data-testid="town-canvas-shell"]', tooltipSide: 'below' },
+  { titleKey: 'tutorial.step2_title', descKey: 'tutorial.step2_desc', icon: '\uD83D\uDC64', gesture: 'click', selector: '[data-testid="town-minimap"]', tooltipSide: 'above' },
+  { titleKey: 'tutorial.step3_title', descKey: 'tutorial.step3_desc', icon: '\u26A1', gesture: 'click', selector: null, tooltipSide: 'center' },
+  { titleKey: 'tutorial.step4_title', descKey: 'tutorial.step4_desc', icon: '\uD83D\uDD78\uFE0F', gesture: 'drag', selector: null, tooltipSide: 'center' },
+  { titleKey: 'tutorial.step5_title', descKey: 'tutorial.step5_desc', icon: '\u23E9', gesture: 'dblclick', selector: null, tooltipSide: 'center' },
 ]
+
+/** Gesture hint icons with animation class names */
+const GESTURE_HINTS: Record<string, { icon: string; animClass: string }> = {
+  click: { icon: '👆', animClass: 'animate-[tutorialTap_1.2s_ease-in-out_infinite]' },
+  dblclick: { icon: '👆', animClass: 'animate-[tutorialDoubleTap_1.6s_ease-in-out_infinite]' },
+  scroll: { icon: '🖱️', animClass: 'animate-[tutorialScroll_2s_ease-in-out_infinite]' },
+  drag: { icon: '✋', animClass: 'animate-[tutorialDrag_2s_ease-in-out_infinite]' },
+}
 
 interface SpotlightRect {
   left: number
@@ -98,6 +107,7 @@ export function TutorialOverlay() {
 
   const curDef = STEP_DEFS[step]
   const isLast = step === STEP_DEFS.length - 1
+  const gestureHint = curDef.gesture ? GESTURE_HINTS[curDef.gesture] : null
 
   // ── Tooltip position ──────────────────────────────────────────
   let cardStyle: React.CSSProperties = {}
@@ -114,10 +124,10 @@ export function TutorialOverlay() {
 
   return createPortal(
     <>
-      {/* Spotlight dim / cutout */}
+      {/* Spotlight dim / cutout — smooth transition on position changes */}
       {spotlight ? (
         <div
-          className="pointer-events-none fixed z-[9001] rounded-2xl ring-2 ring-cyan-400/50"
+          className="pointer-events-none fixed z-[9001] rounded-2xl ring-2 ring-cyan-400/50 transition-all duration-500 ease-out"
           style={{
             left: spotlight.left,
             top: spotlight.top,
@@ -130,9 +140,10 @@ export function TutorialOverlay() {
         <div className="pointer-events-none fixed inset-0 z-[9001] bg-slate-950/78" />
       )}
 
-      {/* Tooltip card */}
+      {/* Tooltip card — animate entry on step change */}
       <div
-        className="pointer-events-auto fixed z-[9002] w-[min(23rem,calc(100vw-2rem))] rounded-xl border border-cyan-300/25 bg-slate-950/96 p-5 shadow-[0_28px_80px_rgba(2,6,23,0.70)] backdrop-blur"
+        key={step}
+        className="pointer-events-auto fixed z-[9002] w-[min(23rem,calc(100vw-2rem))] animate-[scaleIn_250ms_ease-out] rounded-xl border border-cyan-300/25 bg-slate-950/96 p-5 shadow-[0_28px_80px_rgba(2,6,23,0.70)] backdrop-blur"
         style={cardStyle}
       >
         {/* Progress pills */}
@@ -155,10 +166,16 @@ export function TutorialOverlay() {
         {/* Content */}
         <div className="flex items-start gap-3">
           <span className="shrink-0 text-3xl leading-none">{curDef.icon}</span>
-          <div>
+          <div className="flex-1">
             <h3 className="font-display text-xl text-white">{t(curDef.titleKey)}</h3>
             <p className="mt-2 text-sm leading-[1.7] text-slate-300">{t(curDef.descKey)}</p>
           </div>
+          {/* Gesture animation hint */}
+          {gestureHint && (
+            <span className={`shrink-0 text-2xl ${gestureHint.animClass}`} aria-hidden="true">
+              {gestureHint.icon}
+            </span>
+          )}
         </div>
 
         {/* Navigation */}

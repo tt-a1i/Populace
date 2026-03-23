@@ -6,6 +6,16 @@ interface LoadingTransitionProps {
   timedOut: boolean
 }
 
+/** Deterministic skeleton resident positions for the loading animation */
+const SKELETON_RESIDENTS = [
+  { left: '18%', top: '45%', delay: 0 },
+  { left: '42%', top: '35%', delay: 0.3 },
+  { left: '65%', top: '52%', delay: 0.6 },
+  { left: '30%', top: '62%', delay: 0.9 },
+  { left: '78%', top: '38%', delay: 0.15 },
+  { left: '52%', top: '58%', delay: 0.45 },
+]
+
 export function LoadingTransition({ onRetry, timedOut }: LoadingTransitionProps) {
   const { t } = useTranslation()
   const funMessages = t('loading.fun_messages', { returnObjects: true }) as string[]
@@ -21,6 +31,26 @@ export function LoadingTransition({ onRetry, timedOut }: LoadingTransitionProps)
     <div className="fixed inset-0 flex items-center justify-center bg-slate-950">
       {/* Subtle ambient glow */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.08),transparent_60%)]" />
+
+      {/* Skeleton resident silhouettes — pulsing ghost figures */}
+      {!timedOut && SKELETON_RESIDENTS.map((pos, i) => (
+        <div
+          key={i}
+          className="pointer-events-none absolute animate-[skeletonPulse_2s_ease-in-out_infinite]"
+          style={{ left: pos.left, top: pos.top, animationDelay: `${pos.delay}s` }}
+          aria-hidden="true"
+        >
+          {/* Head */}
+          <div className="mx-auto h-3 w-3 rounded-full bg-slate-700/40" />
+          {/* Body */}
+          <div className="mx-auto mt-0.5 h-5 w-4 rounded-sm bg-slate-700/30" />
+          {/* Legs */}
+          <div className="mx-auto flex gap-0.5">
+            <div className="h-3 w-1.5 rounded-b-sm bg-slate-700/20" />
+            <div className="h-3 w-1.5 rounded-b-sm bg-slate-700/20" />
+          </div>
+        </div>
+      ))}
 
       <div className="relative z-10 flex flex-col items-center gap-6 px-6 text-center">
         {timedOut ? (

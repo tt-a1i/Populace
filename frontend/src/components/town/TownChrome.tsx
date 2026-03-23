@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { GraphRelationship } from '../../stores/relationships'
@@ -5,6 +6,7 @@ import type { ResidentPosition } from '../../stores/simulation'
 import {
   teleportResident,
 } from '../../services/api'
+import { BuildingDetailPanel } from '../toolbar/BuildingDetailPanel'
 import type { Building } from '../../types'
 import { ResidentStoryPanel } from './ResidentStoryPanel'
 import {
@@ -34,6 +36,7 @@ interface TownChromeProps {
   buildings: Array<Building & { occupants?: number }>
   relationships: GraphRelationship[]
   selectedResidentId: string | null
+  followedResidentId: string | null
   currentTime: string
   messageFeed: Array<{ text: string }>
   contextMenu: TownContextMenuState | null
@@ -45,12 +48,14 @@ interface TownChromeProps {
   onPlacePlaceholder: () => void
   onClearResidentSelection: () => void
   onDismissInspection: () => void
+  onCancelFollow: () => void
 }
 
 export function TownChrome({
   residents,
   buildings,
   selectedResidentId,
+  followedResidentId,
   contextMenu,
   inspection,
   placeholders,
@@ -60,8 +65,14 @@ export function TownChrome({
   onPlacePlaceholder,
   onClearResidentSelection,
   onDismissInspection,
+  onCancelFollow,
 }: TownChromeProps) {
   const { t } = useTranslation()
+  const [detailBuildingId, setDetailBuildingId] = useState<string | null>(null)
+
+  const followedResident = followedResidentId
+    ? residents.find((r) => r.id === followedResidentId)
+    : null
 
   const handleTeleport = async (x: number, y: number, rid?: string) => {
     const targetId = rid ?? selectedResidentId
@@ -105,6 +116,27 @@ export function TownChrome({
               <dd>{inspection.residentCount}</dd>
             </div>
           </dl>
+          {inspection.buildingId && (
+            <button
+              type="button"
+              onClick={() => setDetailBuildingId(inspection.buildingId)}
+              className="mt-3 w-full rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-1.5 text-xs font-medium text-cyan-200 transition duration-200 hover:bg-cyan-400/20 active:scale-95"
+            >
+              {t('building_detail.view_details')}
+            </button>
+          )}
+        </section>
+      )}
+
+      {/* Building detail panel */}
+      {detailBuildingId && (
+        <section
+          className="absolute left-3 top-56 z-20 w-[min(17rem,calc(100vw-2rem))] rounded-xl border border-white/10 bg-slate-950/85 px-3 py-3 text-slate-100 shadow-xl backdrop-blur-sm animate-[fadeIn_200ms_ease-out]"
+        >
+          <BuildingDetailPanel
+            buildingId={detailBuildingId}
+            onClose={() => setDetailBuildingId(null)}
+          />
         </section>
       )}
 
@@ -121,6 +153,25 @@ export function TownChrome({
             onClose={onClearResidentSelection}
           />
         </aside>
+      )}
+
+      {/* Follow-mode HUD indicator */}
+      {followedResident && (
+        <div className="absolute left-1/2 top-12 z-30 -translate-x-1/2 animate-[fadeIn_300ms_ease-out]">
+          <div className="flex items-center gap-2.5 rounded-full border border-cyan-400/25 bg-slate-950/80 px-4 py-2 shadow-lg backdrop-blur-md">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-400" />
+            <span className="text-xs font-medium text-cyan-200">
+              {t('chrome.following', { name: followedResident.name })}
+            </span>
+            <button
+              type="button"
+              onClick={onCancelFollow}
+              className="ml-1 rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] text-slate-400 transition duration-200 hover:bg-white/10 hover:text-white active:scale-95"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
       )}
 
       <section
@@ -181,60 +232,81 @@ export function TownChrome({
         </div>
       </section>
 
+      {/* Context menu — glassmorphism with icons and dividers */}
       {contextMenu && (
         <section
           data-testid="town-context-menu"
           data-town-context-menu="true"
-          className="absolute z-30 w-44 rounded-xl border border-white/10 bg-slate-950/90 p-1.5 text-slate-100 shadow-xl backdrop-blur-sm animate-[scaleIn_150ms_ease-out]"
+          className="absolute z-30 w-52 overflow-hidden rounded-2xl border border-white/12 bg-slate-950/85 shadow-[0_16px_48px_rgba(0,0,0,0.5)] backdrop-blur-xl animate-[contextMenuIn_150ms_ease-out]"
           style={{ left: contextMenu.screenX, top: contextMenu.screenY }}
         >
-          <div className="border-b border-white/8 px-3 py-2">
-            <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-100/70">{t('chrome.tile_label', { x: contextMenu.tileX, y: contextMenu.tileY })}</p>
-            <p className="mt-1 text-xs text-slate-400">{formatTileKind(contextMenu.tileKind)}</p>
+          {/* Header */}
+          <div className="border-b border-white/8 px-4 py-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-300/70">
+              {t('chrome.tile_label', { x: contextMenu.tileX, y: contextMenu.tileY })}
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-500">{formatTileKind(contextMenu.tileKind)}</p>
           </div>
-          <div className="grid gap-1 px-1 py-2">
+
+          {/* Menu items */}
+          <div className="py-1.5">
             <button
               type="button"
               onClick={onInjectEvent}
-              className="rounded-2xl px-3 py-2 text-left text-sm text-slate-100 transition duration-200 hover:bg-cyan-300/14 active:scale-[0.97]"
+              className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-slate-200 transition duration-150 hover:bg-cyan-400/10 hover:text-white active:bg-cyan-400/15"
             >
+              <span className="w-4 text-center text-xs" aria-hidden="true">⚡</span>
               {t('chrome.ctx_inject_event')}
             </button>
             <button
               type="button"
               onClick={onInspectTile}
-              className="rounded-2xl px-3 py-2 text-left text-sm text-slate-100 transition duration-200 hover:bg-cyan-300/14 active:scale-[0.97]"
+              className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-slate-200 transition duration-150 hover:bg-cyan-400/10 hover:text-white active:bg-cyan-400/15"
             >
+              <span className="w-4 text-center text-xs" aria-hidden="true">🔍</span>
               {t('chrome.ctx_inspect_tile')}
             </button>
+
+            <div className="mx-3 my-1 border-t border-white/6" />
+
             <button
               type="button"
               onClick={onPlacePlaceholder}
-              className="rounded-2xl px-3 py-2 text-left text-sm text-slate-100 transition duration-200 hover:bg-amber-300/14 active:scale-[0.97]"
+              className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-slate-200 transition duration-150 hover:bg-amber-400/10 hover:text-amber-100 active:bg-amber-400/15"
             >
+              <span className="w-4 text-center text-xs" aria-hidden="true">📌</span>
               {t('chrome.ctx_place_placeholder')}
             </button>
+
             {/* Teleport selected resident or context-menu nearby resident */}
             {(selectedResidentId || contextMenu.nearbyResidentId) && (
-              <button
-                type="button"
-                onClick={() => {
-                  void handleTeleport(contextMenu.tileX, contextMenu.tileY, contextMenu.nearbyResidentId)
-                  onCloseContextMenu()
-                }}
-                className="rounded-2xl px-3 py-2 text-left text-sm text-violet-200 transition duration-200 hover:bg-violet-300/14 active:scale-[0.97]"
-              >
-                {t('chrome.ctx_teleport')}
-              </button>
+              <>
+                <div className="mx-3 my-1 border-t border-white/6" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleTeleport(contextMenu.tileX, contextMenu.tileY, contextMenu.nearbyResidentId)
+                    onCloseContextMenu()
+                  }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-violet-200 transition duration-150 hover:bg-violet-400/10 hover:text-violet-100 active:bg-violet-400/15"
+                >
+                  <span className="w-4 text-center text-xs" aria-hidden="true">⚡</span>
+                  {t('chrome.ctx_teleport')}
+                </button>
+              </>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onCloseContextMenu}
-            className="w-full rounded-2xl border border-white/8 px-3 py-2 text-xs text-slate-400 transition duration-200 hover:bg-white/5 active:scale-[0.97]"
-          >
-            {t('chrome.ctx_dismiss')}
-          </button>
+
+          {/* Dismiss footer */}
+          <div className="border-t border-white/6 px-1.5 py-1.5">
+            <button
+              type="button"
+              onClick={onCloseContextMenu}
+              className="w-full rounded-xl px-3 py-1.5 text-center text-xs text-slate-500 transition duration-150 hover:bg-white/5 hover:text-slate-300 active:scale-[0.97]"
+            >
+              {t('chrome.ctx_dismiss')}
+            </button>
+          </div>
         </section>
       )}
     </>

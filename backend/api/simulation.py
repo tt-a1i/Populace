@@ -22,12 +22,20 @@ def _log_task_exception(task: asyncio.Task) -> None:  # type: ignore[type-arg]
 from backend.api.schemas import (
     DialogueHistoryEntryResponse,
     EconomyStatsResponse,
+    KnowledgeGraphEdge,
+    KnowledgeGraphNode,
+    KnowledgeGraphResponse,
     OccupationDistEntry,
     PopulationHistoryEntryResponse,
     ScenarioDataResponse,
     SimulationStatsResponse,
     SimulationStatusResponse,
     TimelineEventResponse,
+    WhatIfRelationshipSnapshot,
+    WhatIfRequest,
+    WhatIfResidentSnapshot,
+    WhatIfResponse,
+    WhatIfStateSnapshot,
     api_error,
     error_responses,
 )
@@ -1642,3 +1650,320 @@ async def replay_simulation_tick(tick: int, request: Request) -> dict[str, Any]:
     if snapshot is None:
         raise api_error(404, f"snapshot for tick {tick} not found", "snapshot_not_found")
     return snapshot
+
+
+# ---------------------------------------------------------------------------
+# What-If Analysis
+# ---------------------------------------------------------------------------
+
+
+def _build_whatif_snapshot(sim: SimulationState) -> WhatIfStateSnapshot:
+    """Build a WhatIfStateSnapshot from the current simulation state."""
+    agents = sim.world.agents
+    residents = [
+        WhatIfResidentSnapshot(
+            id=a.resident.id,
+            name=a.resident.name,
+            mood=a.resident.mood or "neutral",
+            coins=a.resident.coins,
+            energy=float(a.resident.energy),
+            occupation=getattr(a.resident, "occupation", "unemployed"),
+            x=a.resident.x,
+            y=a.resident.y,
+        )
+        for a in agents
+    ]
+    relationships = [
+        WhatIfRelationshipSnapshot(
+            from_id=rel.from_id,
+            to_id=rel.to_id,
+            type=rel.type.value if hasattr(rel.type, "value") else str(rel.type),
+            intensity=rel.intensity,
+        )
+        for rel in sim.world.relationships.values()
+    ]
+    mood_scores = [_mood_score(a.resident.mood) for a in agents]
+    avg_mood = round(sum(mood_scores) / len(mood_scores), 3) if mood_scores else 0.0
+    total_coins = sum(a.resident.coins for a in agents)
+    coin_values = [float(a.resident.coins) for a in agents]
+    gini = _compute_gini(coin_values) if coin_values else 0.0
+
+    return WhatIfStateSnapshot(
+        tick=sim.world.current_tick,
+        population=len(agents),
+        avg_mood_score=avg_mood,
+        total_coins=total_coins,
+        total_relationships=len(sim.world.relationships),
+        gini_coefficient=gini,
+        residents=residents,
+        relationships=relationships,
+    )
+
+
+@router.post(
+    "/what-if",
+    response_model=WhatIfResponse,
+    responses=error_responses(400, 503),
+)
+async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
+    """Run a what-if analysis on a branch copy of the current simulation.
+
+    Creates a deep copy of the world state, optionally applies resident
+    modifications and injects events, then runs N ticks on the copy.
+    Returns current vs predicted state for comparison.
+    """
+    import copy
+    import uuid
+
+    from engine.generative_agent import GenerativeAgent
+    from engine.memory import MemoryStream
+    from engine.types import (
+        Building,
+        DiaryEntry,
+        Event as EngineEvent,
+        Memory,
+        Reflection,
+        Relationship,
+        RelationType,
+        Resident,
+        WeatherType,
+        WorldConfig,
+    )
+    from engine.world import World
+
+    state = get_simulation_state(request)
+
+    # Snapshot current state before branching
+    current_snapshot = _build_whatif_snapshot(state)
+
+    # Deep-copy the world via save_state / manual rebuild (avoids mutating main sim)
+    saved = state.save_state()
+
+    cfg_data = saved.get("config", {})
+    config = WorldConfig(**{k: v for k, v in cfg_data.items() if hasattr(WorldConfig, k)})
+    # Disable LLM calls in branch to keep it fast and deterministic
+    object.__setattr__(config, "llm_call_probability", 0.0)
+
+    branch_world = World(config=config)
+    branch_world.current_tick = saved.get("tick", 0)
+
+    for b in saved.get("buildings", []):
+        branch_world.add_building(Building(
+            id=b["id"], type=b["type"], name=b["name"],
+            capacity=b["capacity"], position=tuple(b["position"]),
+        ))
+
+    for y, row in enumerate(saved.get("grid", [])):
+        for x, val in enumerate(row):
+            if 0 <= y < config.map_height_tiles and 0 <= x < config.map_width_tiles:
+                branch_world.grid[y][x] = bool(val)
+
+    for ad in saved.get("agents", []):
+        res_data = ad["resident"]
+        resident = Resident(
+            id=res_data["id"], name=res_data["name"],
+            personality=res_data["personality"],
+            goals=list(res_data.get("goals", [])),
+            mood=res_data.get("mood", "neutral"),
+            location=res_data.get("location"),
+            x=res_data.get("x", 0), y=res_data.get("y", 0),
+            home_building_id=res_data.get("home_building_id"),
+            skin_color=res_data.get("skin_color"),
+            hair_style=res_data.get("hair_style"),
+            hair_color=res_data.get("hair_color"),
+            outfit_color=res_data.get("outfit_color"),
+            current_goal=res_data.get("current_goal"),
+            coins=res_data.get("coins", 100),
+            occupation=res_data.get("occupation", "unemployed"),
+            energy=float(res_data.get("energy", 1.0)),
+            age_days=int(res_data.get("age_days", 0)),
+        )
+        for d in res_data.get("diary", []):
+            resident.diary.append(DiaryEntry(
+                id=d["id"], date=d["date"], tick=d["tick"], summary=d["summary"],
+            ))
+        agent = GenerativeAgent(resident)
+        ms = MemoryStream(config)
+        for m in ad.get("memories", []):
+            ms._memories.append(Memory(**m))
+        ms._total_added = ad.get("total_added", 0)
+        ms._last_reflect_at = ad.get("last_reflect_at", 0)
+        agent.memory_stream = ms
+        agent.reflections = [Reflection(**r) for r in ad.get("reflections", [])]
+        agent.current_path = [tuple(p) for p in ad.get("current_path", [])]
+        if ad.get("building_ticks_remaining") is not None:
+            agent._building_ticks_remaining = ad["building_ticks_remaining"]
+        branch_world.add_agent(agent)
+
+    for rel_data in saved.get("relationships", []):
+        branch_world.relationships[(rel_data["from_id"], rel_data["to_id"])] = Relationship(
+            from_id=rel_data["from_id"],
+            to_id=rel_data["to_id"],
+            type=RelationType(rel_data["type"]),
+            intensity=rel_data["intensity"],
+            reason=rel_data.get("reason", ""),
+        )
+
+    weather_val = saved.get("weather", "sunny")
+    try:
+        branch_world.weather = WeatherType(weather_val)
+    except ValueError:
+        branch_world.weather = WeatherType.sunny
+    branch_world.season = saved.get("season", "spring")
+
+    # Apply resident modifications
+    agent_map = {a.resident.id: a for a in branch_world.agents}
+    for mod in body.resident_mods:
+        agent = agent_map.get(mod.resident_id)
+        if agent is None:
+            continue
+        if mod.mood is not None:
+            agent.resident.mood = mod.mood
+        if mod.energy is not None:
+            agent.resident.energy = mod.energy
+        if mod.coins is not None:
+            agent.resident.coins = mod.coins
+
+    # Inject events
+    tick_time = branch_world.simulation_time()
+    for ev in body.events:
+        branch_world.pending_events.append(EngineEvent(
+            id=str(uuid.uuid4()),
+            description=ev.description,
+            timestamp=tick_time,
+            source="what-if",
+        ))
+
+    # Run N ticks on the branch (rule-based only, no LLM, no persistence)
+    for _ in range(body.ticks):
+        branch_world.tick()
+
+    # Build a temporary SimulationState-like wrapper for snapshot
+    class _BranchSim:
+        def __init__(self, world):
+            self.world = world
+
+    branch_sim = _BranchSim(branch_world)
+    predicted_snapshot = _build_whatif_snapshot(branch_sim)
+
+    return WhatIfResponse(
+        ticks_simulated=body.ticks,
+        current=current_snapshot,
+        predicted=predicted_snapshot,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Knowledge Graph
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/knowledge-graph",
+    response_model=KnowledgeGraphResponse,
+    responses=error_responses(503),
+)
+async def get_knowledge_graph(
+    request: Request,
+    since_tick: int = 0,
+    until_tick: int | None = None,
+) -> KnowledgeGraphResponse:
+    """Return a global knowledge graph of residents, buildings, and events.
+
+    Nodes: residents (circle), buildings (square), events (diamond).
+    Edges: relationships, location occupancy, event participation.
+    Optional ``since_tick`` / ``until_tick`` params filter events by tick range.
+    """
+    state = get_simulation_state(request)
+    world = state.world
+    max_tick = until_tick if until_tick is not None else world.current_tick
+
+    nodes: list[KnowledgeGraphNode] = []
+    edges: list[KnowledgeGraphEdge] = []
+    node_ids: set[str] = set()
+
+    # --- Resident nodes ---
+    for agent in world.agents:
+        r = agent.resident
+        nodes.append(KnowledgeGraphNode(
+            id=r.id,
+            label=r.name,
+            type="resident",
+            metadata={"mood": r.mood or "neutral", "occupation": getattr(r, "occupation", "unemployed")},
+        ))
+        node_ids.add(r.id)
+
+    # --- Building nodes ---
+    for building in world.buildings:
+        nodes.append(KnowledgeGraphNode(
+            id=building.id,
+            label=building.name,
+            type="building",
+            metadata={"building_type": building.type, "capacity": building.capacity},
+        ))
+        node_ids.add(building.id)
+
+    # --- Relationship edges ---
+    for rel in world.relationships.values():
+        if rel.from_id in node_ids and rel.to_id in node_ids:
+            rel_type = rel.type.value if hasattr(rel.type, "value") else str(rel.type)
+            edges.append(KnowledgeGraphEdge(
+                source=rel.from_id,
+                target=rel.to_id,
+                label=rel_type,
+                tick=world.current_tick,
+            ))
+
+    # --- Location edges (who is currently in which building) ---
+    for agent in world.agents:
+        loc = agent.resident.location
+        if loc and loc in node_ids:
+            edges.append(KnowledgeGraphEdge(
+                source=agent.resident.id,
+                target=loc,
+                label="located_in",
+                tick=world.current_tick,
+            ))
+
+    # --- Event nodes + edges from dialogue history ---
+    dialogue_history = getattr(state, "_dialogue_history", [])
+    for entry in dialogue_history:
+        tick = entry.get("tick", 0)
+        if tick < since_tick or tick > max_tick:
+            continue
+        ev_id = f"dlg-{entry.get('id', '')}"
+        if ev_id not in node_ids:
+            nodes.append(KnowledgeGraphNode(
+                id=ev_id,
+                label=entry.get("text", "")[:40],
+                type="event",
+                metadata={"kind": "dialogue", "tick": tick},
+            ))
+            node_ids.add(ev_id)
+        from_id = entry.get("from_id", "")
+        to_id = entry.get("to_id", "")
+        if from_id in node_ids:
+            edges.append(KnowledgeGraphEdge(source=from_id, target=ev_id, label="spoke", tick=tick))
+        if to_id in node_ids:
+            edges.append(KnowledgeGraphEdge(source=to_id, target=ev_id, label="heard", tick=tick))
+
+    # --- Event nodes from world timeline ---
+    world_timeline = getattr(state, "_world_timeline", [])
+    for entry in world_timeline:
+        tick = entry.get("tick", 0)
+        if tick < since_tick or tick > max_tick:
+            continue
+        ev_id = entry.get("id", "")
+        if ev_id and ev_id not in node_ids:
+            nodes.append(KnowledgeGraphNode(
+                id=ev_id,
+                label=entry.get("description", "")[:40],
+                type="event",
+                metadata={
+                    "event_type": entry.get("event_type", ""),
+                    "tick": tick,
+                },
+            ))
+            node_ids.add(ev_id)
+
+    return KnowledgeGraphResponse(nodes=nodes, edges=edges)

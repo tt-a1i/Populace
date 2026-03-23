@@ -12,6 +12,7 @@ import {
 } from '../../services/api'
 import { useToast } from '../ui/ToastProvider'
 import { PanelShell } from '../ui/PanelShell'
+import { EventCreator } from './EventCreator'
 
 // Static icon + colour map for known preset IDs
 const PRESET_META: Record<string, { icon: string; color: string }> = {
@@ -36,6 +37,7 @@ export function EventInjector() {
   const [flashBorder, setFlashBorder] = useState(false)
   const [presets, setPresets] = useState<PresetEvent[]>([])
   const [activeEvents, setActiveEvents] = useState<ActiveEvent[]>([])
+  const [tab, setTab] = useState<'presets' | 'create'>('presets')
 
   const flashTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const canSubmitCustom = useMemo(() => customEvent.trim().length > 0, [customEvent])
@@ -112,6 +114,27 @@ export function EventInjector() {
     >
       <p className="text-sm leading-6 text-slate-300">{t('event_injector.desc')}</p>
 
+      {/* ── Tab switcher ── */}
+      <div className="flex gap-1">
+        <button
+          type="button"
+          onClick={() => setTab('presets')}
+          className={`rounded-lg px-3 py-1 text-xs font-medium transition ${tab === 'presets' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+        >
+          {t('event_creator.tab_presets')}
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('create')}
+          className={`rounded-lg px-3 py-1 text-xs font-medium transition ${tab === 'create' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+        >
+          {t('event_creator.tab_create')}
+        </button>
+      </div>
+
+      {tab === 'create' && <EventCreator />}
+
+      {tab === 'presets' && <>
       {/* ── Preset event card grid ── */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {presets.map((preset) => {
@@ -192,6 +215,7 @@ export function EventInjector() {
       <p className="panel-section-label">
         {lastEvent ? `Latest: ${lastEvent}` : t('event_injector.empty')}
       </p>
+      </>}
     </PanelShell>
   )
 }

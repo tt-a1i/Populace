@@ -1,6 +1,7 @@
 import { Container, Graphics, Text, type FederatedPointerEvent } from 'pixi.js'
 
 import type { ResidentPosition, ResidentStatus, SimulationSpeed } from '../../stores/simulation'
+import { OCCUPATION_OUTLINE_COLOR } from './visuals'
 
 const TILE_SIZE = 32
 const HALF_TILE = TILE_SIZE / 2
@@ -16,8 +17,8 @@ const BUBBLE_STYLE: Record<DialogueKind, { fill: number; textFill: number; prefi
 }
 
 const MOOD_EMOJI: Record<string, string> = {
-  happy: '\u{1F60A}', excited: '\u{1F60A}', ecstatic: '\u{1F929}',
-  sad: '\u{1F622}', angry: '\u{1F620}', fearful: '\u{1F628}', tired: '\u{1F634}',
+  happy: '\u{1F60A}', excited: '\u{1F929}', ecstatic: '\u{1F929}',
+  sad: '\u{1F622}', angry: '\u{1F621}', fearful: '\u{1F628}', tired: '\u{1F634}',
   calm: '', content: '', neutral: '',
 }
 
@@ -116,9 +117,21 @@ function statusIconFor(status: ResidentStatus): string | null {
   }
 }
 
+export interface ResidentHoverInfo {
+  residentId: string
+  name: string
+  occupation: string
+  mood: string
+  energy: number
+  worldX: number
+  worldY: number
+}
+
 interface ResidentSpriteOptions {
   onFocusRequest?: (residentId: string) => void
   onSelectRequest?: (residentId: string) => void
+  onHoverStart?: (info: ResidentHoverInfo) => void
+  onHoverEnd?: (residentId: string) => void
 }
 
 export class ResidentSprite extends Container {
@@ -148,10 +161,15 @@ export class ResidentSprite extends Container {
   private readonly nameLabel: Text
   private onFocusRequest?: (residentId: string) => void
   private onSelectRequest?: (residentId: string) => void
+  private onHoverStart?: (info: ResidentHoverInfo) => void
+  private onHoverEnd?: (residentId: string) => void
 
   private currentAppearance: ResidentAppearance
   private currentAppearanceSignature: string
   private currentStatus: ResidentStatus
+  private currentOccupation = ''
+  private currentMood = ''
+  private currentEnergy = 1
   private bobTime = 0
   private moveFromX = 0
   private moveFromY = 0
@@ -165,6 +183,12 @@ export class ResidentSprite extends Container {
   private externalHighlight = false
   private highlightPulse = 0
   private currentBubbleKind: DialogueKind = 'dialogue'
+  // Animation timers
+  private walkSwayTime = 0
+  private idleBlinkTimer = 0
+  private idleBlinkCooldown = 2000 + Math.random() * 3000 // stagger per-resident
+  private moodFloatTime = 0
+  private sleepZzzTime = 0
 
   constructor(resident: ResidentPosition, options: ResidentSpriteOptions = {}) {
     super()
@@ -175,6 +199,8 @@ export class ResidentSprite extends Container {
     this.currentStatus = resident.status
     this.onFocusRequest = options.onFocusRequest
     this.onSelectRequest = options.onSelectRequest
+    this.onHoverStart = options.onHoverStart
+    this.onHoverEnd = options.onHoverEnd
     this.sortableChildren = true
     this.eventMode = 'static'
     this.cursor = 'pointer'
@@ -280,6 +306,8 @@ export class ResidentSprite extends Container {
 
     this.addChild(this.shadow, this.highlightGlow, this.body, this.emotionAccent, this.thoughtBubble, this.bubble, this.energyWarning, this.moodEmoji, this.occupationBadge, this.energyBar, this.nameLabel)
     this.on('pointertap', this.handlePointerTap)
+    this.on('pointerenter', this.handlePointerEnter)
+    this.on('pointerleave', this.handlePointerLeave)
 
     this.applyResident(resident, true)
   }
@@ -288,6 +316,8 @@ export class ResidentSprite extends Container {
     this.residentId = resident.id
     this.onFocusRequest = options.onFocusRequest
     this.onSelectRequest = options.onSelectRequest
+    this.onHoverStart = options.onHoverStart
+    this.onHoverEnd = options.onHoverEnd
     this.lastTapAt = 0
     this.dialogueUntil = 0
     this.externalHighlight = false
@@ -319,10 +349,15 @@ export class ResidentSprite extends Container {
     if (appearanceChanged) {
       this.currentAppearance = nextAppearance
       this.currentAppearanceSignature = nextSignature
-      this.redrawAvatar()
     }
 
     this.currentStatus = resident.status
+    const occChanged = (resident.occupation ?? '') !== this.currentOccupation
+    this.currentOccupation = resident.occupation ?? ''
+
+    if (appearanceChanged || occChanged) {
+      this.redrawAvatar()
+    }
     if (statusChanged || appearanceChanged) {
       this.renderEmotionAccent()
     }
@@ -333,9 +368,13 @@ export class ResidentSprite extends Container {
     this.updateEnergy(resident.energy)
 
     // Mood emoji
-    const moodText = MOOD_EMOJI[resident.mood ?? ''] ?? ''
+    this.currentMood = resident.mood ?? ''
+    const moodText = MOOD_EMOJI[this.currentMood] ?? ''
     this.moodEmoji.text = moodText
     this.moodEmoji.visible = moodText.length > 0
+
+    // Energy
+    this.currentEnergy = resident.energy ?? 1
 
     // Occupation badge
     const occIcon = OCCUPATION_ICON[resident.occupation ?? ''] ?? ''
@@ -439,8 +478,13 @@ export class ResidentSprite extends Container {
   }
 
   update(deltaMs: number): void {
-    if (this.moveElapsed < this.moveDuration) {
-      this.moveElapsed = Math.min(this.moveDuration, this.moveElapsed + deltaMs)
+    const isMoving = this.moveElapsed < this.moveDuration
+    const isLowEnergy = this.currentEnergy < 0.2
+
+    // ── Movement with low-energy slowdown ──
+    if (isMoving) {
+      const energyFactor = isLowEnergy ? 0.6 : 1
+      this.moveElapsed = Math.min(this.moveDuration, this.moveElapsed + deltaMs * energyFactor)
       const progress = this.moveDuration === 0 ? 1 : this.moveElapsed / this.moveDuration
       const eased = easeOutCubic(progress)
       this.x = this.moveFromX + (this.targetX - this.moveFromX) * eased
@@ -451,17 +495,81 @@ export class ResidentSprite extends Container {
 
     this.zIndex = this.y
 
+    // ── Walking body sway ──
+    if (isMoving) {
+      this.walkSwayTime += deltaMs
+      const sway = Math.sin(this.walkSwayTime / 80) * 1.5
+      this.body.rotation = sway * 0.04
+      // Low energy: lean forward
+      if (isLowEnergy) {
+        this.body.rotation += 0.08
+      }
+    } else {
+      this.walkSwayTime = 0
+      this.body.rotation = 0
+    }
+
+    // ── Idle blink animation ──
+    if (!isMoving && this.currentStatus !== 'chatting') {
+      this.idleBlinkTimer += deltaMs
+      if (this.idleBlinkTimer >= this.idleBlinkCooldown) {
+        // Brief squint — flatten body scaleY for 120ms
+        const blinkPhase = this.idleBlinkTimer - this.idleBlinkCooldown
+        if (blinkPhase < 120) {
+          const t = blinkPhase / 120
+          const squint = t < 0.5 ? t * 2 : 2 - t * 2
+          this.body.scale.y = 1 - squint * 0.08
+        } else {
+          this.body.scale.y = 1
+          this.idleBlinkTimer = 0
+          this.idleBlinkCooldown = 2000 + Math.random() * 3000
+        }
+      } else {
+        this.body.scale.y = 1
+      }
+    } else {
+      this.body.scale.y = 1
+      this.idleBlinkTimer = 0
+    }
+
+    // ── Mood emoji floating bob ──
+    if (this.moodEmoji.visible) {
+      this.moodFloatTime += deltaMs
+      this.moodEmoji.y = -34 + Math.sin(this.moodFloatTime / 400) * 2
+    } else {
+      this.moodFloatTime = 0
+    }
+
+    // ── Sleep Zzz for tired mood ──
+    if (this.currentMood === 'tired' && !isMoving) {
+      this.sleepZzzTime += deltaMs
+      if (!this.bubble.visible || this.dialogueUntil === 0) {
+        const zzzPhase = Math.floor(this.sleepZzzTime / 800) % 3
+        const zzzText = 'z'.repeat(zzzPhase + 1)
+        this.renderBubble(zzzText)
+        this.bubble.alpha = 0.6
+      }
+    } else {
+      this.sleepZzzTime = 0
+      if (this.bubble.visible && this.dialogueUntil === 0) {
+        this.bubble.alpha = 1
+      }
+    }
+
+    // ── Dialogue expiry ──
     if (this.dialogueUntil > 0 && performance.now() >= this.dialogueUntil) {
       this.dialogueUntil = 0
       this.currentBubbleKind = 'dialogue'
       this.renderBubble(statusIconFor(this.currentStatus))
     }
 
+    // ── Bubble bob ──
     if (this.bubble.visible) {
       this.bobTime += deltaMs
       this.bubble.y = -22 + Math.sin(this.bobTime / 180) * 2
     }
 
+    // ── Highlight glow pulse ──
     if (this.externalHighlight) {
       this.highlightPulse += deltaMs
       const pulse = 0.45 + (Math.sin(this.highlightPulse / 140) + 1) * 0.2
@@ -492,6 +600,22 @@ export class ResidentSprite extends Container {
     this.lastTapAt = now
   }
 
+  private readonly handlePointerEnter = (): void => {
+    this.onHoverStart?.({
+      residentId: this.residentId,
+      name: this.nameLabel.text,
+      occupation: this.currentOccupation,
+      mood: this.currentMood,
+      energy: this.currentEnergy,
+      worldX: this.x,
+      worldY: this.y,
+    })
+  }
+
+  private readonly handlePointerLeave = (): void => {
+    this.onHoverEnd?.(this.residentId)
+  }
+
   private renderBubble(content: string | null): void {
     if (!content) {
       this.bubble.visible = false
@@ -505,22 +629,37 @@ export class ResidentSprite extends Container {
     this.bubbleLabel.text = displayText
     this.bubbleLabel.style.fill = style.textFill
 
-    const width = Math.max(28, Math.min(142, this.bubbleLabel.width + 20))
-    const height = Math.max(22, this.bubbleLabel.height + 12)
+    const paddingX = 14
+    const paddingY = 8
+    const width = Math.max(32, Math.min(148, this.bubbleLabel.width + paddingX * 2))
+    const height = Math.max(24, this.bubbleLabel.height + paddingY * 2)
+    const radius = Math.min(12, height / 2)
 
     this.bubbleBackground.clear()
-    this.bubbleBackground.roundRect(-width / 2, -height / 2, width, height, 10).fill({
-      color: style.fill,
-      alpha: 0.94,
-    })
-    this.bubbleBackground.stroke({ color: 0x0f172a, alpha: 0.18, width: 1 })
-    this.bubbleBackground.moveTo(-4, height / 2 - 1)
-    this.bubbleBackground.lineTo(0, height / 2 + 7)
-    this.bubbleBackground.lineTo(5, height / 2 - 1)
-    this.bubbleBackground.fill({ color: style.fill, alpha: 0.94 })
+
+    // Drop shadow
+    this.bubbleBackground
+      .roundRect(-width / 2 + 1, -height / 2 + 2, width, height, radius)
+      .fill({ color: 0x000000, alpha: 0.12 })
+
+    // Main bubble body
+    this.bubbleBackground
+      .roundRect(-width / 2, -height / 2, width, height, radius)
+      .fill({ color: style.fill, alpha: 0.96 })
+
+    // Subtle border
+    this.bubbleBackground
+      .roundRect(-width / 2, -height / 2, width, height, radius)
+      .stroke({ color: 0x0f172a, alpha: 0.12, width: 1 })
+
+    // Triangle arrow pointing down
+    this.bubbleBackground.moveTo(-5, height / 2 - 1)
+    this.bubbleBackground.lineTo(0, height / 2 + 8)
+    this.bubbleBackground.lineTo(6, height / 2 - 1)
+    this.bubbleBackground.fill({ color: style.fill, alpha: 0.96 })
   }
 
-  /** Render the thought bubble (violet tint) with a small cloud-style pointer. */
+  /** Render the thought bubble (purple cloud shape) with cloud-dot pointer. */
   private _renderThoughtBubble(content: string | null): void {
     if (!content) {
       this.thoughtBubble.visible = false
@@ -529,19 +668,35 @@ export class ResidentSprite extends Container {
     this.thoughtBubble.visible = true
     this.thoughtLabel.text = `💭 ${content}`
 
-    const width = Math.max(32, Math.min(120, this.thoughtLabel.width + 16))
-    const height = Math.max(20, this.thoughtLabel.height + 10)
-
+    const paddingX = 10
+    const paddingY = 7
+    const width = Math.max(36, Math.min(124, this.thoughtLabel.width + paddingX * 2))
+    const height = Math.max(22, this.thoughtLabel.height + paddingY * 2)
     this.thoughtBackground.clear()
-    // Soft violet bubble
-    this.thoughtBackground.roundRect(-width / 2, -height / 2, width, height, 9).fill({
-      color: 0xede9fe,
+
+    // Cloud body — overlapping circles for puffy cloud shape
+    const halfW = width / 2
+    const halfH = height / 2
+    this.thoughtBackground.roundRect(-halfW, -halfH, width, height, halfH).fill({
+      color: 0xddd6fe,
       alpha: 0.92,
     })
-    this.thoughtBackground.stroke({ color: 0x7c3aed, alpha: 0.30, width: 1 })
-    // Small cloud dots pointing down
-    this.thoughtBackground.circle(0, height / 2 + 3, 2).fill({ color: 0xede9fe, alpha: 0.85 })
-    this.thoughtBackground.circle(2, height / 2 + 6, 1.5).fill({ color: 0xede9fe, alpha: 0.65 })
+    // Puffy bumps on top to create cloud silhouette
+    this.thoughtBackground.circle(-halfW * 0.35, -halfH + 1, halfH * 0.5).fill({ color: 0xddd6fe, alpha: 0.92 })
+    this.thoughtBackground.circle(halfW * 0.3, -halfH + 1, halfH * 0.45).fill({ color: 0xddd6fe, alpha: 0.92 })
+    this.thoughtBackground.circle(0, -halfH - 1, halfH * 0.55).fill({ color: 0xddd6fe, alpha: 0.92 })
+
+    // Purple border
+    this.thoughtBackground.roundRect(-halfW, -halfH, width, height, halfH).stroke({
+      color: 0x8b5cf6,
+      alpha: 0.35,
+      width: 1,
+    })
+
+    // Cloud-dot pointer (three descending circles)
+    this.thoughtBackground.circle(-2, halfH + 4, 2.5).fill({ color: 0xddd6fe, alpha: 0.85 })
+    this.thoughtBackground.circle(1, halfH + 8, 1.8).fill({ color: 0xddd6fe, alpha: 0.70 })
+    this.thoughtBackground.circle(3, halfH + 11, 1.2).fill({ color: 0xddd6fe, alpha: 0.55 })
   }
 
   private redrawAvatar(): void {
@@ -564,6 +719,14 @@ export class ResidentSprite extends Container {
     this.body.rect(-3, -12, 2, 2).fill({ color: 0x111827 })
     this.body.rect(1, -12, 2, 2).fill({ color: 0x111827 })
     this.body.rect(-1, -8, 2, 1).fill({ color: this.mixColor(skinColor, 0x111827, 0.45) })
+
+    // Occupation-based colored ring around the character base
+    const occColor = OCCUPATION_OUTLINE_COLOR[this.currentOccupation]
+    if (occColor) {
+      this.body.circle(0, 12, 11)
+      this.body.stroke({ color: occColor, width: 1.8, alpha: 0.65 })
+    }
+
     this.body.zIndex = 2
     this.renderEmotionAccent()
   }

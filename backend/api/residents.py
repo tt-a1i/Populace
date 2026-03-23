@@ -103,6 +103,33 @@ async def get_resident_memories(resident_id: str, request: Request) -> list[Resi
 
 
 @router.get(
+    "/{resident_id}/memories/search",
+    response_model=list[ResidentMemoryResponse],
+    responses=error_responses(404, 503),
+)
+async def search_resident_memories(
+    resident_id: str,
+    request: Request,
+    q: str = "",
+) -> list[ResidentMemoryResponse]:
+    """Full-text search through a resident's memories by keyword."""
+    state = get_simulation_state(request)
+    agent = _find_agent(state, resident_id)
+    if agent is None:
+        raise _NOT_FOUND
+
+    query = q.strip().lower()
+    if not query:
+        return [ResidentMemoryResponse(**asdict(mem)) for mem in agent.memory_stream.all]
+
+    results = [
+        mem for mem in agent.memory_stream.all
+        if query in mem.content.lower()
+    ]
+    return [ResidentMemoryResponse(**asdict(mem)) for mem in results]
+
+
+@router.get(
     "/{resident_id}/relationships",
     response_model=list[ResidentRelationshipResponse],
     responses=error_responses(404, 503),
@@ -123,6 +150,81 @@ async def get_resident_relationships(resident_id: str, request: Request) -> list
             rel_dict["direction"] = "outgoing" if from_id == resident_id else "incoming"
             result.append(ResidentRelationshipResponse(**rel_dict))
     return result
+
+
+class RelationshipHistoryPoint(BaseModel):
+    tick: int
+    time: str
+    intensity: float
+    rel_type: str
+    dialogue: str | None = None
+
+
+class RelationshipHistoryResponse(BaseModel):
+    from_id: str
+    to_id: str
+    from_name: str
+    to_name: str
+    points: list[RelationshipHistoryPoint] = Field(default_factory=list)
+
+
+@router.get(
+    "/{resident_id}/relationship-history/{other_id}",
+    response_model=RelationshipHistoryResponse,
+    responses=error_responses(404, 503),
+)
+async def get_relationship_history(
+    resident_id: str, other_id: str, request: Request,
+) -> RelationshipHistoryResponse:
+    """Return intensity-over-time for a specific resident pair from experiment history."""
+    state = get_simulation_state(request)
+    agent_a = _find_agent(state, resident_id)
+    if agent_a is None:
+        raise _NOT_FOUND
+    agent_b = _find_agent(state, other_id)
+    if agent_b is None:
+        raise api_error(404, "other resident not found", "resident_not_found")
+
+    points: list[RelationshipHistoryPoint] = []
+    experiment_history = getattr(state, "_experiment_history", [])
+
+    for frame in experiment_history:
+        tick = frame.get("tick", 0)
+        time_str = frame.get("time", "")
+        rels = frame.get("relationships", [])
+        dialogues = frame.get("dialogues", [])
+
+        # Find this pair's relationship in the snapshot
+        intensity = 0.0
+        rel_type = "none"
+        for rel in rels:
+            if (rel["from_id"] == resident_id and rel["to_id"] == other_id) or \
+               (rel["from_id"] == other_id and rel["to_id"] == resident_id):
+                intensity = rel.get("intensity", 0)
+                rel_type = rel.get("type", "knows")
+                break
+
+        # Find dialogue between the pair this tick
+        dialogue_text = None
+        for d in dialogues:
+            if (d["from_id"] == resident_id and d["to_id"] == other_id) or \
+               (d["from_id"] == other_id and d["to_id"] == resident_id):
+                dialogue_text = d.get("text", "")[:80]
+                break
+
+        if intensity > 0 or dialogue_text:
+            points.append(RelationshipHistoryPoint(
+                tick=tick, time=time_str, intensity=intensity,
+                rel_type=rel_type, dialogue=dialogue_text,
+            ))
+
+    return RelationshipHistoryResponse(
+        from_id=resident_id,
+        to_id=other_id,
+        from_name=agent_a.resident.name,
+        to_name=agent_b.resident.name,
+        points=points,
+    )
 
 
 @router.get(

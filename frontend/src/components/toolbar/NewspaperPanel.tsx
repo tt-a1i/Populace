@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { type NewspaperData, getNewspaper } from '../../services/api'
-import { useSimulationStore } from '../../stores/simulation'
 import { PanelShell } from '../ui/PanelShell'
 
 const SECTION_STYLES: Record<string, { bg: string; border: string; text: string }> = {
@@ -18,12 +17,6 @@ const DEFAULT_STYLE = { bg: 'bg-white/[0.03]', border: 'border-white/[0.06]', te
 
 export function NewspaperPanel() {
   const { t } = useTranslation()
-  const tickPerDay = 48 // matches backend config default
-  const currentTick = useSimulationStore((s) => {
-    const latest = s.residents[0] // just need current tick approximation
-    return latest ? Math.max(0, s.residents.length) : 0
-  })
-
   // Compute current day from world tick (we'll use the API to get the actual day)
   const [day, setDay] = useState(0)
   const [newspaper, setNewspaper] = useState<NewspaperData | null>(null)

@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
+import { useSimulationStore } from '../../stores/simulation'
 
 import {
   type ResidentMemory,
@@ -14,6 +16,7 @@ import { generateResidentAvatarDataUrl } from '../../lib/residentAvatar'
 import { useToast } from '../ui/ToastProvider'
 import { ChatPanel } from './ChatPanel'
 import { FamilyTreePanel } from './FamilyTreePanel'
+import { SchedulePanel } from './SchedulePanel'
 
 const MOOD_EMOJI: Record<string, string> = {
   happy: '\u{1F60A}',
@@ -55,12 +58,13 @@ const REL_BAR_COLOR: Record<string, string> = {
   dislike: '#f97316',
 }
 
-type TabKey = 'memories' | 'diary' | 'relations' | 'family' | 'achievements'
+type TabKey = 'memories' | 'diary' | 'relations' | 'family' | 'achievements' | 'schedule'
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'memories', label: '\u8BB0\u5FC6' },
   { key: 'diary', label: '\u65E5\u8BB0' },
   { key: 'relations', label: '\u5173\u7CFB' },
+  { key: 'schedule', label: '\u65E5\u7A0B' },
   { key: 'family', label: '\u65CF\u8C31' },
   { key: 'achievements', label: '\u6210\u5C31' },
 ]
@@ -80,6 +84,7 @@ interface ResidentStoryPanelProps {
     id: string
     name: string
     mood?: string
+    personality?: string
     occupation?: string
     coins?: number
     energy?: number
@@ -347,6 +352,14 @@ export function ResidentStoryPanel({
           )}
         </div>
 
+        {/* Schedule */}
+        <div className={activeTab === 'schedule' ? '' : 'hidden'}>
+          <ScheduleTabContent
+            residentId={residentId}
+            residents={residents}
+          />
+        </div>
+
         {/* Family tree */}
         <div className={activeTab === 'family' ? '' : 'hidden'}>
           <FamilyTreePanel residentId={residentId} />
@@ -504,5 +517,40 @@ export function ResidentStoryPanel({
         </div>
       </div>
     </div>
+  )
+}
+
+// ── Schedule tab wrapper (picks up store time + compare logic) ────────────
+
+function ScheduleTabContent({
+  residentId,
+  residents,
+}: {
+  residentId: string
+  residents: Array<{ id: string; name: string; personality?: string }>
+}) {
+  const time = useSimulationStore((s) => s.time)
+  const resident = residents.find((r) => r.id === residentId)
+
+  // Pick up to 2 other residents for comparison
+  const compareResidents = useMemo(
+    () =>
+      residents
+        .filter((r) => r.id !== residentId && r.personality)
+        .slice(0, 2)
+        .map((r) => ({ id: r.id, name: r.name, personality: r.personality ?? '' })),
+    [residents, residentId],
+  )
+
+  if (!resident) return null
+
+  return (
+    <SchedulePanel
+      residentId={residentId}
+      personality={resident.personality ?? ''}
+      name={resident.name}
+      currentTime={time}
+      compareResidents={compareResidents}
+    />
   )
 }

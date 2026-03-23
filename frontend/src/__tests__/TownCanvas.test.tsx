@@ -36,6 +36,7 @@ vi.mock('../components/town/TownRenderer', () => ({
     updateWeather = vi.fn()
     setPlaceholderBuildings = vi.fn()
     showEventRadii = vi.fn()
+    drawRelationshipLines = vi.fn()
     screenToTile = mockScreenToTile
   },
 }))

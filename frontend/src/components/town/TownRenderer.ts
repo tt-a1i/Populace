@@ -81,12 +81,10 @@ export class TownRenderer {
   private readonly buildingCapacityLayer = new Container()
   private readonly buildingHoverTooltip = new Container()
   private readonly buildingHoverBg = new Graphics()
-  private readonly buildingHoverTitle: Text
+  private readonly buildingHoverTitle: Text = null!
   private readonly buildingHoverType: Text = null!
   private readonly buildingHoverOccupancy: Text = null!
-  // @ts-expect-error Reserved for building hover feature
   private hoveredBuildingId: string | null = null
-  // @ts-expect-error Reserved for building hover feature
   private buildingHoverAlpha = 0
   private readonly placeholderGraphics = new Graphics()
   private readonly placeholderLabelLayer = new Container()

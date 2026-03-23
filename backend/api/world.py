@@ -12,7 +12,10 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from backend.api.schemas import (
     ActiveWorldEventResponse,
+    BuildingDetailResponse,
+    BuildingOccupantInfo,
     BuildingResponse,
+    BuildingVisitRecord,
     PresetEventResponse,
     ScenarioDataResponse,
     WeatherResponse,
@@ -205,6 +208,55 @@ async def list_buildings(request: Request) -> list[BuildingResponse]:
     """Return the currently loaded buildings and their map positions."""
     state = get_simulation_state(request)
     return [BuildingResponse(**asdict(building)) for building in state.world.buildings]
+
+
+@router.get(
+    "/buildings/{building_id}/details",
+    response_model=BuildingDetailResponse,
+    responses=error_responses(404, 503),
+)
+async def get_building_details(building_id: str, request: Request) -> BuildingDetailResponse:
+    """Return detailed info about a building including current occupants and visit history."""
+    state = get_simulation_state(request)
+    building = state.world.get_building(building_id)
+    if building is None:
+        raise api_error(404, f"Building '{building_id}' not found", "building_not_found")
+
+    occupant_agents = state.world.get_occupants(building_id)
+    current_residents = [
+        BuildingOccupantInfo(
+            id=agent.resident.id,
+            name=agent.resident.name,
+            occupation=getattr(agent.resident, "occupation", "unemployed"),
+            mood=agent.resident.mood,
+            status="chatting" if getattr(agent, "in_dialogue", False) else "idle",
+        )
+        for agent in occupant_agents
+    ]
+
+    # Collect recent visit records from the building visit log (if tracked)
+    visit_log: list[dict[str, Any]] = getattr(state, "building_visit_log", [])
+    recent_visits = [
+        BuildingVisitRecord(
+            resident_id=entry["resident_id"],
+            resident_name=entry["resident_name"],
+            action=entry["action"],
+            tick=entry["tick"],
+        )
+        for entry in visit_log
+        if entry.get("building_id") == building_id
+    ][-10:]
+
+    return BuildingDetailResponse(
+        id=building.id,
+        type=building.type,
+        name=building.name,
+        capacity=building.capacity,
+        position=building.position,
+        occupants=len(occupant_agents),
+        current_residents=current_residents,
+        recent_visits=recent_visits,
+    )
 
 
 _VALID_BUILDING_TYPES = {"home", "cafe", "park", "shop", "school", "gym", "library", "hospital"}

@@ -87,7 +87,7 @@ export function SplitPane({
   return (
     <div
       ref={containerRef}
-      className="grid h-full min-h-[calc(100vh-15rem)] gap-0"
+      className="grid h-full gap-0"
       style={{ gridTemplateColumns }}
     >
       <div className="min-w-0 pr-2">{left}</div>

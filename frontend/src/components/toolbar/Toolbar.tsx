@@ -18,7 +18,6 @@ import { DashboardView } from './DashboardView'
 import { LeaderboardPanel } from './LeaderboardPanel'
 import { AchievementWall } from './AchievementWall'
 import { NewspaperPanel } from './NewspaperPanel'
-import { FullReportPanel } from './FullReportPanel'
 import { WhatIfPanel } from './WhatIfPanel'
 import { MapEditor } from '../town/MapEditor'
 import { RulesPanel } from './RulesPanel'
@@ -33,7 +32,7 @@ const HeatmapPanel = lazy(() =>
 
 const OPEN_SETTINGS_EVENT = 'populace:open-settings'
 
-type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard' | 'leaderboard' | 'achievements' | 'newspaper', 'fullreport' | 'whatif' | 'mapeditor' | 'rules' | 'knowledge'
+type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard' | 'leaderboard' | 'achievements' | 'newspaper' | 'fullreport' | 'whatif' | 'mapeditor' | 'rules' | 'knowledge'
 
 interface ToolDef {
   key: ToolKey
@@ -133,7 +132,7 @@ export function Toolbar() {
     { key: 'dashboard', label: t('toolbar.dashboard', { defaultValue: 'Dashboard' }), icon: '\uD83D\uDCCA', tone: 'cyan' },
     { key: 'leaderboard', label: t('toolbar.leaderboard', { defaultValue: 'Rankings' }), icon: '\uD83C\uDFC6', tone: 'amber' },
     { key: 'achievements', label: t('toolbar.achievements', { defaultValue: 'Achievements' }), icon: '\uD83C\uDFC5', tone: 'amber' },
-    { key: 'newspaper', 'fullreport', label: t('toolbar.newspaper', { defaultValue: 'Gazette' }), icon: '\uD83D\uDCF0', tone: 'rose' },
+    { key: 'newspaper', label: t('toolbar.newspaper', { defaultValue: 'Gazette' }), icon: '\uD83D\uDCF0', tone: 'rose' },
     { key: 'whatif', label: t('toolbar.whatif', { defaultValue: 'What-If' }), icon: '\uD83D\uDD2E', tone: 'violet' },
     { key: 'mapeditor', label: t('toolbar.mapeditor', { defaultValue: '\u5730\u56FE\u7F16\u8F91' }), icon: '\u{1F5FA}\uFE0F', tone: 'emerald' },
     { key: 'rules', label: t('toolbar.rules', { defaultValue: '\u89C4\u5219\u5F15\u64CE' }), icon: '\u2699\uFE0F', tone: 'cyan' },
@@ -181,7 +180,7 @@ export function Toolbar() {
     if (activeTool === 'dashboard') return <DashboardView />
     if (activeTool === 'leaderboard') return <LeaderboardPanel />
     if (activeTool === 'achievements') return <AchievementWall />
-    if (activeTool === 'newspaper', 'fullreport') return <NewspaperPanel />
+    if (activeTool === 'newspaper' || activeTool === 'fullreport') return <NewspaperPanel />
     if (activeTool === 'whatif') return <WhatIfPanel />
     if (activeTool === 'mapeditor') return <MapEditor onTilesChanged={() => window.dispatchEvent(new CustomEvent('populace:tiles-changed'))} onClose={() => { setActiveTool('director'); setShowSecondary(false) }} />
     if (activeTool === 'rules') return <RulesPanel />

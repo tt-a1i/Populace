@@ -110,6 +110,32 @@ class BuildingResponse(BaseModel):
     occupants: int = 0
 
 
+class BuildingOccupantInfo(BaseModel):
+    id: str
+    name: str
+    occupation: str = "unemployed"
+    mood: str = "neutral"
+    status: str = "idle"
+
+
+class BuildingVisitRecord(BaseModel):
+    resident_id: str
+    resident_name: str
+    action: str  # "enter" or "leave"
+    tick: int
+
+
+class BuildingDetailResponse(BaseModel):
+    id: str
+    type: str
+    name: str
+    capacity: int
+    position: tuple[int, int]
+    occupants: int = 0
+    current_residents: list[BuildingOccupantInfo] = Field(default_factory=list)
+    recent_visits: list[BuildingVisitRecord] = Field(default_factory=list)
+
+
 class ResidentResponse(BaseModel):
     id: str
     name: str
@@ -353,3 +379,84 @@ class TimelineEventResponse(BaseModel):
     tick: int
     time: str
     metadata: dict = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# What-If Analysis
+# ---------------------------------------------------------------------------
+
+
+class WhatIfEventParam(BaseModel):
+    description: str
+
+
+class WhatIfResidentMod(BaseModel):
+    resident_id: str
+    mood: str | None = None
+    energy: float | None = None
+    coins: int | None = None
+
+
+class WhatIfRequest(BaseModel):
+    ticks: int = Field(default=50, ge=1, le=500)
+    events: list[WhatIfEventParam] = Field(default_factory=list)
+    resident_mods: list[WhatIfResidentMod] = Field(default_factory=list)
+
+
+class WhatIfResidentSnapshot(BaseModel):
+    id: str
+    name: str
+    mood: str = "neutral"
+    coins: int = 100
+    energy: float = 1.0
+    occupation: str = "unemployed"
+    x: int = 0
+    y: int = 0
+
+
+class WhatIfRelationshipSnapshot(BaseModel):
+    from_id: str
+    to_id: str
+    type: str
+    intensity: float
+
+
+class WhatIfStateSnapshot(BaseModel):
+    tick: int
+    population: int
+    avg_mood_score: float
+    total_coins: int
+    total_relationships: int
+    gini_coefficient: float
+    residents: list[WhatIfResidentSnapshot] = Field(default_factory=list)
+    relationships: list[WhatIfRelationshipSnapshot] = Field(default_factory=list)
+
+
+class WhatIfResponse(BaseModel):
+    ticks_simulated: int
+    current: WhatIfStateSnapshot
+    predicted: WhatIfStateSnapshot
+
+
+# ---------------------------------------------------------------------------
+# Knowledge Graph
+# ---------------------------------------------------------------------------
+
+
+class KnowledgeGraphNode(BaseModel):
+    id: str
+    label: str
+    type: str  # "resident" | "building" | "event"
+    metadata: dict = Field(default_factory=dict)
+
+
+class KnowledgeGraphEdge(BaseModel):
+    source: str
+    target: str
+    label: str
+    tick: int = 0
+
+
+class KnowledgeGraphResponse(BaseModel):
+    nodes: list[KnowledgeGraphNode] = Field(default_factory=list)
+    edges: list[KnowledgeGraphEdge] = Field(default_factory=list)

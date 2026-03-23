@@ -1,5 +1,6 @@
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../components/ui', () => ({
@@ -7,6 +8,7 @@ vi.mock('../components/ui', () => ({
   LanguageSwitcher: () => <button type="button">Lang</button>,
   LoadingTransition: () => <div>Loading</div>,
   MessageBar: () => <div>MessageBar</div>,
+  RightPanel: () => <div>RightPanel</div>,
   ScenePicker: ({ onEnter }: { onEnter: () => void }) => (
     <button type="button" onClick={onEnter}>
       Enter
@@ -32,6 +34,15 @@ vi.mock('../pages/GuidePage', () => ({
       <button type="button" onClick={onBack}>
         Back
       </button>
+    </div>
+  ),
+}))
+
+vi.mock('../components/ui/SplitPane', () => ({
+  SplitPane: ({ left, right }: { left: ReactNode; right: ReactNode }) => (
+    <div>
+      <div>{left}</div>
+      <div>{right}</div>
     </div>
   ),
 }))
@@ -87,6 +98,7 @@ vi.mock('../stores/simulation', () => ({
       time: 'Day 1, 08:00',
       weather: 'sunny',
       season: 'spring',
+      speed: 1,
     }),
 }))
 

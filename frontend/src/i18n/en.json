@@ -86,7 +86,47 @@
     "compare": "Compare",
     "timeline": "Timeline",
     "settings": "Settings",
-    "current_tool": "Active Tool: "
+    "current_tool": "Active Tool: ",
+    "whatif": "What-If",
+    "knowledge": "Knowledge Graph"
+  },
+  "knowledge": {
+    "title": "Knowledge Graph",
+    "badge": "Global Knowledge",
+    "refresh": "Refresh",
+    "since_tick": "From tick",
+    "until_tick": "To tick",
+    "latest": "Latest",
+    "resident": "Resident",
+    "building": "Building",
+    "event": "Event",
+    "loading": "Loading graph...",
+    "nodes": "nodes",
+    "edges": "edges"
+  },
+  "whatif": {
+    "title": "What-If Analysis",
+    "badge": "Hypothetical",
+    "ticks_label": "Simulation ticks",
+    "inject_event": "Inject event",
+    "event_placeholder": "e.g. A sudden rainstorm hits the town",
+    "modify_resident": "Modify resident",
+    "select_resident": "Select...",
+    "mood": "Mood",
+    "coins": "Coins",
+    "energy": "Energy",
+    "name": "Name",
+    "run": "Run What-If Analysis",
+    "running": "Running analysis...",
+    "results_badge": "Prediction",
+    "ticks_unit": "ticks",
+    "population": "Population",
+    "avg_mood": "Avg Mood",
+    "total_coins": "Total Coins",
+    "relationships": "Relationships",
+    "gini": "Gini Coeff.",
+    "tick_range": "Tick",
+    "resident_changes": "Resident Changes"
   },
   "compare": {
     "badge": "Resident Compare",
@@ -213,6 +253,30 @@
     "custom_placeholder": "e.g. A rose shower suddenly falls on the plaza",
     "submit": "Inject Event",
     "empty": "Awaiting your first divine decree"
+  },
+  "event_creator": {
+    "tab_presets": "Presets",
+    "tab_create": "Create Custom",
+    "name": "Event Name",
+    "name_placeholder": "e.g. Meteor Shower",
+    "description": "Description",
+    "desc_placeholder": "Describe what happens in the town…",
+    "radius": "Range",
+    "duration": "Duration",
+    "target": "Target",
+    "no_target": "Not set",
+    "pick_on_map": "Pick on Map",
+    "picking": "Click map…",
+    "emotion": "Effect",
+    "emotion_positive": "Positive",
+    "emotion_neutral": "Neutral",
+    "emotion_negative": "Negative",
+    "inject": "Inject Event",
+    "injecting": "Injecting…",
+    "save_preset": "Save as Preset",
+    "saved": "Custom event saved",
+    "custom_presets": "Custom Presets",
+    "delete": "Delete"
   },
   "persona": {
     "badge": "Persona Editor",
@@ -361,7 +425,10 @@
     "guide": "User Guide",
     "guide_open": "Open User Guide",
     "tutorial_reset": "Reset Tutorial",
-    "tutorial_reset_done": "Reset ✓"
+    "tutorial_reset_done": "Reset ✓",
+    "about_title": "About Populace",
+    "about_desc": "An AI-driven social simulation lab where autonomous agents perceive, remember, and interact in a pixel town. Based on the Stanford Generative Agents paper.",
+    "about_paper": "Based on Stanford Generative Agents · Open Source"
   },
   "api_key_banner": {
     "message": "No LLM API key configured — AI dialogue will be unavailable.",
@@ -401,6 +468,16 @@
     "wandering": "Wandering around town",
     "at_home": "Resting at home",
     "at_work": "Working"
+  },
+  "family": {
+    "self": "Self",
+    "parent": "Parent",
+    "child": "Child",
+    "spouse": "Spouse",
+    "parents": "Parents",
+    "children": "Children",
+    "loading": "Loading family tree…",
+    "empty": "No family relationships found yet."
   },
   "onboarding": {
     "skip": "Skip →",
@@ -506,7 +583,13 @@
     "season_spring": "spring",
     "season_summer": "summer",
     "season_autumn": "autumn",
-    "season_winter": "winter"
+    "season_winter": "winter",
+    "paused": "PAUSED",
+    "connected": "Connected",
+    "disconnected_short": "Disconnected",
+    "tab_graph": "Graph",
+    "tab_timeline": "Timeline",
+    "tab_stats": "Stats"
   },
   "guide_page": {
     "badge": "Operator Manual",
@@ -656,7 +739,8 @@
     "ctx_inspect_tile": "Inspect Tile",
     "ctx_place_placeholder": "Place Building Marker",
     "ctx_teleport": "⚡ Teleport Here",
-    "ctx_dismiss": "Dismiss"
+    "ctx_dismiss": "Dismiss",
+    "following": "Following: {{name}}"
   },
   "graph": {
     "filter_label": "Filter Relations",
@@ -686,6 +770,13 @@
     "reason_ongoing": "Relationship still evolving",
     "reason_new": "New interaction forming"
   },
+  "rel_timeline": {
+    "badge": "Relationship Timeline",
+    "empty": "No relationship history between these two residents yet.",
+    "actual": "Actual",
+    "predicted": "Predicted (50 ticks)",
+    "data_points": "data points"
+  },
   "canvas": {
     "placeholder_label": "Reserved Plot",
     "event_desc": "New neighborhood rumor at tile {{x}},{{y}}.",
@@ -694,7 +785,8 @@
     "event_fail_title": "Event Injection Failed",
     "event_fail_desc": "Please make sure the backend is available and try again.",
     "waiting": "Waiting for residents to load…",
-    "waiting_badge": "Town Waiting Room"
+    "waiting_badge": "Town Waiting Room",
+    "heatmap_toggle": "Footprint Heatmap"
   },
   "experiment": {
     "badge": "Experiment Lab",
@@ -753,5 +845,27 @@
     "reload": "Reload Page",
     "show_details": "Show error details",
     "hide_details": "Hide error details"
+  },
+  "building_detail": {
+    "view_details": "View Details",
+    "loading": "Loading building data…",
+    "not_found": "Building not found",
+    "capacity": "Capacity",
+    "residents_inside": "Residents Inside",
+    "empty": "No one is here right now",
+    "recent_visits": "Recent Visits"
+  },
+  "schedule": {
+    "title": "Daily Schedule",
+    "current_time": "Current Time",
+    "phase_sleep": "Sleep",
+    "phase_morning": "Morning",
+    "phase_work": "Work",
+    "phase_lunch": "Lunch",
+    "phase_afternoon": "Afternoon",
+    "phase_evening": "Evening",
+    "phase_home": "Home",
+    "ptype_extrovert": "Extrovert",
+    "ptype_introvert": "Introvert"
   }
 }

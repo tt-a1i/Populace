@@ -1,18 +1,28 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../components/ui', () => ({
   FirstRunGuide: () => null,
-  LanguageSwitcher: () => <button type="button" aria-label="切换语言">Lang</button>,
+  LanguageSwitcher: () => (
+    <button type="button" aria-label="切换语言">
+      Lang
+    </button>
+  ),
   LoadingTransition: () => <div>Loading</div>,
   MessageBar: () => <div>MessageBar</div>,
+  RightPanel: () => <div>RightPanel</div>,
   ScenePicker: ({ onEnter }: { onEnter: () => void }) => (
     <button type="button" onClick={onEnter}>
       Enter
     </button>
   ),
-  ThemeToggle: () => <button type="button" aria-label="切换主题">Theme</button>,
+  ThemeToggle: () => (
+    <button type="button" aria-label="切换主题">
+      Theme
+    </button>
+  ),
   WelcomePage: ({ onStart, onGuide }: { onStart: () => void; onGuide: () => void }) => (
     <div>
       <button type="button" onClick={onStart}>
@@ -21,6 +31,15 @@ vi.mock('../components/ui', () => ({
       <button type="button" onClick={onGuide}>
         Guide
       </button>
+    </div>
+  ),
+}))
+
+vi.mock('../components/ui/SplitPane', () => ({
+  SplitPane: ({ left, right }: { left: ReactNode; right: ReactNode }) => (
+    <div>
+      <div>{left}</div>
+      <div>{right}</div>
     </div>
   ),
 }))
@@ -34,7 +53,11 @@ vi.mock('../components/ui/TutorialOverlay', () => ({
 }))
 
 vi.mock('../components/toolbar/SoundToggleButton', () => ({
-  SoundToggleButton: () => <button type="button" aria-label="声音开关">Sound</button>,
+  SoundToggleButton: () => (
+    <button type="button" aria-label="声音开关">
+      Sound
+    </button>
+  ),
 }))
 
 vi.mock('../components/toolbar/SpeedControl', () => ({
@@ -78,6 +101,7 @@ vi.mock('../stores/simulation', () => ({
       time: 'Day 1, 08:00',
       weather: 'sunny',
       season: 'spring',
+      speed: 1,
     }),
 }))
 
@@ -104,7 +128,7 @@ describe('App accessibility flow', () => {
     })
   })
 
-  it('keeps keyboard navigation order aligned with toolbar, map, graph, and panel regions', async () => {
+  it('keeps keyboard navigation order aligned with toolbar, map, and panel regions', async () => {
     const user = userEvent.setup()
 
     render(<App />)
@@ -113,7 +137,6 @@ describe('App accessibility flow', () => {
     await user.click(screen.getByRole('button', { name: 'Enter' }))
 
     await user.click(screen.getByRole('button', { name: '导演台' }))
-    await user.click(screen.getByRole('button', { name: '关系图谱' }))
     ;(document.activeElement as HTMLElement | null)?.blur()
 
     await user.tab()
@@ -123,13 +146,10 @@ describe('App accessibility flow', () => {
     expect(screen.getByRole('region', { name: '小镇地图' })).toHaveFocus()
 
     await user.tab()
-    expect(screen.getByRole('region', { name: '关系图谱面板' })).toHaveFocus()
-
-    await user.tab()
     expect(screen.getByRole('region', { name: '工具面板' })).toHaveFocus()
   })
 
-  it('shows active connection count in the top HUD', async () => {
+  it('shows active connection count in the header', async () => {
     const user = userEvent.setup()
 
     render(<App />)

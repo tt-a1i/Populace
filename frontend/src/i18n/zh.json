@@ -86,7 +86,47 @@
     "compare": "居民对比",
     "timeline": "世界时间线",
     "settings": "系统设置",
-    "current_tool": "当前工具："
+    "current_tool": "当前工具：",
+    "whatif": "假设分析",
+    "knowledge": "知识图谱"
+  },
+  "knowledge": {
+    "title": "知识图谱",
+    "badge": "全局知识",
+    "refresh": "刷新",
+    "since_tick": "起始步数",
+    "until_tick": "截止步数",
+    "latest": "最新",
+    "resident": "居民",
+    "building": "建筑",
+    "event": "事件",
+    "loading": "加载图谱中…",
+    "nodes": "个节点",
+    "edges": "条边"
+  },
+  "whatif": {
+    "title": "假设分析",
+    "badge": "假设推演",
+    "ticks_label": "模拟步数",
+    "inject_event": "注入事件",
+    "event_placeholder": "例如：一场突如其来的暴风雨袭击了小镇",
+    "modify_resident": "修改居民属性",
+    "select_resident": "选择…",
+    "mood": "心情",
+    "coins": "金币",
+    "energy": "体力",
+    "name": "姓名",
+    "run": "运行假设分析",
+    "running": "分析运行中…",
+    "results_badge": "预测结果",
+    "ticks_unit": "步",
+    "population": "人口",
+    "avg_mood": "平均心情",
+    "total_coins": "总金币",
+    "relationships": "关系数",
+    "gini": "基尼系数",
+    "tick_range": "步数",
+    "resident_changes": "居民变化"
   },
   "compare": {
     "badge": "Resident Compare",
@@ -213,6 +253,30 @@
     "custom_placeholder": "例如：广场突然下起玫瑰花雨",
     "submit": "投放事件",
     "empty": "等待你的第一道神谕"
+  },
+  "event_creator": {
+    "tab_presets": "预设事件",
+    "tab_create": "自定义创建",
+    "name": "事件名称",
+    "name_placeholder": "例如：流星雨",
+    "description": "描述",
+    "desc_placeholder": "描述小镇中发生了什么…",
+    "radius": "影响范围",
+    "duration": "持续时间",
+    "target": "目标位置",
+    "no_target": "未设置",
+    "pick_on_map": "地图选点",
+    "picking": "点击地图…",
+    "emotion": "影响类型",
+    "emotion_positive": "积极",
+    "emotion_neutral": "中性",
+    "emotion_negative": "消极",
+    "inject": "注入事件",
+    "injecting": "注入中…",
+    "save_preset": "保存为预设",
+    "saved": "自定义事件已保存",
+    "custom_presets": "自定义预设",
+    "delete": "删除"
   },
   "persona": {
     "badge": "Persona Editor",
@@ -361,7 +425,10 @@
     "guide": "用户指南",
     "guide_open": "打开用户指南",
     "tutorial_reset": "重置引导教程",
-    "tutorial_reset_done": "已重置 ✓"
+    "tutorial_reset_done": "已重置 ✓",
+    "about_title": "关于 Populace",
+    "about_desc": "一个由 AI 驱动的社会模拟实验室，自主智能体在像素小镇中感知、记忆、互动。基于 Stanford Generative Agents 论文。",
+    "about_paper": "基于 Stanford Generative Agents · 完全开源"
   },
   "api_key_banner": {
     "message": "未配置 LLM API Key，AI 对话功能将不可用。",
@@ -401,6 +468,16 @@
     "wandering": "在小镇闲逛",
     "at_home": "在家休息",
     "at_work": "在工作中"
+  },
+  "family": {
+    "self": "本人",
+    "parent": "父母",
+    "child": "子女",
+    "spouse": "配偶",
+    "parents": "父母",
+    "children": "子女",
+    "loading": "加载族谱中…",
+    "empty": "暂无家庭关系。"
   },
   "onboarding": {
     "skip": "跳过 →",
@@ -506,7 +583,13 @@
     "season_spring": "春天",
     "season_summer": "夏天",
     "season_autumn": "秋天",
-    "season_winter": "冬天"
+    "season_winter": "冬天",
+    "paused": "已暂停",
+    "connected": "已连接",
+    "disconnected_short": "未连接",
+    "tab_graph": "关系图谱",
+    "tab_timeline": "时间轴",
+    "tab_stats": "统计"
   },
   "guide_page": {
     "badge": "Operator Manual",
@@ -656,7 +739,8 @@
     "ctx_inspect_tile": "查看位置",
     "ctx_place_placeholder": "放置建筑占位",
     "ctx_teleport": "⚡ 传送到此",
-    "ctx_dismiss": "收起菜单"
+    "ctx_dismiss": "收起菜单",
+    "following": "跟踪中: {{name}}"
   },
   "graph": {
     "filter_label": "关系过滤",
@@ -686,6 +770,13 @@
     "reason_ongoing": "关系仍在波动",
     "reason_new": "新的互动正在形成"
   },
+  "rel_timeline": {
+    "badge": "关系时间线",
+    "empty": "这两位居民之间暂无关系历史。",
+    "actual": "实际",
+    "predicted": "预测 (50 ticks)",
+    "data_points": "个数据点"
+  },
   "canvas": {
     "placeholder_label": "预留地块",
     "event_desc": "地图 Tile {{x}},{{y}} 出现新的街坊传闻。",
@@ -694,7 +785,8 @@
     "event_fail_title": "事件投放失败",
     "event_fail_desc": "请确认后端服务可用后重试。",
     "waiting": "等待居民加载...",
-    "waiting_badge": "小镇候场区"
+    "waiting_badge": "小镇候场区",
+    "heatmap_toggle": "足迹热力图"
   },
   "experiment": {
     "badge": "Experiment Lab",
@@ -753,5 +845,27 @@
     "reload": "刷新页面",
     "show_details": "展开错误详情",
     "hide_details": "收起错误详情"
+  },
+  "building_detail": {
+    "view_details": "查看详情",
+    "loading": "加载建筑数据…",
+    "not_found": "建筑未找到",
+    "capacity": "容量",
+    "residents_inside": "建筑内居民",
+    "empty": "目前没有人在这里",
+    "recent_visits": "最近访问记录"
+  },
+  "schedule": {
+    "title": "每日作息",
+    "current_time": "当前时间",
+    "phase_sleep": "睡眠",
+    "phase_morning": "晨起",
+    "phase_work": "工作",
+    "phase_lunch": "午餐",
+    "phase_afternoon": "下午",
+    "phase_evening": "社交",
+    "phase_home": "归家",
+    "ptype_extrovert": "外向",
+    "ptype_introvert": "内向"
   }
 }
