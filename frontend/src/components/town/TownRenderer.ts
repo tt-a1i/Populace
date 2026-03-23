@@ -10,7 +10,7 @@ import { RainEffect } from './effects/RainEffect'
 import { SnowEffect } from './effects/SnowEffect'
 import { StormEffect } from './effects/StormEffect'
 import { createWeatherFilter } from './effects/WeatherFilter'
-import { getDayLightingFromTime, getSeasonTilePalette } from './visuals'
+import { BUILDING_SHAPE, getDayLightingFromTime, getGrassDecoration, getSeasonTilePalette } from './visuals'
 import {
   MAP_HEIGHT,
   MAP_WIDTH,
@@ -87,11 +87,20 @@ export class TownRenderer {
   private highlightedResidentIds = new Set<string>()
   private currentBuildings: Array<Building & { occupants?: number }> = []
   private placeholderBuildings: PlaceholderBuilding[] = []
+  private readonly vignetteGraphics = new Graphics()
+  private readonly waterOverlay = new Graphics()
+  private waterTime = 0
 
   private dragging = false
   private dragPointerId: number | null = null
   private dragStartX = 0
   private dragStartY = 0
+  private dragLastX = 0
+  private dragLastY = 0
+  private dragLastTime = 0
+  private inertiaVx = 0
+  private inertiaVy = 0
+  private inertiaRaf: number | null = null
   private worldStartX = 0
   private worldStartY = 0
   private hasUserCameraOverride = false
@@ -136,9 +145,10 @@ export class TownRenderer {
       this.buildingLabelLayer,
       this.placeholderLabelLayer,
     )
+    this.tileLayer.addChild(this.waterOverlay)
     this.effectLayer.addChild(
       this.ambientAccent, this.sunnyGlow, this.dayNightOverlay,
-      this.eventRadiusGraphics, this.weatherContainer,
+      this.eventRadiusGraphics, this.weatherContainer, this.vignetteGraphics,
     )
 
     this.tileLayer.eventMode = 'static'
@@ -175,6 +185,7 @@ export class TownRenderer {
     this.drawTiles()
     this.drawBuildings()
     this.drawAmbientAccent()
+    this.drawVignette()
     this.updateDayNightOverlay()
     this.bindCameraControls()
     this.app.ticker.add(this.animate)
@@ -251,13 +262,47 @@ export class TownRenderer {
       const width = TILE_SIZE * 2
       const height = TILE_SIZE * 3
 
+      const shape = BUILDING_SHAPE[b.type] ?? 'rect'
+
       // Building shadow
       this.buildingGraphics.roundRect(x + 2, y + 2, width, height, 6)
       this.buildingGraphics.fill({ color: 0x000000, alpha: 0.25 })
-      // Building body
-      this.buildingGraphics.roundRect(x, y, width, height, 6)
-      this.buildingGraphics.fill({ color, alpha: 0.88 })
-      this.buildingGraphics.stroke({ color: 0xffffff, alpha: 0.12, width: 1.5 })
+
+      // Building body — shape varies by type
+      if (shape === 'peaked') {
+        // Peaked roof top
+        this.buildingGraphics.moveTo(x, y + 10)
+        this.buildingGraphics.lineTo(x + width / 2, y)
+        this.buildingGraphics.lineTo(x + width, y + 10)
+        this.buildingGraphics.lineTo(x + width, y + height)
+        this.buildingGraphics.lineTo(x, y + height)
+        this.buildingGraphics.closePath()
+        this.buildingGraphics.fill({ color, alpha: 0.88 })
+        this.buildingGraphics.stroke({ color: 0xffffff, alpha: 0.12, width: 1.5 })
+      } else if (shape === 'arch') {
+        // Arched top
+        this.buildingGraphics.roundRect(x, y, width, height, 16)
+        this.buildingGraphics.fill({ color, alpha: 0.88 })
+        this.buildingGraphics.stroke({ color: 0xffffff, alpha: 0.12, width: 1.5 })
+      } else if (shape === 'round') {
+        // Rounded/oval (parks)
+        this.buildingGraphics.ellipse(x + width / 2, y + height / 2, width / 2, height / 2)
+        this.buildingGraphics.fill({ color, alpha: 0.72 })
+        this.buildingGraphics.stroke({ color: 0xffffff, alpha: 0.12, width: 1.5 })
+      } else {
+        this.buildingGraphics.roundRect(x, y, width, height, 6)
+        this.buildingGraphics.fill({ color, alpha: 0.88 })
+        this.buildingGraphics.stroke({ color: 0xffffff, alpha: 0.12, width: 1.5 })
+      }
+
+      // Entrance marker — small triangle at bottom center
+      const entranceX = x + width / 2
+      const entranceY = y + height
+      this.buildingGraphics.moveTo(entranceX - 4, entranceY)
+      this.buildingGraphics.lineTo(entranceX, entranceY + 5)
+      this.buildingGraphics.lineTo(entranceX + 4, entranceY)
+      this.buildingGraphics.closePath()
+      this.buildingGraphics.fill({ color: 0xfbbf24, alpha: 0.7 })
 
       const icon = typeIcon[b.type] ?? ''
       const label = new Text({
@@ -484,6 +529,10 @@ export class TownRenderer {
     // Animate weather particles
     this.tickWeatherEffect(deltaMs)
 
+    // Animate water ripple overlay
+    this.waterTime += deltaMs * 0.001
+    this.updateWaterRipple()
+
     // Animate milestone effects
     for (let i = this.milestoneEffects.length - 1; i >= 0; i--) {
       const effect = this.milestoneEffects[i]
@@ -544,10 +593,16 @@ export class TownRenderer {
       return
     }
 
+    this.stopInertia()
     this.dragging = true
     this.dragPointerId = event.pointerId
     this.dragStartX = event.clientX
     this.dragStartY = event.clientY
+    this.dragLastX = event.clientX
+    this.dragLastY = event.clientY
+    this.dragLastTime = performance.now()
+    this.inertiaVx = 0
+    this.inertiaVy = 0
     this.worldStartX = this.world.x
     this.worldStartY = this.world.y
     this.hasUserCameraOverride = true
@@ -567,6 +622,18 @@ export class TownRenderer {
     this.clearFollowMode()
     const deltaX = event.clientX - this.dragStartX
     const deltaY = event.clientY - this.dragStartY
+
+    // Track velocity for inertia
+    const now = performance.now()
+    const dt = now - this.dragLastTime
+    if (dt > 0) {
+      const alpha = 0.4
+      this.inertiaVx = alpha * ((event.clientX - this.dragLastX) / dt) + (1 - alpha) * this.inertiaVx
+      this.inertiaVy = alpha * ((event.clientY - this.dragLastY) / dt) + (1 - alpha) * this.inertiaVy
+    }
+    this.dragLastX = event.clientX
+    this.dragLastY = event.clientY
+    this.dragLastTime = now
 
     this.world.position.set(this.worldStartX + deltaX, this.worldStartY + deltaY)
     this.clampPan()
@@ -607,11 +674,13 @@ export class TownRenderer {
       return
     }
 
-    const nextZoom = this.clamp(
+    const targetZoom = this.clamp(
       this.pinchStartZoom * (distance / this.pinchStartDistance),
       this.minZoom,
       this.maxZoom,
     )
+    // Smooth interpolation for fluid pinch feel
+    const nextZoom = this.zoom + (targetZoom - this.zoom) * 0.6
     const rect = this.app.canvas.getBoundingClientRect()
     const midpointX = (event.touches[0].clientX + event.touches[1].clientX) / 2 - rect.left
     const midpointY = (event.touches[0].clientY + event.touches[1].clientY) / 2 - rect.top
@@ -688,9 +757,44 @@ export class TownRenderer {
       this.app.canvas.releasePointerCapture(this.dragPointerId)
     }
 
+    // Start inertia if velocity is significant
+    const speed = Math.hypot(this.inertiaVx, this.inertiaVy)
+    if (speed > 0.15) {
+      this.startInertia()
+    }
+
     this.dragging = false
     this.dragPointerId = null
     this.app.canvas.style.cursor = 'grab'
+  }
+
+  private startInertia(): void {
+    this.stopInertia()
+    const friction = 0.94
+    const minSpeed = 0.08
+    const step = () => {
+      this.inertiaVx *= friction
+      this.inertiaVy *= friction
+      if (Math.hypot(this.inertiaVx, this.inertiaVy) < minSpeed) {
+        this.inertiaRaf = null
+        return
+      }
+      this.world.x += this.inertiaVx * 16
+      this.world.y += this.inertiaVy * 16
+      this.clampPan()
+      this.emitViewportChange()
+      this.inertiaRaf = requestAnimationFrame(step)
+    }
+    this.inertiaRaf = requestAnimationFrame(step)
+  }
+
+  private stopInertia(): void {
+    if (this.inertiaRaf !== null) {
+      cancelAnimationFrame(this.inertiaRaf)
+      this.inertiaRaf = null
+    }
+    this.inertiaVx = 0
+    this.inertiaVy = 0
   }
 
   private centerOnResident(residentId: string, immediate = false): void {
@@ -747,7 +851,92 @@ export class TownRenderer {
         this.tileGraphics.rect(tileX, tileY, TILE_SIZE, TILE_SIZE)
         this.tileGraphics.fill({ color: fillColor })
         this.tileGraphics.stroke({ color: strokeColor, width: 0.5, alpha: 0.15 })
+
+        // Grass decorations — small dots for visual depth
+        if (tileKind === 'grass') {
+          const deco = getGrassDecoration(x, y)
+          for (const dot of deco.dots) {
+            const dx = tileX + dot.rx * TILE_SIZE
+            const dy = tileY + dot.ry * TILE_SIZE
+            this.tileGraphics.circle(dx, dy, dot.size)
+            this.tileGraphics.fill({
+              color: dot.darken ? 0x1a5c28 : 0x6dd87a,
+              alpha: dot.darken ? 0.25 : 0.2,
+            })
+          }
+        }
+
+        // Road edge transitions — soften border where road meets grass
+        if (tileKind === 'road') {
+          const neighbors: Array<[number, number, 'top' | 'bottom' | 'left' | 'right']> = [
+            [x, y - 1, 'top'], [x, y + 1, 'bottom'], [x - 1, y, 'left'], [x + 1, y, 'right'],
+          ]
+          for (const [nx, ny, side] of neighbors) {
+            if (nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT && this.getTileKind(nx, ny) === 'grass') {
+              const { fillColor: grassColor } = this.getTilePalette('grass', nx, ny)
+              const ex = side === 'left' ? tileX : side === 'right' ? tileX + TILE_SIZE - 3 : tileX
+              const ey = side === 'top' ? tileY : side === 'bottom' ? tileY + TILE_SIZE - 3 : tileY
+              const ew = side === 'left' || side === 'right' ? 3 : TILE_SIZE
+              const eh = side === 'top' || side === 'bottom' ? 3 : TILE_SIZE
+              this.tileGraphics.rect(ex, ey, ew, eh)
+              this.tileGraphics.fill({ color: grassColor, alpha: 0.3 })
+            }
+          }
+        }
       }
+    }
+  }
+
+  /** Animate water tiles with a slow ripple effect */
+  private updateWaterRipple(): void {
+    this.waterOverlay.clear()
+    const t = this.waterTime
+
+    for (let y = 0; y < MAP_HEIGHT; y += 1) {
+      for (let x = 0; x < MAP_WIDTH; x += 1) {
+        if (this.getTileKind(x, y) !== 'water') continue
+
+        const tileX = x * TILE_SIZE
+        const tileY = y * TILE_SIZE
+        // 2-3 ripple lines per water tile
+        const phase = (x * 0.7 + y * 1.3)
+        const waveY1 = tileY + 10 + Math.sin(t * 1.2 + phase) * 3
+        const waveY2 = tileY + 22 + Math.sin(t * 0.9 + phase + 2) * 2.5
+
+        this.waterOverlay.moveTo(tileX + 4, waveY1)
+        this.waterOverlay.lineTo(tileX + TILE_SIZE - 4, waveY1 + Math.sin(t + phase) * 1.5)
+        this.waterOverlay.stroke({ color: 0xffffff, width: 0.8, alpha: 0.12 + Math.sin(t * 0.6 + phase) * 0.05 })
+
+        this.waterOverlay.moveTo(tileX + 8, waveY2)
+        this.waterOverlay.lineTo(tileX + TILE_SIZE - 8, waveY2 + Math.sin(t * 0.7 + phase) * 1)
+        this.waterOverlay.stroke({ color: 0xffffff, width: 0.6, alpha: 0.08 + Math.sin(t * 0.4 + phase + 1) * 0.04 })
+      }
+    }
+  }
+
+  /** Draw darkening vignette at map edges for cinematic framing */
+  private drawVignette(): void {
+    this.vignetteGraphics.clear()
+    const edgeSize = TILE_SIZE * 2
+    const color = 0x020617
+
+    // Top edge
+    this.vignetteGraphics.rect(0, 0, WORLD_WIDTH, edgeSize)
+    this.vignetteGraphics.fill({ color, alpha: 0.2 })
+    // Bottom edge
+    this.vignetteGraphics.rect(0, WORLD_HEIGHT - edgeSize, WORLD_WIDTH, edgeSize)
+    this.vignetteGraphics.fill({ color, alpha: 0.2 })
+    // Left edge
+    this.vignetteGraphics.rect(0, 0, edgeSize, WORLD_HEIGHT)
+    this.vignetteGraphics.fill({ color, alpha: 0.15 })
+    // Right edge
+    this.vignetteGraphics.rect(WORLD_WIDTH - edgeSize, 0, edgeSize, WORLD_HEIGHT)
+    this.vignetteGraphics.fill({ color, alpha: 0.15 })
+    // Corners (double overlap = darker)
+    const cornerSize = TILE_SIZE * 1.5
+    for (const [cx, cy] of [[0, 0], [WORLD_WIDTH - cornerSize, 0], [0, WORLD_HEIGHT - cornerSize], [WORLD_WIDTH - cornerSize, WORLD_HEIGHT - cornerSize]]) {
+      this.vignetteGraphics.rect(cx, cy, cornerSize, cornerSize)
+      this.vignetteGraphics.fill({ color, alpha: 0.1 })
     }
   }
 

@@ -8,12 +8,15 @@ import {
   LanguageSwitcher,
   LoadingTransition,
   MessageBar,
+  RightPanel,
   ScenePicker,
   ThemeToggle,
   WelcomePage,
 } from './components/ui'
+import { SplitPane } from './components/ui/SplitPane'
 import { OnboardingDrama } from './components/ui/OnboardingDrama'
 import { TutorialOverlay } from './components/ui/TutorialOverlay'
+import { NotificationCenter } from './components/ui/NotificationCenter'
 import { SoundToggleButton } from './components/toolbar/SoundToggleButton'
 import { SpeedControl } from './components/toolbar/SpeedControl'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
@@ -39,9 +42,6 @@ const SEASON_EMOJI: Record<string, string> = {
 const TownCanvas = lazy(() =>
   import('./components/town/TownCanvas').then((module) => ({ default: module.TownCanvas })),
 )
-const GraphPanel = lazy(() =>
-  import('./components/graph/GraphPanel').then((module) => ({ default: module.GraphPanel })),
-)
 
 type AppPage = 'welcome' | 'picking' | 'guide' | 'simulation'
 
@@ -59,35 +59,33 @@ function SimulationView() {
   } = useWebSocket()
   useKeyboardShortcuts(true)
 
-  const selectedResidentId = useSimulationStore((s) => s.selectedResidentId)
   const time = useSimulationStore((s) => s.time)
   const weather = useSimulationStore((s) => s.weather)
   const season = useSimulationStore((s) => s.season)
+  const speed = useSimulationStore((s) => s.speed)
 
   const [showOnboarding, setShowOnboarding] = useState(
     () => !localStorage.getItem('populace:onboarding_done'),
   )
-  const [showGraph, setShowGraph] = useState(false)
   const [showToolbar, setShowToolbar] = useState(false)
   const [activeQuickTool, setActiveQuickTool] = useState<string | null>(null)
 
-  // Hide graph when sidebar is open (they share the right side)
-  const graphVisible = showGraph && !selectedResidentId
+  const isPaused = speed === 0
 
-  // Escape closes drawers in priority order: toolbar → graph → (resident handled by useKeyboardShortcuts)
-  const handleEscape = useCallback((e: KeyboardEvent) => {
-    if (e.code !== 'Escape') return
-    const tag = (e.target as HTMLElement).tagName
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return
-    if (showToolbar) {
-      setShowToolbar(false)
-      setActiveQuickTool(null)
-      e.stopPropagation()
-    } else if (showGraph) {
-      setShowGraph(false)
-      e.stopPropagation()
-    }
-  }, [showToolbar, showGraph])
+  // Escape closes toolbar drawer
+  const handleEscape = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.code !== 'Escape') return
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (showToolbar) {
+        setShowToolbar(false)
+        setActiveQuickTool(null)
+        e.stopPropagation()
+      }
+    },
+    [showToolbar],
+  )
 
   useEffect(() => {
     window.addEventListener('keydown', handleEscape, true)
@@ -115,11 +113,11 @@ function SimulationView() {
     return <LoadingTransition onRetry={retry} timedOut={startupTimedOut} />
   }
 
-  return (
-    <div className="fixed inset-0 bg-slate-950 animate-[fadeIn_600ms_ease-out]">
-      {/* -- FULLSCREEN MAP -- */}
+  const mapArea = (
+    <div className="relative h-full w-full overflow-hidden">
+      {/* Fullscreen Map */}
       <div
-        className="absolute inset-0"
+        className={`absolute inset-0 transition-[filter] duration-500 ${isPaused ? 'grayscale' : ''}`}
         role="region"
         aria-label={t('app.map_region')}
         tabIndex={2}
@@ -129,7 +127,186 @@ function SimulationView() {
         </Suspense>
       </div>
 
-      {/* -- Disconnected overlay -- */}
+      {/* Paused overlay */}
+      {isPaused && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+          <div className="animate-[fadeIn_300ms_ease-out] rounded-2xl border border-white/10 bg-slate-950/60 px-8 py-4 shadow-2xl backdrop-blur-sm">
+            <span className="text-lg font-bold uppercase tracking-[0.3em] text-white/70">
+              {t('app.paused')}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* TOP-LEFT HUD: Glassmorphism status bar */}
+      <div className="pointer-events-auto absolute left-3 top-3 z-20">
+        <div className="flex items-center gap-0 rounded-xl border border-white/10 bg-slate-950/50 shadow-lg backdrop-blur-md">
+          <div className="flex items-center gap-2 px-3 py-2 text-[11px]">
+            <span className="text-slate-300">{time}</span>
+            <span className="text-white/15">|</span>
+            <span title={seasonLabel}>{seasonEmoji}</span>
+            <span>{weatherEmoji}</span>
+            <span className="text-white/15">|</span>
+            <SpeedControl variant="compact" />
+          </div>
+        </div>
+      </div>
+
+      {/* BOTTOM-LEFT: Message Feed (hidden on small screens) */}
+      <div className="pointer-events-none absolute bottom-16 left-3 z-20 hidden w-72 sm:bottom-14 sm:block">
+        <MessageBar />
+      </div>
+
+      {/* BOTTOM: Mobile tab bar / Desktop floating toolbar */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center sm:bottom-3 sm:px-3">
+        <div
+          className="pointer-events-auto flex w-full items-stretch border-t border-white/10 bg-slate-950/85 backdrop-blur-md sm:w-auto sm:max-w-full sm:gap-1 sm:rounded-2xl sm:border sm:px-1.5 sm:py-1.5 sm:shadow-xl"
+          role="toolbar"
+          aria-label={t('app.toolbar_region')}
+          tabIndex={1}
+        >
+          {[
+            { key: 'director', icon: '\u26A1', event: 'populace:open-director' },
+            { key: 'persona', icon: '\uD83D\uDC64', event: 'populace:open-persona' },
+            { key: 'quest', icon: '\uD83C\uDFAF', event: 'populace:open-quest' },
+            { key: 'report', icon: '\uD83D\uDCF0', event: 'populace:open-report' },
+            { key: 'settings', icon: '\u2699\uFE0F', event: 'populace:open-settings' },
+          ].map((tool) => {
+            const isActive = showToolbar && activeQuickTool === tool.key
+            return (
+              <button
+                key={tool.key}
+                type="button"
+                onClick={() => toggleTool(tool.key, tool.event)}
+                aria-pressed={isActive}
+                aria-label={t(`toolbar.${tool.key}`)}
+                title={t(`toolbar.${tool.key}`)}
+                className={[
+                  'flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[10px] font-medium transition duration-200 active:scale-95',
+                  'sm:flex-none sm:flex-row sm:gap-1 sm:rounded-lg sm:border sm:px-2.5 sm:py-1.5 sm:text-xs',
+                  isActive
+                    ? 'text-white theme-accent-button-active'
+                    : 'text-slate-400 hover:text-white sm:border-white/10 sm:bg-white/5 sm:text-slate-300 sm:hover:bg-white/10',
+                ].join(' ')}
+              >
+                <span aria-hidden="true" className="text-lg leading-none sm:text-sm">{tool.icon}</span>
+                <span className="sm:hidden">{t(`toolbar.${tool.key}`)}</span>
+                <span className="hidden sm:inline">{t(`toolbar.${tool.key}`)}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* TOOL PANEL DRAWER */}
+      {showToolbar && (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              setShowToolbar(false)
+              setActiveQuickTool(null)
+            }}
+            className="absolute inset-0 z-30 bg-black/20"
+            aria-label={t('app.close')}
+          />
+          <div className="pointer-events-none absolute inset-x-0 bottom-[3.25rem] z-40 flex animate-[slideUp_200ms_ease-out] justify-center sm:bottom-14">
+            <div
+              className="pointer-events-auto w-full rounded-t-2xl border border-b-0 border-white/10 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md sm:mx-3 sm:max-w-2xl sm:rounded-xl sm:border-b sm:p-3"
+              role="region"
+              aria-label={t('app.panel_region')}
+              tabIndex={4}
+            >
+              {/* Drag handle (mobile) */}
+              <div className="mb-2 flex justify-center sm:hidden">
+                <div className="h-1 w-10 rounded-full bg-white/20" />
+              </div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-400">
+                  {activeQuickTool ? t(`toolbar.${activeQuickTool}`) : t('app.open_tools')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowToolbar(false)
+                    setActiveQuickTool(null)
+                  }}
+                  aria-label={t('app.close')}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400 transition duration-200 hover:bg-white/10 hover:text-white active:scale-95"
+                >
+                  {'\u2715'} {t('app.close')}
+                </button>
+              </div>
+              <div className="max-h-[60vh] overflow-y-auto sm:max-h-[50vh]">
+                <Toolbar />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="fixed inset-0 flex flex-col bg-slate-950 animate-[fadeIn_600ms_ease-out]">
+      {/* ── HEADER BAR ── */}
+      <header className="relative z-30 flex h-10 shrink-0 items-center justify-between border-b border-white/8 bg-slate-950/90 px-3 backdrop-blur-sm">
+        {/* Left: Logo */}
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs font-bold uppercase tracking-wider text-cyan-300/80">
+            POPULACE
+          </span>
+        </div>
+
+        {/* Right: Connection + online + settings */}
+        <div className="flex items-center gap-2">
+          <div
+            className={`flex items-center gap-1.5 text-[10px] font-medium ${connected ? 'text-emerald-400/80' : 'animate-pulse text-amber-400/80'}`}
+            title={connected ? t('ws.reconnected') : t('ws.connection_lost')}
+          >
+            <span
+              className={`inline-block h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-400' : 'bg-amber-400'}`}
+            />
+            <span>{connected ? t('app.connected') : t('app.disconnected_short')}</span>
+          </div>
+          <span className="text-[10px] text-slate-500">|</span>
+          <span className="text-[10px] text-slate-400">
+            {t('app.online_count', { count: connectionCount })}
+          </span>
+          <span className="text-[10px] text-slate-500">|</span>
+          <SoundToggleButton />
+          <LanguageSwitcher />
+          <ThemeToggle />
+          <NotificationCenter />
+          <button
+            type="button"
+            onClick={() => {
+              setShowToolbar(true)
+              setActiveQuickTool('settings')
+              window.dispatchEvent(new CustomEvent('populace:open-settings'))
+            }}
+            className="theme-accent-focus flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-white/5 text-[11px] text-slate-300 transition duration-200 hover:bg-white/10 hover:text-white active:scale-95"
+            title={t('toolbar.settings')}
+            aria-label={t('toolbar.settings')}
+          >
+            {'\u2699\uFE0F'}
+          </button>
+        </div>
+      </header>
+
+      {/* ── MAIN CONTENT: Split Pane ── */}
+      <div className="relative min-h-0 flex-1">
+        <SplitPane
+          left={mapArea}
+          right={<RightPanel />}
+          defaultRatio={65}
+          minLeftRatio={45}
+          minRightRatio={20}
+          storageKey="populace:main-split-ratio"
+        />
+      </div>
+
+      {/* ── Disconnected overlay ── */}
       {disconnected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/72 backdrop-blur-md">
           <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-slate-900/90 px-10 py-9 shadow-2xl">
@@ -137,8 +314,12 @@ function SimulationView() {
               <>
                 <span className="text-2xl">{'\u26A0\uFE0F'}</span>
                 <div className="text-center">
-                  <p className="text-[11px] uppercase tracking-[0.34em] text-amber-100/70">{t('app.conn_failed_badge')}</p>
-                  <p className="mt-3 text-base font-medium text-amber-50">{t('app.conn_failed')}</p>
+                  <p className="text-[11px] uppercase tracking-[0.34em] text-amber-100/70">
+                    {t('app.conn_failed_badge')}
+                  </p>
+                  <p className="mt-3 text-base font-medium text-amber-50">
+                    {t('app.conn_failed')}
+                  </p>
                   <button
                     type="button"
                     onClick={retry}
@@ -152,9 +333,13 @@ function SimulationView() {
               <>
                 <span className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-300/90 border-t-transparent" />
                 <div className="text-center">
-                  <p className="text-[11px] uppercase tracking-[0.34em] text-cyan-100/70">{t('app.conn_interrupted_badge')}</p>
+                  <p className="text-[11px] uppercase tracking-[0.34em] text-cyan-100/70">
+                    {t('app.conn_interrupted_badge')}
+                  </p>
                   <p className="mt-3 text-base font-medium text-cyan-50">
-                    {reconnectCountdown > 0 ? t('app.reconnecting', { seconds: reconnectCountdown }) : t('app.conn_interrupted')}
+                    {reconnectCountdown > 0
+                      ? t('app.reconnecting', { seconds: reconnectCountdown })
+                      : t('app.conn_interrupted')}
                   </p>
                 </div>
               </>
@@ -163,168 +348,7 @@ function SimulationView() {
         </div>
       )}
 
-      {/* -- TOP-LEFT HUD: Status -- */}
-      <div className="fixed left-3 top-3 z-20 pointer-events-auto">
-        <div className="rounded-xl border border-white/8 bg-slate-950/65 px-3 py-2 shadow-lg backdrop-blur-sm">
-          <div className="flex items-center gap-2 text-[11px]">
-            <span className="font-mono font-bold uppercase tracking-wider text-cyan-300/80">POPULACE</span>
-            <span className="text-slate-600">|</span>
-            <span className="text-slate-400">{time}</span>
-            <span className="text-slate-600">|</span>
-            <span>{weatherEmoji}</span>
-            <span>{seasonEmoji} {seasonLabel}</span>
-            <span className="text-slate-600">|</span>
-            <span className="text-emerald-300/80">{t('app.online_count', { count: connectionCount })}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* -- TOP-RIGHT: Settings icons -- */}
-      <div className="fixed right-3 top-3 z-20 flex items-center gap-1.5 pointer-events-auto">
-        <SoundToggleButton />
-        <LanguageSwitcher />
-        <ThemeToggle />
-        <button
-          type="button"
-          onClick={() => { setShowToolbar(true); setActiveQuickTool('settings'); window.dispatchEvent(new CustomEvent('populace:open-settings')) }}
-          className="theme-accent-focus flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-sm text-slate-300 transition duration-200 hover:bg-white/10 hover:text-white active:scale-95"
-          title={t('toolbar.settings')}
-          aria-label={t('toolbar.settings')}
-        >
-          {'\u2699\uFE0F'}
-        </button>
-      </div>
-
-      {/* -- BOTTOM-LEFT: Message Feed (hidden on small screens) -- */}
-      <div className="fixed bottom-14 left-3 z-20 hidden w-72 pointer-events-none sm:block">
-        <MessageBar />
-      </div>
-
-      {/* -- BOTTOM-CENTER: Quick Action Bar -- */}
-      <div className="fixed inset-x-0 bottom-3 z-30 flex justify-center pointer-events-none px-3">
-        <div
-          className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/80 px-1.5 py-1.5 shadow-xl backdrop-blur-sm scrollbar-none"
-          role="toolbar"
-          aria-label={t('app.toolbar_region')}
-          tabIndex={1}
-        >
-          {[
-            { key: 'director', icon: '\u26A1', event: 'populace:open-director' },
-            { key: 'persona', icon: '\uD83D\uDC64', event: 'populace:open-persona' },
-            { key: 'quest', icon: '\uD83C\uDFAF', event: 'populace:open-quest' },
-            { key: 'report', icon: '\uD83D\uDCF0', event: 'populace:open-report' },
-          ].map((tool) => (
-            <button
-              key={tool.key}
-              type="button"
-              onClick={() => toggleTool(tool.key, tool.event)}
-              aria-pressed={showToolbar && activeQuickTool === tool.key}
-              aria-label={t(`toolbar.${tool.key}`)}
-              title={t(`toolbar.${tool.key}`)}
-              className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition duration-200 active:scale-95 ${
-                showToolbar && activeQuickTool === tool.key
-                  ? 'theme-accent-button-active'
-                  : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              <span aria-hidden="true">{tool.icon}</span><span className="ml-1 hidden sm:inline">{t(`toolbar.${tool.key}`)}</span>
-            </button>
-          ))}
-
-          <div className="mx-0.5 h-5 w-px bg-white/10" />
-
-          <button
-            type="button"
-            onClick={() => setShowGraph((v) => !v)}
-            aria-pressed={graphVisible}
-            aria-label={t('app.relationship_graph')}
-            title={t('app.relationship_graph')}
-            className={`rounded-lg border px-2 py-1.5 text-xs transition duration-200 active:scale-95 ${graphVisible ? 'theme-accent-button-active' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
-          >
-            <span aria-hidden="true">{'\uD83D\uDD78\uFE0F'}</span>
-          </button>
-
-          <div className="mx-0.5 h-5 w-px bg-white/10" />
-
-          <SpeedControl />
-        </div>
-      </div>
-
-      {/* -- RIGHT DRAWER: Graph Panel -- */}
-      <div
-        className={`fixed right-0 top-0 bottom-0 z-20 w-full transform transition-transform duration-300 will-change-transform sm:w-96 ${graphVisible ? 'translate-x-0' : 'translate-x-full'} pointer-events-auto`}
-        role="region"
-        aria-label={t('app.graph_region')}
-        tabIndex={graphVisible ? 3 : -1}
-        aria-hidden={!graphVisible}
-      >
-        <div className="h-full border-l border-white/10 bg-slate-950/92 p-3 backdrop-blur-md sm:p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white">{t('app.relationship_graph')}</h3>
-            <button
-              type="button"
-              onClick={() => setShowGraph(false)}
-              aria-label={t('app.close')}
-              className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-400 transition duration-200 hover:bg-white/10 hover:text-white active:scale-95"
-            >
-              {'\u2715'}
-            </button>
-          </div>
-          <Suspense fallback={null}>
-            <GraphPanel />
-          </Suspense>
-        </div>
-      </div>
-
-      {/* -- TOOL PANEL DRAWER -- */}
-      {showToolbar && (
-        <>
-          <button
-            type="button"
-            onClick={() => { setShowToolbar(false); setActiveQuickTool(null) }}
-            className="fixed inset-0 z-30 bg-black/20"
-            aria-label={t('app.close')}
-          />
-          <div className="fixed inset-x-0 bottom-12 z-40 flex justify-center pointer-events-none animate-[slideUp_200ms_ease-out] sm:bottom-14">
-            <div
-              className="pointer-events-auto w-full max-w-2xl rounded-xl border border-white/10 bg-slate-950/92 p-2 shadow-2xl backdrop-blur-md mx-2 sm:mx-3 sm:p-3"
-              role="region"
-              aria-label={t('app.panel_region')}
-              tabIndex={4}
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-400">{activeQuickTool ? t(`toolbar.${activeQuickTool}`) : t('app.open_tools')}</span>
-                <button
-                  type="button"
-                  onClick={() => { setShowToolbar(false); setActiveQuickTool(null) }}
-                  aria-label={t('app.close')}
-                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-400 transition duration-200 hover:bg-white/10 hover:text-white active:scale-95"
-                >
-                  {'\u2715'} {t('app.close')}
-                </button>
-              </div>
-              <div className="max-h-[50vh] overflow-y-auto">
-                <Toolbar />
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* -- Connection indicator (top-left, below HUD) -- */}
-      <div
-        className={[
-          'fixed left-3 top-11 z-20 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors pointer-events-none',
-          connected
-            ? 'text-emerald-400/60'
-            : 'text-amber-400/70 animate-pulse',
-        ].join(' ')}
-        title={connected ? t('ws.reconnected') : t('ws.connection_lost')}
-      >
-        {connected ? '\u25CF' : '\u25CB'}
-      </div>
-
-      {/* -- Onboarding + tutorial -- */}
+      {/* ── Onboarding + tutorial ── */}
       {hasInitialSnapshot && showOnboarding && (
         <OnboardingDrama
           onComplete={() => {
@@ -382,23 +406,34 @@ function App() {
   }, [accent])
 
   if (page === 'welcome') {
-    return <WelcomePage onStart={() => setPage('picking')} onGuide={() => openGuide('welcome')} />
+    return (
+      <div key="welcome" className="animate-[pageEnter_400ms_ease-out]">
+        <WelcomePage onStart={() => setPage('picking')} onGuide={() => openGuide('welcome')} />
+      </div>
+    )
   }
 
   if (page === 'picking') {
     return (
-      <ScenePicker
-        onEnter={() => setPage('simulation')}
-        onBack={() => setPage('welcome')}
-      />
+      <div key="picking" className="animate-[pageEnter_400ms_ease-out]">
+        <ScenePicker onEnter={() => setPage('simulation')} onBack={() => setPage('welcome')} />
+      </div>
     )
   }
 
   if (page === 'guide') {
-    return <GuidePage onBack={() => setPage(lastPageRef.current)} />
+    return (
+      <div key="guide" className="animate-[pageEnter_400ms_ease-out]">
+        <GuidePage onBack={() => setPage(lastPageRef.current)} />
+      </div>
+    )
   }
 
-  return <SimulationView />
+  return (
+    <div key="simulation" className="animate-[pageEnter_400ms_ease-out]">
+      <SimulationView />
+    </div>
+  )
 }
 
 export default App

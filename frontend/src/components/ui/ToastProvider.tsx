@@ -19,11 +19,35 @@ interface Toast {
   description: string
 }
 
-interface ToastCtxValue {
-  pushToast: (messageOrOpts: string | ToastOptions, opts?: ToastOptions) => void
+export interface NotificationEntry {
+  id: string
+  type: ToastType
+  category: ToastCategory
+  title: string
+  description: string
+  timestamp: number
+  read: boolean
 }
 
-const ToastCtx = React.createContext<ToastCtxValue>({ pushToast: () => {} })
+interface ToastCtxValue {
+  pushToast: (messageOrOpts: string | ToastOptions, opts?: ToastOptions) => void
+  notifications: NotificationEntry[]
+  unreadCount: number
+  markRead: (id: string) => void
+  markAllRead: () => void
+  clearNotifications: () => void
+}
+
+const MAX_NOTIFICATIONS = 100
+
+const ToastCtx = React.createContext<ToastCtxValue>({
+  pushToast: () => {},
+  notifications: [],
+  unreadCount: 0,
+  markRead: () => {},
+  markAllRead: () => {},
+  clearNotifications: () => {},
+})
 
 const TOAST_VARIANTS: Record<
   ToastType,
@@ -60,6 +84,7 @@ function relationshipBorderClass(title: string): string {
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = React.useState<Toast[]>([])
+  const [notifications, setNotifications] = React.useState<NotificationEntry[]>([])
   const timersRef = React.useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
 
   React.useEffect(() => {
@@ -87,6 +112,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       }
 
       setToasts((current) => [...current, { id, type, category, title, description }])
+
+      setNotifications((current) => {
+        const entry: NotificationEntry = { id, type, category, title, description, timestamp: Date.now(), read: false }
+        return [entry, ...current].slice(0, MAX_NOTIFICATIONS)
+      })
+
       const timer = window.setTimeout(() => {
         timersRef.current.delete(timer)
         setToasts((current) => current.filter((toast) => toast.id !== id))
@@ -96,12 +127,36 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [],
   )
 
+  const markRead = React.useCallback((id: string) => {
+    setNotifications((current) =>
+      current.map((n) => (n.id === id ? { ...n, read: true } : n)),
+    )
+  }, [])
+
+  const markAllRead = React.useCallback(() => {
+    setNotifications((current) => current.map((n) => ({ ...n, read: true })))
+  }, [])
+
+  const clearNotifications = React.useCallback(() => {
+    setNotifications([])
+  }, [])
+
+  const unreadCount = React.useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications],
+  )
+
+  const ctxValue = React.useMemo<ToastCtxValue>(
+    () => ({ pushToast, notifications, unreadCount, markRead, markAllRead, clearNotifications }),
+    [pushToast, notifications, unreadCount, markRead, markAllRead, clearNotifications],
+  )
+
   return (
-    <ToastCtx.Provider value={{ pushToast }}>
+    <ToastCtx.Provider value={ctxValue}>
       {children}
       <div
         data-testid="toast-viewport"
-        className="fixed top-4 right-4 z-50 flex flex-col gap-2"
+        className="fixed z-50 flex flex-col gap-2 top-3 inset-x-3 items-center sm:inset-x-auto sm:top-4 sm:right-4 sm:items-end"
       >
         {toasts.map((toast) => {
           const variant = TOAST_VARIANTS[toast.type]
