@@ -11,9 +11,10 @@ import { useTranslation } from 'react-i18next'
 import { Application } from 'pixi.js'
 
 import { useSound } from '../../audio'
-import { getActiveEvents, injectEvent, type ActiveEvent } from '../../services/api'
+import { getActiveEvents, getZones, injectEvent, type ActiveEvent } from '../../services/api'
 import { useToast } from '../ui/ToastProvider'
 import { useRelationshipsStore } from '../../stores/relationships'
+import type { Zone } from '../../types'
 import {
   useSimulationStore,
   type ResidentPosition,
@@ -21,7 +22,7 @@ import {
 } from '../../stores/simulation'
 import { TownChrome, type TownContextMenuState, type TownInspectionState, type TownPlaceholder } from './TownChrome'
 import { TownRenderer } from './TownRenderer'
-import { inspectTile } from './townMap'
+import { inspectTile, zoneContainsTile } from './townMap'
 
 function toReplayResident(
   resident: {
@@ -97,13 +98,18 @@ export function TownCanvas() {
   const [placeholders, setPlaceholders] = useState<TownPlaceholder[]>([])
   const [followedResidentId, setFollowedResidentId] = useState<string | null>(null)
   const [heatmapOn, setHeatmapOn] = useState(false)
+  const [zones, setZones] = useState<Zone[]>([])
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null)
   const lastRecordedTick = useRef(0)
 
   // Sync follow state from renderer on each animation frame
   useEffect(() => {
     let raf: number
     const sync = () => {
-      const rid = rendererRef.current?.getFollowedResidentId() ?? null
+      const rid =
+        typeof rendererRef.current?.getFollowedResidentId === 'function'
+          ? rendererRef.current.getFollowedResidentId()
+          : null
       setFollowedResidentId((prev) => (prev !== rid ? rid : prev))
       raf = requestAnimationFrame(sync)
     }
@@ -132,7 +138,7 @@ export function TownCanvas() {
     [liveRunning, speed, liveTick, tickPerDay, liveTime, weather, season],
   )
 
-  const residents = useMemo<ResidentPosition[]>(
+  const renderResidents = useMemo<ResidentPosition[]>(
     () =>
       replayTick !== null
         ? replaySnapshot?.residents.map((resident) => toReplayResident(resident, liveResidents)) ??
@@ -151,9 +157,26 @@ export function TownCanvas() {
       reason: relationship.reason ?? '',
     })) ?? liveRelationships
   const selectedResident = useMemo(
-    () => residents.find((resident) => resident.id === selectedResidentId) ?? null,
-    [residents, selectedResidentId],
+    () => renderResidents.find((resident) => resident.id === selectedResidentId) ?? null,
+    [renderResidents, selectedResidentId],
   )
+  const selectedZone = useMemo(() => {
+    const zone = zones.find((item) => item.id === selectedZoneId)
+    if (!zone) {
+      return null
+    }
+
+    const residentCount = renderResidents.filter((resident) =>
+      zoneContainsTile(zone, resident.targetX, resident.targetY),
+    ).length
+    const buildingCount = buildings.filter((building) => zoneContainsTile(zone, building.position[0], building.position[1])).length
+
+    return {
+      ...zone,
+      resident_count: residentCount,
+      building_count: buildingCount,
+    }
+  }, [buildings, renderResidents, selectedZoneId, zones])
   const simulationMeta = useMemo(
     () =>
       replayTick !== null
@@ -183,8 +206,11 @@ export function TownCanvas() {
     const tile = renderer.screenToTile(event.clientX - bounds.left, event.clientY - bounds.top)
     if (!tile) return
 
+    const clickedZone = zones.find((zone) => zoneContainsTile(zone, tile.tileX, tile.tileY)) ?? null
+    setSelectedZoneId(clickedZone?.id ?? null)
+
     window.dispatchEvent(new CustomEvent('populace:map-editor-paint', { detail: { tileX: tile.tileX, tileY: tile.tileY } }))
-  }, [])
+  }, [zones])
 
   const handleCanvasPointerMove = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     if (!(window as unknown as Record<string, unknown>).__mapEditorPainting) return
@@ -236,9 +262,9 @@ export function TownCanvas() {
       return
     }
 
-    setInspection(inspectTile(contextMenu.tileX, contextMenu.tileY, buildings, residents))
+    setInspection(inspectTile(contextMenu.tileX, contextMenu.tileY, buildings, renderResidents))
     setContextMenu(null)
-  }, [buildings, contextMenu, residents])
+  }, [buildings, contextMenu, renderResidents])
 
   const handlePlacePlaceholder = useCallback(() => {
     if (!contextMenu) {
@@ -357,6 +383,7 @@ export function TownCanvas() {
 
       const state = useSimulationStore.getState()
       renderer.syncBuildings(state.buildings)
+      renderer.syncZones(zones)
       renderer.syncResidents(state.residents)
       renderer.updateSimulationMeta({
         running: state.running,
@@ -395,8 +422,12 @@ export function TownCanvas() {
   }, [buildings])
 
   useEffect(() => {
-    rendererRef.current?.syncResidents(residents)
-  }, [residents])
+    rendererRef.current?.syncZones(zones)
+  }, [zones])
+
+  useEffect(() => {
+    rendererRef.current?.syncResidents(renderResidents)
+  }, [renderResidents])
 
   useEffect(() => {
     rendererRef.current?.updateSimulationMeta({
@@ -424,6 +455,10 @@ export function TownCanvas() {
   }, [hoveredPairIds])
 
   useEffect(() => {
+    rendererRef.current?.setSelectedZone(selectedZoneId)
+  }, [selectedZoneId])
+
+  useEffect(() => {
     rendererRef.current?.updateWeather(simulationMeta.weather)
   }, [simulationMeta.weather])
 
@@ -434,11 +469,11 @@ export function TownCanvas() {
 
   // Heatmap: record tick positions
   useEffect(() => {
-    if (simulationMeta.tick > lastRecordedTick.current && residents.length > 0) {
+    if (simulationMeta.tick > lastRecordedTick.current && renderResidents.length > 0) {
       lastRecordedTick.current = simulationMeta.tick
-      rendererRef.current?.recordHeatmapTick(residents)
+      rendererRef.current?.recordHeatmapTick(renderResidents)
     }
-  }, [simulationMeta.tick, residents])
+  }, [simulationMeta.tick, renderResidents])
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -474,6 +509,28 @@ export function TownCanvas() {
       void poll()
     }, 3000)
     return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadZones = async () => {
+      try {
+        const nextZones = await getZones()
+        if (!cancelled) {
+          setZones(nextZones)
+        }
+      } catch {
+        if (!cancelled) {
+          setZones([])
+        }
+      }
+    }
+
+    void loadZones()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -519,7 +576,7 @@ export function TownCanvas() {
     >
       <div id="town-canvas" ref={hostRef} className="h-full w-full" />
       <TownChrome
-        residents={residents}
+        residents={renderResidents}
         buildings={buildings}
         relationships={relationships}
         selectedResidentId={selectedResident?.id ?? null}
@@ -528,6 +585,7 @@ export function TownCanvas() {
         messageFeed={messageFeed}
         contextMenu={contextMenu}
         inspection={inspection}
+        selectedZone={selectedZone}
         placeholders={placeholders}
         onCloseContextMenu={closeContextMenu}
         onInjectEvent={() => {
@@ -537,6 +595,7 @@ export function TownCanvas() {
         onPlacePlaceholder={handlePlacePlaceholder}
         onClearResidentSelection={() => selectResident(null)}
         onDismissInspection={() => setInspection(null)}
+        onDismissZone={() => setSelectedZoneId(null)}
         onCancelFollow={() => {
           rendererRef.current?.setFollowTarget(null)
           selectResident(null)
@@ -558,7 +617,7 @@ export function TownCanvas() {
           {heatmapOn ? 'ON' : 'OFF'}
         </button>
       </div>
-      {residents.length === 0 && (
+      {renderResidents.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/45 backdrop-blur-[2px]">
           <div className="rounded-xl border border-cyan-300/15 bg-slate-950/80 px-6 py-5 text-center shadow-[0_18px_44px_rgba(8,15,31,0.4)]">
             <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-100/70">{t('canvas.waiting_badge')}</p>

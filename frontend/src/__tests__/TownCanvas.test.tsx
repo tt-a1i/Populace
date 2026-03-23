@@ -2,9 +2,22 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockScreenToTile, mockInjectEvent, mockPushToast, mockPlay } = vi.hoisted(() => ({
+const { mockScreenToTile, mockInjectEvent, mockPushToast, mockPlay, mockGetActiveEvents, mockGetZones } = vi.hoisted(() => ({
   mockScreenToTile: vi.fn(),
   mockInjectEvent: vi.fn().mockResolvedValue({}),
+  mockGetActiveEvents: vi.fn().mockResolvedValue([{ id: 'evt-1', radius: 6 }]),
+  mockGetZones: vi.fn().mockResolvedValue([
+    {
+      id: 'zone-commercial',
+      name: '商业活力带',
+      type: 'commercial',
+      bounds: { x: 0, y: 0, width: 12, height: 10 },
+      atmosphere: { noise: 0.82, safety: 0.64, beauty: 0.58 },
+      resident_count: 1,
+      building_count: 1,
+      dominant_building_types: ['cafe'],
+    },
+  ]),
   mockPushToast: vi.fn(),
   mockPlay: vi.fn(),
 }))
@@ -35,14 +48,22 @@ vi.mock('../components/town/TownRenderer', () => ({
     destroy = vi.fn()
     updateWeather = vi.fn()
     setPlaceholderBuildings = vi.fn()
+    syncZones = vi.fn()
+    setSelectedZone = vi.fn()
     showEventRadii = vi.fn()
     drawRelationshipLines = vi.fn()
+    setHeatmapEnabled = vi.fn()
+    recordHeatmapTick = vi.fn()
+    triggerMilestone = vi.fn()
+    redrawTiles = vi.fn()
+    getFollowedResidentId = vi.fn().mockReturnValue(null)
     screenToTile = mockScreenToTile
   },
 }))
 
 vi.mock('../services/api', () => ({
-  getActiveEvents: vi.fn().mockResolvedValue([]),
+  getActiveEvents: mockGetActiveEvents,
+  getZones: mockGetZones,
   injectEvent: mockInjectEvent,
 }))
 
@@ -93,9 +114,11 @@ vi.mock('../stores/simulation', () => ({
         speed: 1,
         hoveredPairIds: null,
         weather: 'sunny',
+        season: 'spring',
         messageFeed: [],
         replayFrozenFrame: null,
         getFrameByTick: vi.fn().mockReturnValue(null),
+        getSnapshotByTick: vi.fn().mockReturnValue(null),
         selectResident: vi.fn(),
       }),
     {
@@ -135,6 +158,7 @@ vi.mock('../stores/simulation', () => ({
         speed: 1,
         hoveredPairIds: null,
         weather: 'sunny',
+        season: 'spring',
       }),
     },
   ),
@@ -162,6 +186,9 @@ describe('TownCanvas', () => {
     mockInjectEvent.mockClear()
     mockPushToast.mockClear()
     mockPlay.mockClear()
+    mockGetActiveEvents.mockClear()
+    mockGetZones.mockClear()
+    mockGetActiveEvents.mockResolvedValue([{ id: 'evt-1', radius: 6 }])
     vi.stubGlobal('ResizeObserver', MockResizeObserver)
   })
 
@@ -209,5 +236,47 @@ describe('TownCanvas', () => {
     await waitFor(() => {
       expect(screen.getByTestId('town-inspection')).toHaveTextContent('晨曦咖啡馆')
     })
+  })
+
+  it('loads active events and forwards their radii to the renderer', async () => {
+    render(<TownCanvas />)
+
+    await waitFor(() => {
+      expect(mockGetActiveEvents).toHaveBeenCalledTimes(1)
+    })
+
+    const rendererInstances = (await import('../components/town/TownRenderer')).TownRenderer as unknown as {
+      instances: Array<{ showEventRadii: ReturnType<typeof vi.fn> }>
+    }
+    expect(rendererInstances.instances[0]?.showEventRadii).toHaveBeenCalledWith([
+      { x: 20, y: 15, radius: 6 },
+    ])
+  })
+
+  it('loads zones, forwards them to the renderer, and opens the zone panel on click', async () => {
+    mockScreenToTile.mockReturnValue({ tileX: 3, tileY: 4, tileKind: 'grass' })
+    const user = userEvent.setup()
+
+    render(<TownCanvas />)
+
+    const shell = await screen.findByTestId('town-canvas-shell')
+    Object.defineProperty(shell, 'getBoundingClientRect', {
+      value: () => ({ left: 0, top: 0, width: 960, height: 640 }),
+    })
+
+    await waitFor(() => {
+      expect(mockGetZones).toHaveBeenCalledTimes(1)
+    })
+
+    const rendererInstances = (await import('../components/town/TownRenderer')).TownRenderer as unknown as {
+      instances: Array<{ syncZones: ReturnType<typeof vi.fn> }>
+    }
+    expect(rendererInstances.instances[0]?.syncZones).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ id: 'zone-commercial' })]),
+    )
+
+    await user.pointer([{ target: shell, keys: '[MouseLeft]', coords: { x: 40, y: 40 } }])
+
+    expect(await screen.findByTestId('town-zone-panel')).toHaveTextContent('商业活力带')
   })
 })

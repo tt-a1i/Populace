@@ -50,12 +50,17 @@ export function FamilyTreePanel({ residentId }: FamilyTreePanelProps) {
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    getResidentFamilyTree(residentId)
-      .then((data) => { if (!cancelled) setTree(data) })
-      .catch(() => { if (!cancelled) setTree(null) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+    const timeoutId = window.setTimeout(() => {
+      setLoading(true)
+      getResidentFamilyTree(residentId)
+        .then((data) => { if (!cancelled) setTree(data) })
+        .catch(() => { if (!cancelled) setTree(null) })
+        .finally(() => { if (!cancelled) setLoading(false) })
+    }, 0)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeoutId)
+    }
   }, [residentId])
 
   if (loading) {

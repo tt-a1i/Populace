@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+from collections import Counter
 import logging
+import math
+import random
 from dataclasses import asdict, is_dataclass
 from typing import Any, Literal, Optional
 
@@ -27,6 +30,7 @@ from backend.api.schemas import (
     KnowledgeGraphResponse,
     OccupationDistEntry,
     PopulationHistoryEntryResponse,
+    MarketStatsResponse,
     ScenarioDataResponse,
     SimulationStatsResponse,
     SimulationStatusResponse,
@@ -41,7 +45,7 @@ from backend.api.schemas import (
 )
 from backend.core.simulation import SimulationLoop
 from backend.llm.client import validate_llm_config
-from engine.types import EventUpdate
+from engine.types import EventUpdate, RelationType, VoteUpdate
 
 
 router = APIRouter(prefix="/api/simulation", tags=["simulation"])
@@ -106,6 +110,9 @@ class SimulationState:
         # World timeline: list of timeline event dicts (max 500)
         self._world_timeline: list[dict[str, Any]] = []
         self._population_history: list[dict[str, Any]] = []
+        self._trade_history: list[dict[str, Any]] = []
+        self._active_votes: list[dict[str, Any]] = []
+        self._vote_history: list[dict[str, Any]] = []
         self.building_visit_log: list[dict[str, Any]] = []
         self._timeline_id_counter: int = 0
         # Quest system
@@ -259,6 +266,9 @@ class SimulationState:
         self._rel_events_fired = set()
         self._world_timeline = []
         self._population_history = []
+        self._trade_history = []
+        self._active_votes = []
+        self._vote_history = []
         self._timeline_id_counter = 0
         self._active_quests = []
         self._completed_quests = []
@@ -351,6 +361,9 @@ class SimulationState:
             "active_events": list(getattr(self, "_active_events", [])),
             "world_timeline": list(getattr(self, "_world_timeline", [])),
             "population_history": list(getattr(self, "_population_history", [])),
+            "trade_history": list(getattr(self, "_trade_history", [])),
+            "active_votes": list(getattr(self, "_active_votes", [])),
+            "vote_history": list(getattr(self, "_vote_history", [])),
             "timeline_id_counter": getattr(self, "_timeline_id_counter", 0),
             "rel_events_fired": [list(x) for x in getattr(self, "_rel_events_fired", set())],
             "buildings_visited": {k: list(v) for k, v in getattr(self, "_buildings_visited", {}).items()},
@@ -365,7 +378,7 @@ class SimulationState:
         from engine.generative_agent import GenerativeAgent
         from engine.memory import MemoryStream
         from engine.types import (
-            Building, DiaryEntry, Memory, Reflection, Relationship, RelationType, Resident, WorldConfig,
+            Building, DiaryEntry, Item, Memory, MoodEntry, Reflection, Relationship, RelationType, Resident, WorldConfig,
         )
         from engine.world import World
 
@@ -386,6 +399,9 @@ class SimulationState:
         self._rel_events_fired = set()
         self._world_timeline = []
         self._population_history = []
+        self._trade_history = []
+        self._active_votes = []
+        self._vote_history = []
         self._timeline_id_counter = 0
         self._active_quests = []
         self._completed_quests = []
@@ -428,8 +444,13 @@ class SimulationState:
                 current_goal=res_data.get("current_goal"),
                 coins=res_data.get("coins", 100),
                 occupation=res_data.get("occupation", "unemployed"),
+                skills=dict(res_data.get("skills", {})),
+                inventory=[Item(**item) for item in res_data.get("inventory", [])],
                 energy=float(res_data.get("energy", 1.0)),
                 age_days=int(res_data.get("age_days", 0)),
+                mood_history=[MoodEntry(**entry) for entry in res_data.get("mood_history", [])],
+                mental_state=res_data.get("mental_state", "stable"),
+                low_mood_ticks=int(res_data.get("low_mood_ticks", 0)),
             )
             for d in res_data.get("diary", []):
                 resident.diary.append(DiaryEntry(
@@ -483,6 +504,9 @@ class SimulationState:
         self._active_events = list(data.get("active_events", []))
         self._world_timeline = list(data.get("world_timeline", []))
         self._population_history = list(data.get("population_history", []))
+        self._trade_history = list(data.get("trade_history", []))
+        self._active_votes = list(data.get("active_votes", []))
+        self._vote_history = list(data.get("vote_history", []))
         self._timeline_id_counter = data.get("timeline_id_counter", 0)
         self._rel_events_fired = {tuple(x) for x in data.get("rel_events_fired", [])}
         self._buildings_visited = {k: set(v) for k, v in data.get("buildings_visited", {}).items()}
@@ -517,6 +541,16 @@ class SimulationState:
             self._total_relationship_change_count = 0
         if not hasattr(self, "_dialogue_history"):
             self._dialogue_history = []
+
+    def _ensure_performance_counters(self) -> None:
+        if not hasattr(self, "_tick_durations"):
+            self._tick_durations = []
+        if not hasattr(self, "_max_tick_history"):
+            self._max_tick_history = 50
+        if not hasattr(self, "_pending_llm_count"):
+            self._pending_llm_count = 0
+        if not hasattr(self, "_adaptive_throttle_active"):
+            self._adaptive_throttle_active = False
 
     def get_stats(self) -> dict[str, Any]:
         self._ensure_stats_counters()
@@ -630,6 +664,8 @@ class SimulationState:
                 }
                 for rel in self.world.relationships.values()
             ],
+            "active_votes": list(getattr(self, "_active_votes", [])),
+            "vote_history": list(getattr(self, "_vote_history", []))[-20:],
         }
 
     def _build_replay_snapshot(self) -> dict[str, Any]:
@@ -676,6 +712,224 @@ class SimulationState:
             if snapshot["tick"] == tick:
                 return snapshot
         return None
+
+    def _ensure_vote_state(self) -> None:
+        if not hasattr(self, "_active_votes"):
+            self._active_votes = []
+        if not hasattr(self, "_vote_history"):
+            self._vote_history = []
+
+    def create_vote(self, issue: str, options: list[str], duration_ticks: int) -> dict[str, Any]:
+        self._ensure_vote_state()
+        start_tick = self.world.current_tick
+        vote = {
+            "id": f"vote-{start_tick}-{len(self._active_votes) + len(self._vote_history) + 1}",
+            "issue": issue,
+            "options": list(options),
+            "counts": {option: 0 for option in options},
+            "status": "active",
+            "start_tick": start_tick,
+            "end_tick": start_tick + duration_ticks,
+            "winning_option": None,
+            "result_announced": False,
+            "total_votes": 0,
+            "votes_by_resident": {},
+            "effects": [],
+        }
+        self._active_votes.append(vote)
+        self._add_timeline_event(
+            "vote_started",
+            f"社区发起投票：{issue}",
+            {"vote_id": vote["id"], "issue": issue, "options": list(options)},
+        )
+        return self._serialize_vote(vote)
+
+    def get_active_votes(self) -> list[dict[str, Any]]:
+        self._ensure_vote_state()
+        return [self._serialize_vote(vote) for vote in self._active_votes]
+
+    def get_vote_history(self) -> list[dict[str, Any]]:
+        self._ensure_vote_state()
+        return [self._serialize_vote(vote) for vote in reversed(self._vote_history)]
+
+    def _serialize_vote(self, vote: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "id": vote["id"],
+            "issue": vote["issue"],
+            "options": list(vote["options"]),
+            "counts": dict(vote["counts"]),
+            "status": vote["status"],
+            "start_tick": vote["start_tick"],
+            "end_tick": vote["end_tick"],
+            "winning_option": vote.get("winning_option"),
+            "result_announced": bool(vote.get("result_announced", False)),
+            "total_votes": int(vote.get("total_votes", 0)),
+            "effects": list(vote.get("effects", [])),
+        }
+
+    def _cast_vote_score(self, agent: Any, vote: dict[str, Any], option: str) -> float:
+        resident = agent.resident
+        issue = vote["issue"]
+        option_text = option.lower()
+        personality = (resident.personality or "").lower()
+        mood = (resident.mood or "").lower()
+        score = 0.0
+
+        proactive_keywords = ("建", "扩建", "举办", "开放", "增加", "改善", "支持", "公园", "park")
+        conservative_keywords = ("维持", "暂缓", "反对", "取消", "搁置", "现状")
+
+        if any(keyword in option for keyword in proactive_keywords):
+            score += 0.8
+        if any(keyword in option for keyword in conservative_keywords):
+            score -= 0.4
+        if "公园" in issue or "park" in issue.lower():
+            if "公园" in option or "park" in option_text:
+                score += 0.8
+            elif any(keyword in option for keyword in conservative_keywords):
+                score -= 0.2
+
+        if any(keyword in personality for keyword in ("外向", "热心", "开朗", "社牛", "community")):
+            score += 0.4
+        if any(keyword in personality for keyword in ("内向", "保守", "谨慎")):
+            score -= 0.2
+
+        if mood in {"happy", "excited", "ecstatic", "content"}:
+            score += 0.3
+        elif mood in {"sad", "tired", "angry", "fearful"}:
+            score -= 0.2
+
+        for other_id, other_option in vote.get("votes_by_resident", {}).items():
+            rel = self.world.get_relationship(resident.id, other_id)
+            reverse = self.world.get_relationship(other_id, resident.id)
+            affinity = 0.0
+            for candidate in (rel, reverse):
+                if candidate is not None:
+                    affinity += float(candidate.intensity) + float(candidate.familiarity)
+            if affinity == 0.0:
+                continue
+            if other_option == option:
+                score += affinity * 0.08
+            else:
+                score -= affinity * 0.04
+
+        return score
+
+    def _vote_participation_probability(self, agent: Any, vote: dict[str, Any]) -> float:
+        personality = (agent.resident.personality or "").lower()
+        mood = (agent.resident.mood or "").lower()
+        probability = 0.45
+        if any(keyword in personality for keyword in ("外向", "热心", "开朗", "社牛")):
+            probability += 0.25
+        if any(keyword in personality for keyword in ("内向", "谨慎", "保守")):
+            probability -= 0.1
+        if mood in {"happy", "excited", "ecstatic", "content"}:
+            probability += 0.15
+        elif mood in {"sad", "tired", "angry", "fearful"}:
+            probability -= 0.05
+
+        ticks_remaining = max(0, vote["end_tick"] - self.world.current_tick)
+        if ticks_remaining <= 1:
+            probability = 1.0
+        return max(0.1, min(1.0, probability))
+
+    def _find_open_building_position(self) -> tuple[int, int]:
+        occupied = {tuple(building.position) for building in self.world.buildings}
+        width = self.world.config.map_width_tiles
+        height = self.world.config.map_height_tiles
+        for y in range(1, max(1, height - 2)):
+            for x in range(1, max(1, width - 2)):
+                if (x, y) in occupied:
+                    continue
+                if x + 1 >= width or y + 2 >= height:
+                    continue
+                if any((x + dx, y + dy) in occupied for dx in range(2) for dy in range(3)):
+                    continue
+                return x, y
+        return 1, 1
+
+    def _apply_vote_result(self, vote: dict[str, Any]) -> list[str]:
+        effects: list[str] = []
+        winning_option = vote.get("winning_option") or ""
+        issue = vote.get("issue", "")
+        if "公园" not in f"{issue}{winning_option}" and "park" not in f"{issue}{winning_option}".lower():
+            return effects
+
+        park_count = sum(1 for building in self.world.buildings if building.type == "park")
+        position = self._find_open_building_position()
+        building = {
+            "id": f"community_park_{park_count + 1}",
+            "type": "park",
+            "name": f"社区公园 {park_count + 1}",
+            "capacity": 24,
+            "position": position,
+        }
+        from engine.types import Building
+
+        self.world.add_building(Building(**building))
+        x, y = position
+        self.world.grid[y][x] = True
+        for dy in range(1, 3):
+            for dx in range(0, 2):
+                self.world.grid[y + dy][x + dx] = False
+        self.world.path_cache.clear()
+        self.world.mark_grid_index_dirty()
+        effects.append(f"新增建筑：{building['name']}")
+        self._add_timeline_event(
+            "vote_effect",
+            f"投票结果生效：{building['name']} 已建成",
+            {"vote_id": vote["id"], "building_id": building["id"]},
+        )
+        return effects
+
+    def _process_votes_for_tick(self) -> list[dict[str, Any]]:
+        self._ensure_vote_state()
+        announcements: list[dict[str, Any]] = []
+        next_active_votes: list[dict[str, Any]] = []
+
+        for vote in self._active_votes:
+            votes_by_resident = vote.setdefault("votes_by_resident", {})
+            for agent in self.world.agents:
+                resident_id = agent.resident.id
+                if resident_id in votes_by_resident:
+                    continue
+                if random.random() > self._vote_participation_probability(agent, vote):
+                    continue
+
+                ranked_options = sorted(
+                    vote["options"],
+                    key=lambda option: (
+                        -self._cast_vote_score(agent, vote, option),
+                        vote["options"].index(option),
+                    ),
+                )
+                selected_option = ranked_options[0]
+                votes_by_resident[resident_id] = selected_option
+                vote["counts"][selected_option] += 1
+                vote["total_votes"] = len(votes_by_resident)
+
+            should_finalize = self.world.current_tick >= vote["end_tick"] or len(votes_by_resident) >= len(self.world.agents)
+            if should_finalize:
+                winning_option = max(
+                    vote["options"],
+                    key=lambda option: (vote["counts"][option], -vote["options"].index(option)),
+                )
+                vote["status"] = "completed"
+                vote["winning_option"] = winning_option
+                vote["effects"] = self._apply_vote_result(vote)
+                vote["result_announced"] = True
+                self._vote_history.append(vote)
+                self._vote_history = self._vote_history[-100:]
+                self._add_timeline_event(
+                    "vote_completed",
+                    f"投票结束：{vote['issue']}，结果为「{winning_option}」",
+                    {"vote_id": vote["id"], "winning_option": winning_option, "effects": list(vote.get("effects", []))},
+                )
+                announcements.append(self._serialize_vote(vote))
+            else:
+                next_active_votes.append(vote)
+
+        self._active_votes = next_active_votes
+        return announcements
 
     def _add_timeline_event(
         self,
@@ -986,6 +1240,33 @@ class SimulationState:
         seen_pairs: set = set(self._active_dialogue_pairs)
         dialogue_count = 0
 
+        depressed_agents = [agent for agent in self.world.agents if getattr(agent.resident, "mental_state", "stable") == "depressed"]
+        for depressed_agent in depressed_agents:
+            if dialogue_count >= cfg.max_dialogues_per_tick:
+                break
+            nearby = self.world.get_social_candidates(depressed_agent)
+            comforter = None
+            comfort_score = -1.0
+            for candidate in nearby:
+                relationship = self.world.get_relationship(candidate.resident.id, depressed_agent.resident.id)
+                if relationship is None or relationship.type not in {RelationType.friendship, RelationType.trust, RelationType.love}:
+                    continue
+                score = float(relationship.intensity) + float(relationship.familiarity)
+                if score > comfort_score:
+                    comforter = candidate
+                    comfort_score = score
+            if comforter is None:
+                continue
+            pair = frozenset([comforter.resident.id, depressed_agent.resident.id])
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
+            task = asyncio.create_task(initiate_dialogue(comforter, depressed_agent, self.world, comfort_target_id=depressed_agent.resident.id))
+            self._dialogue_pair_ids[task] = (comforter.resident.id, depressed_agent.resident.id)
+            self._active_dialogue_pairs.add(pair)
+            self._pending_dialogues.append(task)
+            dialogue_count += 1
+
         for a in self.world.agents:
             if dialogue_count >= cfg.max_dialogues_per_tick:
                 break
@@ -1023,6 +1304,9 @@ class SimulationState:
 
         # Advance tick counter and collect movements
         tick_state = self.world.tick()
+        vote_announcements = self._process_votes_for_tick()
+        tick_state.vote_updates.extend(VoteUpdate(**vote) for vote in self.get_active_votes())
+        tick_state.vote_announcements.extend(VoteUpdate(**vote) for vote in vote_announcements)
         if self.world.current_tick % self.world.config.tick_per_day == 0:
             from engine.lifecycle import process_daily_population
 
@@ -1063,6 +1347,7 @@ class SimulationState:
         tick_state.gossips.extend(gossip_updates)
         self._record_dialogue_history(dialogue_updates, agents_by_id)
         self._ensure_stats_counters()
+        self._ensure_performance_counters()
         self._total_dialogue_count += len(tick_state.dialogues)
         self._total_relationship_change_count += len(tick_state.relationships)
 
@@ -1449,6 +1734,47 @@ async def get_population_history(request: Request) -> list[PopulationHistoryEntr
     return [PopulationHistoryEntryResponse(**entry) for entry in getattr(state, "_population_history", [])]
 
 
+@router.get(
+    "/market-stats",
+    response_model=MarketStatsResponse,
+    responses=error_responses(503),
+)
+async def get_market_stats(request: Request) -> MarketStatsResponse:
+    """Return trade volume and the most active market entities."""
+    state = get_simulation_state(request)
+    trade_history = getattr(state, "_trade_history", [])
+    if not trade_history:
+        return MarketStatsResponse()
+
+    item_counts: Counter[str] = Counter()
+    trader_counts: Counter[str] = Counter()
+    total_items = 0
+
+    for entry in trade_history:
+        quantity = int(entry.get("quantity", 0))
+        total_items += quantity
+        item_name = entry.get("item_name")
+        if item_name:
+            item_counts[item_name] += quantity
+        seller_id = entry.get("seller_id")
+        if seller_id:
+            trader_counts[seller_id] += 1
+
+    hottest_item = None
+    if item_counts:
+        hottest_item = max(item_counts.items(), key=lambda item: (item[1], item[0]))[0]
+    most_active_trader = None
+    if trader_counts:
+        most_active_trader = max(trader_counts.items(), key=lambda item: (item[1], item[0]))[0]
+
+    return MarketStatsResponse(
+        trade_volume=len(trade_history),
+        total_items_traded=total_items,
+        hottest_item=hottest_item,
+        most_active_trader=most_active_trader,
+    )
+
+
 @router.get("/network-analysis", responses=error_responses(503))
 async def get_network_analysis(request: Request) -> list[dict[str, Any]]:
     """Return per-resident centrality metrics from the current relationship graph."""
@@ -1721,7 +2047,9 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
         Building,
         DiaryEntry,
         Event as EngineEvent,
+        Item,
         Memory,
+        MoodEntry,
         Reflection,
         Relationship,
         RelationType,
@@ -1775,8 +2103,13 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
             current_goal=res_data.get("current_goal"),
             coins=res_data.get("coins", 100),
             occupation=res_data.get("occupation", "unemployed"),
+            skills=dict(res_data.get("skills", {})),
+            inventory=[Item(**item) for item in res_data.get("inventory", [])],
             energy=float(res_data.get("energy", 1.0)),
             age_days=int(res_data.get("age_days", 0)),
+            mood_history=[MoodEntry(**entry) for entry in res_data.get("mood_history", [])],
+            mental_state=res_data.get("mental_state", "stable"),
+            low_mood_ticks=int(res_data.get("low_mood_ticks", 0)),
         )
         for d in res_data.get("diary", []):
             resident.diary.append(DiaryEntry(

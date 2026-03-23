@@ -27,12 +27,17 @@ export function RelationshipTimeline({ fromId, toId, onClose }: RelationshipTime
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    getRelationshipHistory(fromId, toId)
-      .then((d) => { if (!cancelled) setData(d) })
-      .catch(() => { if (!cancelled) setData(null) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+    const timeoutId = window.setTimeout(() => {
+      setLoading(true)
+      getRelationshipHistory(fromId, toId)
+        .then((d) => { if (!cancelled) setData(d) })
+        .catch(() => { if (!cancelled) setData(null) })
+        .finally(() => { if (!cancelled) setLoading(false) })
+    }, 0)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeoutId)
+    }
   }, [fromId, toId])
 
   // Generate prediction points (linear extrapolation of last 10 points)

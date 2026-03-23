@@ -57,7 +57,12 @@ export function LeaderboardPanel() {
   }, [residents])
 
   useEffect(() => {
-    void fetchData()
+    const timeoutId = window.setTimeout(() => {
+      void fetchData()
+    }, 0)
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
   }, [fetchData])
 
   const sorted = useMemo(() => {

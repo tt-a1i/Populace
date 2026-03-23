@@ -53,7 +53,12 @@ export function AchievementWall() {
   }, [residents])
 
   useEffect(() => {
-    void fetchAll()
+    const timeoutId = window.setTimeout(() => {
+      void fetchAll()
+    }, 0)
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
   }, [fetchAll])
 
   const unlocked = useMemo(() => allAchievements.filter((a) => a.unlocked), [allAchievements])

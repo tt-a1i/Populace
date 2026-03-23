@@ -195,9 +195,14 @@ export function DashboardView() {
   }, [])
 
   useEffect(() => {
-    void load()
+    const timeoutId = window.setTimeout(() => {
+      void load()
+    }, 0)
     const id = setInterval(() => void load(), 5000)
-    return () => clearInterval(id)
+    return () => {
+      window.clearTimeout(timeoutId)
+      clearInterval(id)
+    }
   }, [load])
 
   const SEASON_EMOJI: Record<string, string> = { spring: '🌸', summer: '☀️', autumn: '🍂', winter: '❄️' }

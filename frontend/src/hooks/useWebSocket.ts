@@ -97,6 +97,15 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
     ((s: SimulationSnapshot & { applyResidentOperation?: (resident: unknown, operation: string) => void }) =>
       s.applyResidentOperation) as never,
   ) as ((resident: unknown, operation: string) => void) | undefined
+  const simSetActiveVotes = useSimulationStore(
+    ((s: SimulationSnapshot & { setActiveVotes?: (votes: unknown[]) => void }) => s.setActiveVotes) as never,
+  ) as ((votes: unknown[]) => void) | undefined
+  const simSetVoteHistory = useSimulationStore(
+    ((s: SimulationSnapshot & { setVoteHistory?: (votes: unknown[]) => void }) => s.setVoteHistory) as never,
+  ) as ((votes: unknown[]) => void) | undefined
+  const simApplyVoteTick = useSimulationStore(
+    ((s: SimulationSnapshot & { applyVoteTick?: (votes: unknown[], announcements: unknown[]) => void }) => s.applyVoteTick) as never,
+  ) as ((votes: unknown[], announcements: unknown[]) => void) | undefined
   const clientIdRef = useRef<string | null>(null)
 
   // -------------------------------------------------------------------------
@@ -148,6 +157,9 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
             }
             if (typeof relApplyPopulationEvents === 'function') {
               relApplyPopulationEvents(populationEvents)
+            }
+            if (typeof simApplyVoteTick === 'function') {
+              simApplyVoteTick(queuedTick.vote_updates ?? [], queuedTick.vote_announcements ?? [])
             }
             if (playSounds) {
               for (const unlock of achievementUnlocks) {
@@ -203,6 +215,19 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
                   play('event')
                 }
               }
+              for (const announcement of queuedTick.vote_announcements ?? []) {
+                pushToast({
+                  type: 'success',
+                  category: 'default',
+                  title: i18n.t('vote.result_title', { defaultValue: '社区决议已公布' }),
+                  description: i18n.t('vote.result_desc', {
+                    defaultValue: `${announcement.issue}：${announcement.winning_option ?? ''}`,
+                    issue: announcement.issue,
+                    result: announcement.winning_option ?? '',
+                  }),
+                })
+                play('event')
+              }
             }
             if (relationshipEvents.length > 0) {
               relAddFlashingKeys(relationshipEvents.map((ev) => `${ev.from_id}::${ev.to_id}`))
@@ -234,6 +259,12 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
         relSetAbsolute(((snapshot as Record<string, unknown>).relationships ?? []) as Array<{
           from_id: string; to_id: string; type: string; intensity: number; reason?: string
         }>)
+        if (typeof simSetActiveVotes === 'function') {
+          simSetActiveVotes(((snapshot as Record<string, unknown>).active_votes ?? []) as unknown[])
+        }
+        if (typeof simSetVoteHistory === 'function') {
+          simSetVoteHistory(((snapshot as Record<string, unknown>).vote_history ?? []) as unknown[])
+        }
         if (snapshot.last_tick) {
           // Apply last_tick for positions/dialogues but SKIP relationship deltas to prevent
           // double-stacking with the absolute snapshot.relationships already applied above.
@@ -273,7 +304,7 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
         }
       }
     },
-    [play, pushToast, relAddFlashingKeys, relApplyPopulationEvents, relInitFromSnapshot, relSetAbsolute, relUpdateFromTick, simApplyPopulationEvents, simApplyResidentOperation, simInitFromSnapshot, simUpdateFromTick],
+    [play, pushToast, relAddFlashingKeys, relApplyPopulationEvents, relInitFromSnapshot, relSetAbsolute, relUpdateFromTick, simApplyPopulationEvents, simApplyResidentOperation, simApplyVoteTick, simInitFromSnapshot, simSetActiveVotes, simSetVoteHistory, simUpdateFromTick],
   )
 
   // -------------------------------------------------------------------------

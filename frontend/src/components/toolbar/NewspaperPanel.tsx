@@ -37,7 +37,12 @@ export function NewspaperPanel() {
   }, [])
 
   useEffect(() => {
-    void fetchNewspaper(day)
+    const timeoutId = window.setTimeout(() => {
+      void fetchNewspaper(day)
+    }, 0)
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
   }, [day, fetchNewspaper])
 
   const goToPrev = () => setDay((d) => Math.max(0, d - 1))

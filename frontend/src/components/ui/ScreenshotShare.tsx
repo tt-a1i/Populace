@@ -183,9 +183,9 @@ export function ShareCardButton() {
   const [busy, setBusy] = useState(false)
   const time = useSimulationStore((s) => s.time)
   const tick = useSimulationStore((s) => s.tick)
-  const residents = useSimulationStore((s) => s.residents)
-  const relationships = useRelationshipsStore((s) => s.relationships)
-  const messageFeed = useSimulationStore((s) => s.messageFeed)
+  const residents = useSimulationStore((s) => s.residents ?? [])
+  const relationships = useRelationshipsStore((s) => s.relationships ?? [])
+  const messageFeed = useSimulationStore((s) => s.messageFeed ?? [])
 
   const handleShare = useCallback(() => {
     if (busy) return

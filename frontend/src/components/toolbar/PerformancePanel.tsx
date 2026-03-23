@@ -112,9 +112,14 @@ export function PerformancePanel() {
   }, [])
 
   useEffect(() => {
-    void fetchMetrics()
+    const timeoutId = window.setTimeout(() => {
+      void fetchMetrics()
+    }, 0)
     const id = setInterval(() => void fetchMetrics(), 3000)
-    return () => clearInterval(id)
+    return () => {
+      window.clearTimeout(timeoutId)
+      clearInterval(id)
+    }
   }, [fetchMetrics])
 
   if (error || !metrics) {
