@@ -26,6 +26,7 @@ try:
         world_router,
         ws_router,
     )
+    from backend.api.rules import router as rules_router
     from backend.db import close_driver, close_redis, get_driver, get_redis, initialize_constraints
     from backend.observability import (
         InMemoryRateLimiter,
@@ -274,3 +275,4 @@ app.include_router(report_router)
 app.include_router(saves_router)
 app.include_router(settings_router)
 app.include_router(ws_router)
+app.include_router(rules_router)

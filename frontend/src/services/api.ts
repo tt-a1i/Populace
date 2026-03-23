@@ -314,6 +314,26 @@ export function getResidentFamilyTree(id: string) {
   return request<FamilyTree>(`/api/residents/${id}/family-tree`)
 }
 
+export interface RelationshipHistoryPoint {
+  tick: number
+  time: string
+  intensity: number
+  rel_type: string
+  dialogue: string | null
+}
+
+export interface RelationshipHistory {
+  from_id: string
+  to_id: string
+  from_name: string
+  to_name: string
+  points: RelationshipHistoryPoint[]
+}
+
+export function getRelationshipHistory(id1: string, id2: string) {
+  return request<RelationshipHistory>(`/api/residents/${id1}/relationship-history/${id2}`)
+}
+
 export function getSimulationStats() {
   return request<SimulationStats>('/api/simulation/stats')
 }
@@ -827,4 +847,97 @@ export function chatWithResident(residentId: string, message: string) {
     method: 'POST',
     body: JSON.stringify({ message }),
   })
+}
+
+// ── Simulation Rules ─────────────────────────────────────────────────
+export interface RuleCondition {
+  field: string
+  operator: string
+  value: string
+}
+
+export interface RuleAction {
+  action: string
+  value: string
+}
+
+export interface SimulationRule {
+  id: string
+  name: string
+  description: string
+  conditions: RuleCondition[]
+  actions: RuleAction[]
+  enabled: boolean
+  times_fired: number
+}
+
+export function getRules() {
+  return request<SimulationRule[]>('/api/simulation/rules')
+}
+
+export function createRule(payload: {
+  name: string
+  description?: string
+  conditions: RuleCondition[]
+  actions: RuleAction[]
+  enabled?: boolean
+}) {
+  return request<SimulationRule>('/api/simulation/rules', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function toggleRule(ruleId: string, enabled: boolean) {
+  return request<SimulationRule>(`/api/simulation/rules/${ruleId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ enabled }),
+  })
+}
+
+export function deleteRule(ruleId: string) {
+  return request<{ status: string; id: string }>(`/api/simulation/rules/${ruleId}`, {
+    method: 'DELETE',
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Memory search
+// ---------------------------------------------------------------------------
+
+export function searchResidentMemories(residentId: string, q: string) {
+  return request<ResidentMemory[]>(
+    `/api/residents/${residentId}/memories/search?q=${encodeURIComponent(q)}`,
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge Graph
+// ---------------------------------------------------------------------------
+
+export interface KnowledgeGraphNode {
+  id: string
+  label: string
+  type: 'resident' | 'building' | 'event'
+  metadata: Record<string, unknown>
+}
+
+export interface KnowledgeGraphEdge {
+  source: string
+  target: string
+  label: string
+  tick: number
+}
+
+export interface KnowledgeGraphData {
+  nodes: KnowledgeGraphNode[]
+  edges: KnowledgeGraphEdge[]
+}
+
+export function getKnowledgeGraph(sinceTick?: number, untilTick?: number) {
+  const params = new URLSearchParams()
+  if (sinceTick !== undefined) params.set('since_tick', String(sinceTick))
+  if (untilTick !== undefined) params.set('until_tick', String(untilTick))
+  const qs = params.toString()
+  return request<KnowledgeGraphData>(`/api/simulation/knowledge-graph${qs ? `?${qs}` : ''}`)
 }

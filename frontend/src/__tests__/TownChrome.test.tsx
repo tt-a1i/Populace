@@ -221,8 +221,8 @@ describe('TownChrome', () => {
     expect(screen.getByTestId('resident-sidebar')).toBeInTheDocument()
     expect(screen.getByTestId('resident-story-panel')).toBeInTheDocument()
 
-    // Name shown
-    expect(screen.getByText(/\u5c0f\u660e/)).toBeInTheDocument()
+    // Name shown (may appear in family tree too)
+    expect(screen.getAllByText(/\u5c0f\u660e/)[0]).toBeInTheDocument()
 
     // Building name shown (activity line + possibly inspection panel)
     expect(screen.getAllByText(/\u6668\u66e6\u5496\u5561\u9986/)[0]).toBeInTheDocument()
@@ -303,7 +303,7 @@ describe('TownChrome', () => {
 
     rerender(<TownChrome {...buildProps('r2')} />)
 
-    expect(screen.getByText('\u5c0f\u7ea2')).toBeInTheDocument()
+    expect(screen.getAllByText('\u5c0f\u7ea2')[0]).toBeInTheDocument()
     // Old data should be gone (new panel remounts with empty state)
     expect(screen.queryByText('A API \u8bb0\u5fc6')).not.toBeInTheDocument()
     expect(screen.queryByText('A API \u5173\u7cfb')).not.toBeInTheDocument()
@@ -351,7 +351,7 @@ describe('TownChrome', () => {
     ])
 
     await waitFor(() => {
-      expect(screen.getByText('\u5c0f\u7ea2')).toBeInTheDocument()
+      expect(screen.getAllByText('\u5c0f\u7ea2')[0]).toBeInTheDocument()
     })
 
     expect(screen.queryByText('\u8fc7\u671f\u7684 A \u8bb0\u5fc6')).not.toBeInTheDocument()
@@ -422,7 +422,7 @@ describe('TownChrome', () => {
       expect(screen.queryByText('\u6210\u529f\u7684 A \u5173\u7cfb')).not.toBeInTheDocument()
     })
 
-    expect(screen.getByText('\u5c0f\u7ea2')).toBeInTheDocument()
+    expect(screen.getAllByText('\u5c0f\u7ea2')[0]).toBeInTheDocument()
   })
 
   it('shows the story panel with god action buttons', async () => {
