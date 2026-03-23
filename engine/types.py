@@ -28,7 +28,7 @@ if __name__ == "types":
 else:
     from dataclasses import dataclass, field
     from enum import Enum
-    from typing import List, Optional, Tuple
+    from typing import Dict, List, Optional, Tuple
 
     # ---------------------------------------------------------------------------
     # Enums
@@ -65,6 +65,18 @@ else:
         summary: str   # narrative diary text
 
     @dataclass
+    class MoodEntry:
+        tick: int
+        mood: str
+        cause: str
+
+    @dataclass
+    class Item:
+        name: str
+        quantity: int = 1
+        value: int = 0
+
+    @dataclass
     class Resident:
         """An AI resident of the town. Maps to a Neo4j ``Resident`` node."""
 
@@ -84,8 +96,13 @@ else:
         current_goal: Optional[str] = None   # active short-term goal text
         coins: int = 100
         occupation: str = "unemployed"
+        skills: Dict[str, float] = field(default_factory=dict)
+        inventory: List["Item"] = field(default_factory=list)
         energy: float = 1.0
         age_days: int = 0
+        mood_history: List["MoodEntry"] = field(default_factory=list)
+        mental_state: str = "stable"
+        low_mood_ticks: int = 0
         diary: List["DiaryEntry"] = field(default_factory=list)
 
 
@@ -98,6 +115,30 @@ else:
         name: str
         capacity: int
         position: Tuple[int, int]
+
+
+    @dataclass
+    class ZoneBounds:
+        x: int
+        y: int
+        width: int
+        height: int
+
+
+    @dataclass
+    class ZoneAtmosphere:
+        noise: float
+        safety: float
+        beauty: float
+
+
+    @dataclass
+    class Zone:
+        id: str
+        name: str
+        type: str
+        bounds: "ZoneBounds"
+        atmosphere: "ZoneAtmosphere"
 
 
     @dataclass
@@ -239,6 +280,8 @@ else:
         outfit_color: Optional[str] = None
         coins: int = 100
         occupation: str = "unemployed"
+        skills: Dict[str, float] = field(default_factory=dict)
+        inventory: List["Item"] = field(default_factory=list)
         energy: float = 1.0
         age_days: int = 0
         goals: List[str] = field(default_factory=list)
@@ -255,6 +298,22 @@ else:
         parent_ids: List[str] = field(default_factory=list)
         parent_names: List[str] = field(default_factory=list)
         summary: str = ""
+
+
+    @dataclass
+    class VoteUpdate:
+        id: str
+        issue: str
+        options: List[str] = field(default_factory=list)
+        counts: dict[str, int] = field(default_factory=dict)
+        status: str = "active"
+        start_tick: int = 0
+        end_tick: int = 0
+        winning_option: Optional[str] = None
+        result_announced: bool = False
+        total_votes: int = 0
+        effects: List[str] = field(default_factory=list)
+        effects: List[str] = field(default_factory=list)
 
 
     @dataclass
@@ -275,6 +334,8 @@ else:
         energy_updates: List["EnergyUpdate"] = field(default_factory=list)
         gossips: List["GossipUpdate"] = field(default_factory=list)
         population_events: List["PopulationEvent"] = field(default_factory=list)
+        vote_updates: List["VoteUpdate"] = field(default_factory=list)
+        vote_announcements: List["VoteUpdate"] = field(default_factory=list)
 
 
     # ---------------------------------------------------------------------------

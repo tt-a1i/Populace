@@ -4,19 +4,30 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   mockGetResidentMemories,
+  mockGetResidentMoodLog,
   mockGetResidentRelationships,
+  mockGetResidentSkills,
 } = vi.hoisted(() => ({
   mockGetResidentMemories: vi.fn(),
+  mockGetResidentMoodLog: vi.fn(),
   mockGetResidentRelationships: vi.fn(),
+  mockGetResidentSkills: vi.fn(),
 }))
 
-vi.mock('../services/api', () => ({
-  getResidentMemories: mockGetResidentMemories,
-  getResidentRelationships: mockGetResidentRelationships,
-  teleportResident: vi.fn(),
-  getResidentFamilyTree: vi.fn().mockResolvedValue({ root: { id: '', name: '', age_days: 0, deceased: false, relation: 'self' }, parents: [], spouse: null, children: [] }),
-  chatWithResident: vi.fn().mockResolvedValue({ reply: 'hello', resident_id: 'r1', resident_name: 'test' }),
-}))
+vi.mock('../services/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../services/api')>()
+  return {
+    ...actual,
+    getResidentMemories: mockGetResidentMemories,
+    getResidentMoodLog: mockGetResidentMoodLog,
+    getResidentRelationships: mockGetResidentRelationships,
+    getResidentSkills: mockGetResidentSkills,
+    tradeResidentItem: vi.fn(),
+    teleportResident: vi.fn(),
+    getResidentFamilyTree: vi.fn().mockResolvedValue({ root: { id: '', name: '', age_days: 0, deceased: false, relation: 'self' }, parents: [], spouse: null, children: [] }),
+    chatWithResident: vi.fn().mockResolvedValue({ reply: 'hello', resident_id: 'r1', resident_name: 'test' }),
+  }
+})
 
 import { TownChrome, type TownContextMenuState, type TownInspectionState, type TownPlaceholder } from '../components/town/TownChrome'
 import type { ResidentPosition } from '../stores/simulation'
@@ -134,10 +145,14 @@ function buildProps(selectedResidentId: string | null) {
 describe('TownChrome', () => {
   beforeEach(() => {
     mockGetResidentMemories.mockReset()
+    mockGetResidentMoodLog.mockReset()
     mockGetResidentRelationships.mockReset()
+    mockGetResidentSkills.mockReset()
 
     mockGetResidentMemories.mockResolvedValue([])
+    mockGetResidentMoodLog.mockResolvedValue([])
     mockGetResidentRelationships.mockResolvedValue([])
+    mockGetResidentSkills.mockResolvedValue({ resident_id: 'r1', resident_name: '小明', skills: {} })
   })
 
   it('shows the tile context menu and dispatches actions', async () => {

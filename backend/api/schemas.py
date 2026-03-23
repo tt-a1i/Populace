@@ -153,6 +153,8 @@ class ResidentResponse(BaseModel):
     current_goal: str | None = None
     coins: int = 100
     occupation: str = "unemployed"
+    skills: dict[str, float] = Field(default_factory=dict)
+    inventory: list[dict[str, Any]] = Field(default_factory=list)
     energy: float = 1.0
     age_days: int = 0
 
@@ -172,9 +174,18 @@ class PopulationResidentResponse(BaseModel):
     outfit_color: str | None = None
     coins: int = 100
     occupation: str = "unemployed"
+    skills: dict[str, float] = Field(default_factory=dict)
+    inventory: list[dict[str, Any]] = Field(default_factory=list)
     energy: float = 1.0
     age_days: int = 0
     goals: list[str] = Field(default_factory=list)
+
+
+class MarketStatsResponse(BaseModel):
+    trade_volume: int = 0
+    total_items_traded: int = 0
+    hottest_item: str | None = None
+    most_active_trader: str | None = None
 
 
 class PopulationEventResponse(BaseModel):
@@ -224,6 +235,12 @@ class ResidentRelationshipResponse(BaseModel):
     direction: str
 
 
+class ResidentMoodLogEntryResponse(BaseModel):
+    tick: int
+    mood: str
+    cause: str
+
+
 class ResidentReflectionResponse(BaseModel):
     id: str
     summary: str
@@ -236,6 +253,30 @@ class ScenarioMapRect(BaseModel):
     y: int
     width: int
     height: int
+
+
+class ZoneBoundsResponse(BaseModel):
+    x: int
+    y: int
+    width: int
+    height: int
+
+
+class ZoneAtmosphereResponse(BaseModel):
+    noise: float
+    safety: float
+    beauty: float
+
+
+class ZoneResponse(BaseModel):
+    id: str
+    name: str
+    type: str
+    bounds: ZoneBoundsResponse
+    atmosphere: ZoneAtmosphereResponse
+    resident_count: int = 0
+    building_count: int = 0
+    dominant_building_types: list[str] = Field(default_factory=list)
 
 
 class ScenarioMapResponse(BaseModel):

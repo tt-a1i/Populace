@@ -105,7 +105,7 @@ def _step_astar(agent: "Agent", target: tuple, world: "World") -> None:
         agent.current_path = new_path[1:]
 
     # Advance up to 2 steps along the path; elderly residents move at half speed.
-    max_steps = 1 if is_elderly(res) else 2
+    max_steps = 1 if is_elderly(res) or getattr(res, "mental_state", "stable") == "depressed" else 2
     steps = min(max_steps, len(agent.current_path))
     for _ in range(steps):
         if not agent.current_path:
@@ -136,6 +136,8 @@ def _step_random(agent: "Agent", world: "World") -> None:
     ]
     walkable = [p for p in candidates if _is_walkable(p[0], p[1], world)]
     if walkable:
+        if getattr(res, "mental_state", "stable") == "depressed" and random.random() < 0.5:
+            return
         res.x, res.y = random.choice(walkable)
         world.mark_grid_index_dirty()
         res.energy = max(0.0, res.energy - 0.01)
@@ -208,7 +210,7 @@ def apply_mood_contagion(world: "World") -> None:
 
             if net_push > 0 and random.random() < min(1.0, net_push):
                 new_rank = min(my_rank + 1, len(_MOOD_LADDER) - 1)
-                agent.resident.mood = _MOOD_LADDER[new_rank]
+                world.set_resident_mood(agent, _MOOD_LADDER[new_rank], "contagion")
             elif net_push < 0 and random.random() < min(1.0, -net_push):
                 new_rank = max(my_rank - 1, 0)
-                agent.resident.mood = _MOOD_LADDER[new_rank]
+                world.set_resident_mood(agent, _MOOD_LADDER[new_rank], "contagion")

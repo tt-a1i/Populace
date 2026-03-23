@@ -68,6 +68,28 @@ def test_get_nearby_agents_custom_radius(mock_world):
     )
 
 
+def test_zone_preference_scores_reflect_personality(mock_world):
+    social_zone = mock_world.zones[0]
+    quiet_zone = mock_world.zones[1]
+
+    extrovert_score = mock_world.score_zone_for_resident(mock_world.agents[0].resident, social_zone)
+    introvert_score = mock_world.score_zone_for_resident(mock_world.agents[1].resident, quiet_zone)
+
+    assert extrovert_score > mock_world.score_zone_for_resident(mock_world.agents[0].resident, quiet_zone)
+    assert introvert_score > mock_world.score_zone_for_resident(mock_world.agents[1].resident, social_zone)
+
+
+def test_zone_stats_include_residents_buildings_and_atmosphere(mock_world):
+    stats = mock_world.get_zone_stats(mock_world.zones[0].id)
+
+    assert stats is not None
+    assert stats["building_count"] >= 1
+    assert stats["resident_count"] >= 1
+    assert stats["atmosphere"]["noise"] >= 0
+    assert stats["atmosphere"]["safety"] >= 0
+    assert stats["atmosphere"]["beauty"] >= 0
+
+
 def test_get_nearby_agents_uses_grid_index_without_full_agent_scan(mock_world):
     mock_world.rebuild_grid_index()
 
@@ -164,3 +186,59 @@ def test_relationship_graph_operations(mock_world):
 
     mock_world.remove_relationship("a1", "a2")
     assert mock_world.get_relationship("a1", "a2") is None
+
+
+def test_work_building_improves_skill_and_income(mock_world):
+    agent = mock_world.agents[0]
+    cafe = mock_world.get_building("cafe1")
+    agent.resident.location = cafe.id
+    agent.resident.skills["cooking"] = 0.6
+    agent.resident.coins = 100
+    mock_world.current_tick = 18  # work hours
+
+    mock_world.apply_building_effects(agent)
+
+    assert agent.resident.occupation == "barista"
+    assert agent.resident.skills["cooking"] > 0.6
+    assert agent.resident.coins > 103
+    assert any(item.name == "coffee" for item in agent.resident.inventory)
+
+
+def test_set_resident_mood_records_history(mock_world):
+    agent = mock_world.agents[0]
+
+    changed = mock_world.set_resident_mood(agent, "sad", "event")
+
+    assert changed is True
+    assert agent.resident.mood == "sad"
+    assert agent.resident.mood_history[-1].cause == "event"
+    assert agent.resident.mood_history[-1].mood == "sad"
+
+
+def test_depression_triggers_after_20_low_mood_ticks(mock_world, monkeypatch):
+    for agent in mock_world.agents:
+        agent.resident.location = None
+        agent.resident.x = 0
+        agent.resident.y = 0
+        agent.resident.energy = 1.0
+        mock_world.set_resident_mood(agent, "sad", "event")
+
+    monkeypatch.setattr("engine.world.random.random", lambda: 0.99)
+    monkeypatch.setattr("engine.act.random.random", lambda: 0.99)
+
+    for _ in range(20):
+        mock_world.tick()
+
+    assert mock_world.agents[0].resident.mental_state == "depressed"
+    assert mock_world.agents[0].resident.low_mood_ticks >= 20
+
+
+def test_depressed_resident_has_lower_social_probability(mock_world):
+    agent_a = mock_world.agents[0]
+    agent_b = mock_world.agents[1]
+
+    baseline = mock_world.get_social_probability(agent_a, agent_b)
+    agent_a.resident.mental_state = "depressed"
+    reduced = mock_world.get_social_probability(agent_a, agent_b)
+
+    assert reduced < baseline

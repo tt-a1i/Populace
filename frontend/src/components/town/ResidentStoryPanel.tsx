@@ -4,13 +4,18 @@ import { useTranslation } from 'react-i18next'
 import { useSimulationStore } from '../../stores/simulation'
 
 import {
+  type Item,
   type ResidentMemory,
+  type ResidentMoodLogEntry,
   type ResidentRelationship,
   generateMemoir,
   getResidentMemories,
+  getResidentMoodLog,
   getResidentRelationships,
+  getResidentSkills,
   injectResidentMemory,
   patchResidentAttributes,
+  tradeResidentItem,
 } from '../../services/api'
 import { generateResidentAvatarDataUrl } from '../../lib/residentAvatar'
 import { useToast } from '../ui/ToastProvider'
@@ -58,16 +63,16 @@ const REL_BAR_COLOR: Record<string, string> = {
   dislike: '#f97316',
 }
 
-type TabKey = 'memories' | 'diary' | 'relations' | 'family' | 'achievements' | 'schedule'
-
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'memories', label: '\u8BB0\u5FC6' },
-  { key: 'diary', label: '\u65E5\u8BB0' },
-  { key: 'relations', label: '\u5173\u7CFB' },
-  { key: 'schedule', label: '\u65E5\u7A0B' },
-  { key: 'family', label: '\u65CF\u8C31' },
-  { key: 'achievements', label: '\u6210\u5C31' },
-]
+type TabKey =
+  | 'memories'
+  | 'diary'
+  | 'relations'
+  | 'skills'
+  | 'mood_log'
+  | 'backpack'
+  | 'family'
+  | 'achievements'
+  | 'schedule'
 
 const MOCK_ACHIEVEMENTS = [
   { id: 'first_friend', icon: '\u{1F91D}', label: '\u521D\u8BC6', unlocked: true },
@@ -87,6 +92,8 @@ interface ResidentStoryPanelProps {
     personality?: string
     occupation?: string
     coins?: number
+    skills?: Record<string, number>
+    inventory?: Item[]
     energy?: number
     currentGoal?: string | null
     currentBuildingId?: string | null
@@ -116,6 +123,13 @@ function describeActivity(
   return `${t('resident_panel.at_work')} @ ${building.name}`
 }
 
+function skillLevelLabel(level: number, t: (key: string) => string): string {
+  if (level >= 0.8) return t('resident_panel.skill_level_expert')
+  if (level >= 0.55) return t('resident_panel.skill_level_skilled')
+  if (level >= 0.3) return t('resident_panel.skill_level_learning')
+  return t('resident_panel.skill_level_novice')
+}
+
 export function ResidentStoryPanel({
   residentId,
   residents,
@@ -127,11 +141,28 @@ export function ResidentStoryPanel({
 
   const [memories, setMemories] = useState<ResidentMemory[]>([])
   const [relationships, setRelationships] = useState<ResidentRelationship[]>([])
+  const [skills, setSkills] = useState<Record<string, number>>({})
+  const [moodLog, setMoodLog] = useState<ResidentMoodLogEntry[]>([])
   const [memoirBusy, setMemoirBusy] = useState(false)
+  const [tradeBusy, setTradeBusy] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [activeTab, setActiveTab] = useState<TabKey>('memories')
 
   const resident = residents.find((r) => r.id === residentId)
+  const tabs = useMemo(
+    () => [
+      { key: 'memories' as const, label: t('resident_panel.tab_memories') },
+      { key: 'diary' as const, label: t('resident_panel.tab_diary') },
+      { key: 'relations' as const, label: t('resident_panel.tab_relations') },
+      { key: 'skills' as const, label: t('resident_panel.tab_skills') },
+      { key: 'mood_log' as const, label: t('resident_panel.tab_mood_log', 'Mood Log') },
+      { key: 'backpack' as const, label: t('resident_panel.tab_backpack', 'Backpack') },
+      { key: 'schedule' as const, label: t('resident_panel.tab_schedule') },
+      { key: 'family' as const, label: t('resident_panel.tab_family') },
+      { key: 'achievements' as const, label: t('resident_panel.tab_achievements') },
+    ],
+    [t],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -152,10 +183,26 @@ export function ResidentStoryPanel({
         if (!cancelled) setRelationships([])
       })
 
+    void getResidentSkills(residentId)
+      .then((data) => {
+        if (!cancelled) setSkills(data.skills ?? {})
+      })
+      .catch(() => {
+        if (!cancelled) setSkills(resident?.skills ?? {})
+      })
+
+    void getResidentMoodLog(residentId)
+      .then((data) => {
+        if (!cancelled) setMoodLog(data)
+      })
+      .catch(() => {
+        if (!cancelled) setMoodLog([])
+      })
+
     return () => {
       cancelled = true
     }
-  }, [residentId])
+  }, [residentId, resident?.skills])
 
   if (!resident) return null
 
@@ -180,6 +227,10 @@ export function ResidentStoryPanel({
   const topRelationships = [...relationships]
     .sort((a, b) => b.intensity - a.intensity)
     .slice(0, 8)
+  const sortedSkills = Object.entries(skills)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+  const inventoryItems = resident.inventory ?? []
 
   const activity = describeActivity(resident.currentBuildingId, buildings, t)
 
@@ -262,7 +313,7 @@ export function ResidentStoryPanel({
 
       {/* ---- Pill tabs ---- */}
       <div className="mt-4 flex gap-1.5" role="tablist">
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.key}
             type="button"
@@ -349,6 +400,116 @@ export function ResidentStoryPanel({
             </div>
           ) : (
             <p className="text-sm text-slate-500">{t('resident_panel.no_relationships')}</p>
+          )}
+        </div>
+
+        <div className={activeTab === 'skills' ? '' : 'hidden'}>
+          {sortedSkills.length > 0 ? (
+            <div className="space-y-2">
+              {sortedSkills.map(([skillName, value]) => {
+                const pct = Math.round(value * 100)
+                return (
+                  <div
+                    key={skillName}
+                    className="rounded-xl border border-white/6 bg-slate-900/50 px-3 py-2.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium capitalize text-white">{skillName}</span>
+                      <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2 py-0.5 text-[10px] font-medium text-emerald-200">
+                        {skillLevelLabel(value, t)}
+                      </span>
+                    </div>
+                    <div className="mt-2 h-1.5 rounded-full bg-white/10">
+                      <div
+                        className="h-1.5 rounded-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-lime-300 transition-all duration-500"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-[10px] tabular-nums text-slate-400">{pct}%</p>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">{t('resident_panel.no_skills')}</p>
+          )}
+        </div>
+
+        <div className={activeTab === 'mood_log' ? '' : 'hidden'}>
+          {moodLog.length > 0 ? (
+            <div className="space-y-2">
+              {moodLog.map((entry) => (
+                <div
+                  key={`${entry.tick}-${entry.mood}-${entry.cause}`}
+                  className="rounded-xl border border-white/6 bg-slate-900/50 px-3 py-2.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-white">{entry.mood}</span>
+                    <span className="text-[10px] text-slate-500">#{entry.tick}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-300">{entry.cause}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">{t('resident_panel.no_mood_log', 'No mood log yet')}</p>
+          )}
+        </div>
+
+        <div className={activeTab === 'backpack' ? '' : 'hidden'}>
+          {inventoryItems.length > 0 ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                {inventoryItems.map((item) => (
+                  <div
+                    key={`${item.name}-${item.value}`}
+                    className="rounded-xl border border-white/6 bg-slate-900/50 px-3 py-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium capitalize text-white">{item.name}</span>
+                      <span className="text-[10px] text-slate-400">x{item.quantity}</span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-amber-200">
+                      {t('resident_panel.item_value', 'Value')}: {item.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                disabled={tradeBusy}
+                onClick={async () => {
+                  const tradeItem = inventoryItems.find((item) => item.quantity > 0)
+                  const buyer = residents.find((candidate) => candidate.id !== residentId)
+                  if (!tradeItem || !buyer) {
+                    pushToast({ type: 'error', title: t('resident_panel.trade_unavailable', 'Trade unavailable') })
+                    return
+                  }
+                  setTradeBusy(true)
+                  try {
+                    const result = await tradeResidentItem(residentId, {
+                      buyer_id: buyer.id,
+                      item_name: tradeItem.name,
+                      quantity: 1,
+                    })
+                    pushToast({
+                      type: 'success',
+                      title: t('resident_panel.trade_success', 'Trade completed'),
+                      description: `${tradeItem.name} → ${buyer.name} (+${result.total_price})`,
+                    })
+                  } catch {
+                    pushToast({ type: 'error', title: t('resident_panel.trade_failed', 'Trade failed') })
+                  } finally {
+                    setTradeBusy(false)
+                  }
+                }}
+                className="btn-micro rounded-xl border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-sm font-medium text-emerald-200 transition duration-200 hover:bg-emerald-300/20 active:scale-95 disabled:opacity-40"
+              >
+                {t('resident_panel.trade', 'Trade')}
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">{t('resident_panel.no_inventory', 'Backpack is empty')}</p>
           )}
         </div>
 

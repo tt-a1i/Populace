@@ -61,6 +61,21 @@ def test_patch_resident_not_found(client):
     assert response.status_code == 404
 
 
+def test_get_resident_mood_log(client):
+    residents = client.get("/api/residents").json()
+    rid = residents[0]["id"]
+    client.patch(f"/api/residents/{rid}", json={"mood": "sad"})
+    client.patch(f"/api/residents/{rid}", json={"mood": "happy"})
+
+    response = client.get(f"/api/residents/{rid}/mood-log")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert isinstance(payload, list)
+    assert payload[-1]["mood"] == "happy"
+    assert "cause" in payload[-1]
+
+
 # ---------------------------------------------------------------------------
 # POST /api/residents/create
 # ---------------------------------------------------------------------------
@@ -149,6 +164,32 @@ def test_resident_has_coins_field(client):
     assert resident["coins"] >= 0
 
 
+def test_resident_has_skills_field(client):
+    residents = client.get("/api/residents").json()
+    resident = residents[0]
+    assert "skills" in resident
+    assert isinstance(resident["skills"], dict)
+
+
+def test_resident_has_inventory_field(client):
+    residents = client.get("/api/residents").json()
+    resident = residents[0]
+    assert "inventory" in resident
+    assert isinstance(resident["inventory"], list)
+
+
+def test_get_resident_skills_returns_mapping(client):
+    residents = client.get("/api/residents").json()
+    rid = residents[0]["id"]
+
+    response = client.get(f"/api/residents/{rid}/skills")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["resident_id"] == rid
+    assert isinstance(payload["skills"], dict)
+
+
 def test_transfer_coins_success(client):
     residents = client.get("/api/residents").json()
     from_id = residents[0]["id"]
@@ -201,6 +242,31 @@ def test_transfer_coins_resident_not_found(client):
         json={"to_id": to_id, "amount": 5},
     )
     assert response.status_code == 404
+
+
+def test_trade_item_success(client):
+    residents = client.get("/api/residents").json()
+    seller_id = residents[0]["id"]
+    buyer_id = residents[1]["id"]
+    client.post(
+        f"/api/residents/{seller_id}/trade",
+        json={"buyer_id": buyer_id, "item_name": "coffee", "quantity": 1},
+    )
+    seller_after = client.get(f"/api/residents/{seller_id}").json()
+    buyer_after = client.get(f"/api/residents/{buyer_id}").json()
+    assert any(item["name"] == "coffee" for item in buyer_after["inventory"])
+    assert seller_after["coins"] >= 100
+
+
+def test_trade_item_not_found(client):
+    residents = client.get("/api/residents").json()
+    seller_id = residents[0]["id"]
+    buyer_id = residents[1]["id"]
+    response = client.post(
+        f"/api/residents/{seller_id}/trade",
+        json={"buyer_id": buyer_id, "item_name": "nonexistent", "quantity": 1},
+    )
+    assert response.status_code == 400
 
 
 # ---------------------------------------------------------------------------

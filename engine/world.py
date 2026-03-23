@@ -50,7 +50,7 @@ _BUILDING_WORK_MAP = {
         "base_income": 3,
         "skill": "cooking",
         "item_name": "coffee",
-        "item_value": 5,
+        "item_value": 12,
     },
     "school": {
         "occupation": "teacher",

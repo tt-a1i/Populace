@@ -6,7 +6,9 @@ import pytest
 from engine.types import (
     Building,
     Event,
+    Item,
     Memory,
+    MoodEntry,
     Reflection,
     RelationType,
     Relationship,
@@ -21,12 +23,17 @@ def test_resident_defaults():
     assert r.mood == "neutral"
     assert r.location is None
     assert r.goals == []
+    assert r.skills == {}
+    assert r.inventory == []
     assert r.x == 0 and r.y == 0
     assert r.skin_color is None
     assert r.hair_style is None
     assert r.hair_color is None
     assert r.outfit_color is None
     assert r.age_days == 0
+    assert r.mood_history == []
+    assert r.mental_state == "stable"
+    assert r.low_mood_ticks == 0
 
 
 def test_resident_serialisation():
@@ -42,9 +49,22 @@ def test_building_creation():
     assert b.position == (5, 5)
 
 
+def test_item_creation():
+    item = Item(name="coffee", quantity=2, value=6)
+    assert item.name == "coffee"
+    assert item.quantity == 2
+
+
 def test_memory_creation():
     m = Memory(id="m1", content="遇见小红", timestamp="Day 1, 08:00", importance=0.8, emotion="happy")
     assert m.importance == 0.8
+
+
+def test_mood_entry_creation():
+    entry = MoodEntry(tick=12, mood="sad", cause="weather")
+    assert entry.tick == 12
+    assert entry.mood == "sad"
+    assert entry.cause == "weather"
 
 
 def test_event_creation():

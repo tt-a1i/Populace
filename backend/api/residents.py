@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import asdict
 from typing import Any, Optional
 
@@ -9,6 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 from backend.api.schemas import (
     DiaryEntryResponse,
     ResidentMemoryResponse,
+    ResidentMoodLogEntryResponse,
     ResidentReflectionResponse,
     ResidentRelationshipResponse,
     ResidentResponse,
@@ -75,6 +77,9 @@ async def update_resident(
             for field_name, value in updates.items():
                 if field_name not in _PATCHABLE_FIELDS:
                     continue
+                if field_name == "mood":
+                    state.world.set_resident_mood(agent, value or "neutral", "event")
+                    continue
                 setattr(agent.resident, field_name, value)
             from backend.api.ws import manager
 
@@ -100,6 +105,19 @@ async def get_resident_memories(resident_id: str, request: Request) -> list[Resi
     if agent is None:
         raise _NOT_FOUND
     return [ResidentMemoryResponse(**asdict(mem)) for mem in agent.memory_stream.all]
+
+
+@router.get(
+    "/{resident_id}/mood-log",
+    response_model=list[ResidentMoodLogEntryResponse],
+    responses=error_responses(404, 503),
+)
+async def get_resident_mood_log(resident_id: str, request: Request) -> list[ResidentMoodLogEntryResponse]:
+    state = get_simulation_state(request)
+    agent = _find_agent(state, resident_id)
+    if agent is None:
+        raise _NOT_FOUND
+    return [ResidentMoodLogEntryResponse(**asdict(entry)) for entry in agent.resident.mood_history]
 
 
 @router.get(
@@ -168,6 +186,65 @@ class RelationshipHistoryResponse(BaseModel):
     points: list[RelationshipHistoryPoint] = Field(default_factory=list)
 
 
+class ResidentSkillsResponse(BaseModel):
+    resident_id: str
+    resident_name: str
+    skills: dict[str, float] = Field(default_factory=dict)
+
+
+class TradeRequest(BaseModel):
+    buyer_id: str
+    item_name: str
+    quantity: int = 1
+
+    @field_validator("item_name")
+    @classmethod
+    def item_name_required(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("item_name must not be empty")
+        return cleaned
+
+    @field_validator("quantity")
+    @classmethod
+    def quantity_positive(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("quantity must be positive")
+        return value
+
+
+class TradeResponse(BaseModel):
+    seller_resident: ResidentResponse
+    buyer_resident: ResidentResponse
+    item_name: str
+    quantity: int
+    total_price: int
+
+
+def _friendship_discount(state: Any, seller_id: str, buyer_id: str) -> float:
+    relationship_scores: list[float] = []
+    for relation in (
+        state.world.get_relationship(seller_id, buyer_id),
+        state.world.get_relationship(buyer_id, seller_id),
+    ):
+        if relation is None:
+            continue
+        multiplier = 1.0
+        if relation.type.value == "love":
+            multiplier = 1.0
+        elif relation.type.value in {"friendship", "trust"}:
+            multiplier = 0.85
+        else:
+            multiplier = 0.35
+        relationship_scores.append(max(0.0, relation.intensity) * multiplier)
+
+    if not relationship_scores:
+        return 0.0
+
+    closeness = min(1.0, sum(relationship_scores) / len(relationship_scores))
+    return round(min(0.3, closeness * 0.3), 2)
+
+
 @router.get(
     "/{resident_id}/relationship-history/{other_id}",
     response_model=RelationshipHistoryResponse,
@@ -224,6 +301,98 @@ async def get_relationship_history(
         from_name=agent_a.resident.name,
         to_name=agent_b.resident.name,
         points=points,
+    )
+
+
+@router.get(
+    "/{resident_id}/skills",
+    response_model=ResidentSkillsResponse,
+    responses=error_responses(404, 503),
+)
+async def get_resident_skills(resident_id: str, request: Request) -> ResidentSkillsResponse:
+    """Return the resident's current skill levels."""
+    state = get_simulation_state(request)
+    agent = _find_agent(state, resident_id)
+    if agent is None:
+        raise _NOT_FOUND
+
+    return ResidentSkillsResponse(
+        resident_id=agent.resident.id,
+        resident_name=agent.resident.name,
+        skills=dict(sorted(agent.resident.skills.items())),
+    )
+
+
+@router.post(
+    "/{resident_id}/trade",
+    response_model=TradeResponse,
+    responses=error_responses(400, 404, 422, 503),
+)
+async def trade_resident_item(
+    resident_id: str,
+    payload: TradeRequest,
+    request: Request,
+) -> TradeResponse:
+    """Trade an inventory item from one resident to another with relationship-based discounts."""
+    state = get_simulation_state(request)
+    seller = _find_agent(state, resident_id)
+    if seller is None:
+        raise _NOT_FOUND
+
+    buyer = _find_agent(state, payload.buyer_id)
+    if buyer is None:
+        raise api_error(404, "buyer resident not found", "resident_not_found")
+    if buyer.resident.id == seller.resident.id:
+        raise api_error(400, "cannot trade with self", "trade_invalid")
+
+    item = next(
+        (inventory_item for inventory_item in seller.resident.inventory if inventory_item.name == payload.item_name),
+        None,
+    )
+    if item is None or item.quantity < payload.quantity:
+        raise api_error(400, "item not available", "item_not_available")
+
+    unit_value = max(1, int(item.value or 1))
+    discount = _friendship_discount(state, seller.resident.id, buyer.resident.id)
+    total_price = max(1, round(unit_value * payload.quantity * (1.0 - discount)))
+
+    if buyer.resident.coins < total_price:
+        raise api_error(400, "buyer has insufficient coins", "insufficient_coins")
+
+    buyer.resident.coins -= total_price
+    seller.resident.coins += total_price
+    item.quantity -= payload.quantity
+    if item.quantity <= 0:
+        seller.resident.inventory = [
+            inventory_item
+            for inventory_item in seller.resident.inventory
+            if inventory_item.name != payload.item_name
+        ]
+    state.world.add_inventory_item(
+        buyer.resident,
+        item_name=payload.item_name,
+        quantity=payload.quantity,
+        value=unit_value,
+    )
+
+    state._trade_history.append(
+        {
+            "seller_id": seller.resident.id,
+            "buyer_id": buyer.resident.id,
+            "item_name": payload.item_name,
+            "quantity": payload.quantity,
+            "unit_price": unit_value,
+            "discount": discount,
+            "total_price": total_price,
+        }
+    )
+
+    return TradeResponse(
+        seller_resident=ResidentResponse(**asdict(seller.resident)),
+        buyer_resident=ResidentResponse(**asdict(buyer.resident)),
+        item_name=payload.item_name,
+        quantity=payload.quantity,
+        total_price=total_price,
     )
 
 

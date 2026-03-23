@@ -1,5 +1,11 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
+export interface Item {
+  name: string
+  quantity: number
+  value: number
+}
+
 export interface ApiResident {
   id: string
   name: string
@@ -15,6 +21,8 @@ export interface ApiResident {
   outfit_color?: string | null
   coins?: number
   occupation?: string
+  skills?: Record<string, number>
+  inventory?: Item[]
   energy?: number
 }
 
@@ -60,6 +68,26 @@ export interface PresetEvent {
   description: string
   radius: number
   duration: number
+}
+
+export interface VoteRecord {
+  id: string
+  issue: string
+  options: string[]
+  counts: Record<string, number>
+  status: 'active' | 'completed'
+  start_tick: number
+  end_tick: number
+  winning_option: string | null
+  result_announced: boolean
+  total_votes: number
+  effects?: string[]
+}
+
+interface VotePayload {
+  issue: string
+  options: string[]
+  duration_ticks: number
 }
 
 interface ResidentUpdatePayload {
@@ -179,6 +207,21 @@ export function getPresetEvents() {
   return request<PresetEvent[]>('/api/world/events/presets')
 }
 
+export function createVote(payload: VotePayload) {
+  return request<VoteRecord>('/api/world/vote', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function getActiveVotes() {
+  return request<VoteRecord[]>('/api/world/votes/active')
+}
+
+export function getVoteHistory() {
+  return request<VoteRecord[]>('/api/world/votes/history')
+}
+
 export function getResidents() {
   return request<ApiResident[]>('/api/residents')
 }
@@ -222,6 +265,39 @@ export interface ResidentDiaryEntry {
   date: string
   tick: number
   summary: string
+}
+
+export interface ResidentSkillsPayload {
+  resident_id: string
+  resident_name: string
+  skills: Record<string, number>
+}
+
+export interface ResidentMoodLogEntry {
+  tick: number
+  mood: string
+  cause: string
+}
+
+export interface TradeResidentItemPayload {
+  buyer_id: string
+  item_name: string
+  quantity: number
+}
+
+export interface TradeResidentItemResponse {
+  seller_resident: ApiResident
+  buyer_resident: ApiResident
+  item_name: string
+  quantity: number
+  total_price: number
+}
+
+export interface MarketStatsPayload {
+  trade_volume: number
+  total_items_traded: number
+  hottest_item: string | null
+  most_active_trader: string | null
 }
 
 export interface SimulationResidentStat {
@@ -293,6 +369,21 @@ export function getResidentReflections(id: string) {
 
 export function getResidentDiary(id: string) {
   return request<ResidentDiaryEntry[]>(`/api/residents/${id}/diary`)
+}
+
+export function getResidentSkills(id: string) {
+  return request<ResidentSkillsPayload>(`/api/residents/${id}/skills`)
+}
+
+export function getResidentMoodLog(id: string) {
+  return request<ResidentMoodLogEntry[]>(`/api/residents/${id}/mood-log`)
+}
+
+export function tradeResidentItem(id: string, payload: TradeResidentItemPayload) {
+  return request<TradeResidentItemResponse>(`/api/residents/${id}/trade`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
 }
 
 export interface FamilyMember {
@@ -385,6 +476,30 @@ export interface BuildingData {
   name: string
   capacity: number
   position: [number, number]
+}
+
+export interface ZoneData {
+  id: string
+  name: string
+  type: 'residential' | 'commercial' | 'leisure' | 'education' | string
+  bounds: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  atmosphere: {
+    noise: number
+    safety: number
+    beauty: number
+  }
+  resident_count: number
+  building_count: number
+  dominant_building_types: string[]
+}
+
+export function getZones() {
+  return request<ZoneData[]>('/api/world/zones')
 }
 
 export interface AddBuildingPayload {
@@ -592,6 +707,10 @@ export interface EconomyStats {
 
 export function getEconomyStats() {
   return request<EconomyStats>('/api/simulation/economy-stats')
+}
+
+export function getMarketStats() {
+  return request<MarketStatsPayload>('/api/simulation/market-stats')
 }
 
 export interface PerformanceMetrics {

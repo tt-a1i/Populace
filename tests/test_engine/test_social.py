@@ -6,6 +6,7 @@ import pytest
 from engine.social import (
     DialogueResult,
     decay_relationships,
+    maybe_conduct_skill_teaching,
     evolve_relationship,
     initiate_dialogue,
     should_interact,
@@ -68,6 +69,21 @@ async def test_initiate_dialogue_llm_fail_falls_back_to_template(mock_world):
     assert any("小红" in message["text"] or "小明" in message["text"] for message in result.messages)
 
 
+@pytest.mark.asyncio
+async def test_initiate_dialogue_can_comfort_depressed_friend(mock_world):
+    a = mock_world.agents[0]
+    b = mock_world.agents[1]
+    a.resident.mental_state = "depressed"
+    a.resident.mood = "sad"
+
+    result = await initiate_dialogue(b, a, mock_world, comfort_target_id=a.resident.id)
+
+    assert any("别一个人扛" in message["text"] or "我陪着你" in message["text"] for message in result.messages)
+    assert result.relationship_delta > 0
+    assert a.resident.mood in {"calm", "content", "happy"}
+    assert a.resident.mental_state in {"depressed", "stable"}
+
+
 def test_decay_reduces_intensity(mock_world):
     from engine.types import Relationship as Rel
     mock_world.set_relationship(Rel(
@@ -115,3 +131,19 @@ def test_update_relationships_bidirectional(mock_world):
     assert len(deltas) == 2
     assert deltas[0].from_id == "a1" and deltas[0].to_id == "a2"
     assert deltas[1].from_id == "a2" and deltas[1].to_id == "a1"
+
+
+def test_skill_teaching_boosts_student_and_friendship(mock_world):
+    teacher = mock_world.agents[0]
+    student = mock_world.agents[1]
+    teacher.resident.skills["teaching"] = 0.95
+    teacher.resident.skills["trading"] = 0.9
+    student.resident.skills["trading"] = 0.1
+
+    taught = maybe_conduct_skill_teaching(mock_world, teacher, student)
+
+    assert taught is True
+    assert student.resident.skills["trading"] > 0.1
+    assert teacher.resident.skills["teaching"] > 0.95
+    assert mock_world.get_relationship("a1", "a2") is not None
+    assert mock_world.get_relationship("a2", "a1") is not None

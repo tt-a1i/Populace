@@ -84,7 +84,7 @@ async def inject_emotion(payload: InjectEmotionRequest, request: Request) -> Res
     if emotion not in _VALID_EMOTIONS:
         raise api_error(422, f"Invalid emotion '{payload.emotion}'. Must be one of: {', '.join(sorted(_VALID_EMOTIONS))}", "invalid_emotion")
 
-    agent.resident.mood = emotion
+    state.world.set_resident_mood(agent, emotion, "event")
 
     if payload.reason.strip():
         mem = Memory(
@@ -271,7 +271,7 @@ async def trigger_jealousy(payload: TriggerJealousyRequest, request: Request) ->
         raise api_error(404, "rival resident not found", "resident_not_found")
 
     # Set mood to angry
-    agent.resident.mood = "angry"
+    state.world.set_resident_mood(agent, "angry", "event")
 
     # Inject jealousy memory
     name = agent.resident.name

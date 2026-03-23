@@ -123,6 +123,22 @@ def _ensure_relationship(world: "World", from_id: str, to_id: str, since: str) -
     return relationship
 
 
+def _boost_teaching_friendship(
+    world: "World",
+    teacher_id: str,
+    student_id: str,
+    tick_time: str,
+) -> None:
+    for from_id, to_id in ((teacher_id, student_id), (student_id, teacher_id)):
+        relationship = _ensure_relationship(world, from_id, to_id, tick_time)
+        relationship.type = RelationType.friendship
+        relationship.intensity = round(_clamp(max(relationship.intensity, 0.3) + 0.08, 0.0, 1.0), 4)
+        relationship.familiarity = round(_clamp(relationship.familiarity + 0.12, 0.0, 1.0), 4)
+        if from_id == teacher_id:
+            relationship.reason = "teaching_session"
+        world.set_relationship(relationship)
+
+
 def _extroversion(personality: str) -> float:
     """Return a [0.0, 1.0] extroversion score from personality text."""
     p = personality.lower()
@@ -226,6 +242,42 @@ def update_relationships_from_dialogue(
         _apply_relationship_delta(world, agent_a.resident.id, agent_b.resident.id, delta, tick_time),
         _apply_relationship_delta(world, agent_b.resident.id, agent_a.resident.id, delta, tick_time),
     ]
+
+
+def maybe_conduct_skill_teaching(
+    world: "World",
+    teacher: "Agent",
+    student: "Agent",
+) -> bool:
+    """Let a stronger resident teach a weaker one when the gap is meaningful."""
+    teacher_skills = teacher.resident.skills
+    student_skills = student.resident.skills
+    if not teacher_skills:
+        return False
+
+    candidate_name = ""
+    largest_gap = 0.0
+    for skill_name, teacher_level in teacher_skills.items():
+        if skill_name == "teaching" or teacher_level < 0.35:
+            continue
+        student_level = float(student_skills.get(skill_name, 0.0))
+        gap = teacher_level - student_level
+        if gap > largest_gap and gap >= 0.25:
+            candidate_name = skill_name
+            largest_gap = gap
+
+    if not candidate_name:
+        return False
+
+    student_current = float(student_skills.get(candidate_name, 0.0))
+    student_gain = min(0.08, max(0.03, largest_gap * 0.18))
+    teacher_teaching = float(teacher_skills.get("teaching", 0.0))
+    teacher_gain = 0.02 if teacher_teaching < 0.95 else 0.01
+
+    student_skills[candidate_name] = round(min(1.0, student_current + student_gain), 4)
+    teacher_skills["teaching"] = round(min(1.0, teacher_teaching + teacher_gain), 4)
+    _boost_teaching_friendship(world, teacher.resident.id, student.resident.id, world.simulation_time())
+    return True
 
 
 def _apply_relationship_delta(
@@ -340,6 +392,7 @@ async def initiate_dialogue(
     agent_a: "Agent",
     agent_b: "Agent",
     world: "World",
+    comfort_target_id: str | None = None,
 ) -> DialogueResult:
     """Run a full dialogue exchange between two agents (spec §11).
 
@@ -364,18 +417,52 @@ async def initiate_dialogue(
     relation_type = relation_type_for_agents(agent_a, agent_b, world)
     from engine.gossip import generate_gossip, spread_gossip
 
-    gossip = generate_gossip(agent_a, world)
-    template = generate_template_dialogue(
-        agent_a,
-        agent_b,
-        world,
-        relation_type=relation_type,
-        gossip=gossip,
-    )
-    messages = template["messages"]
-    context_history = template["context_history"]
-    delta = int(template["relationship_delta"])
-    is_important = bool(template["is_important"])
+    gossip = None if comfort_target_id else generate_gossip(agent_a, world)
+    if comfort_target_id and comfort_target_id in {agent_a.resident.id, agent_b.resident.id}:
+        comfort_target = agent_a if comfort_target_id == agent_a.resident.id else agent_b
+        comforter = agent_b if comfort_target is agent_a else agent_a
+        messages = [
+            {
+                "speaker_id": comforter.resident.id,
+                "text": f"{comfort_target.resident.name}，别一个人扛着了，我陪着你慢慢缓过来。",
+            },
+            {
+                "speaker_id": comfort_target.resident.id,
+                "text": f"谢谢你来找我，我现在确实有点低落，但听你这么说轻松了一些。",
+            },
+        ]
+        context_history = "\n".join(
+            f"{agent_a.resident.name if message['speaker_id'] == agent_a.resident.id else agent_b.resident.name}：{message['text']}"
+            for message in messages
+        )
+        delta = 6
+        is_important = True
+        if world.mood_score(comfort_target.resident.mood) < -0.3:
+            world.set_resident_mood(comfort_target, "calm", "social")
+            world.update_mental_state(comfort_target.resident)
+        else:
+            world.shift_resident_mood(comfort_target, 1, "social")
+        if world.mood_score(comfort_target.resident.mood) < 0:
+            world.set_resident_mood(comfort_target, "calm", "social")
+        world.shift_resident_mood(comforter, 1, "social")
+    else:
+        template = generate_template_dialogue(
+            agent_a,
+            agent_b,
+            world,
+            relation_type=relation_type,
+            gossip=gossip,
+        )
+        messages = template["messages"]
+        context_history = template["context_history"]
+        delta = int(template["relationship_delta"])
+        is_important = bool(template["is_important"])
+        if delta > 0:
+            world.shift_resident_mood(agent_a, 1, "social")
+            world.shift_resident_mood(agent_b, 1, "social")
+        elif delta < 0:
+            world.shift_resident_mood(agent_a, -1, "social")
+            world.shift_resident_mood(agent_b, -1, "social")
 
     # Memorise important dialogues (spec §11)
     if is_important:
@@ -402,6 +489,10 @@ async def initiate_dialogue(
     # Social interaction costs energy for both participants
     agent_a.resident.energy = max(0.0, agent_a.resident.energy - 0.02)
     agent_b.resident.energy = max(0.0, agent_b.resident.energy - 0.02)
+
+    taught = maybe_conduct_skill_teaching(world, agent_a, agent_b)
+    if not taught:
+        maybe_conduct_skill_teaching(world, agent_b, agent_a)
 
     if gossip is not None:
         spread_gossip(agent_b, gossip, world)

@@ -157,10 +157,10 @@ def _check_condition(cond: RuleCondition, resident: Any, world: Any) -> bool:
     return False
 
 
-def _apply_action(action: RuleAction, agent: Any) -> None:
+def _apply_action(action: RuleAction, agent: Any, world: Any) -> None:
     resident = agent.resident
     if action.action == "set_mood":
-        resident.mood = action.value or "neutral"
+        world.set_resident_mood(agent, action.value or "neutral", "event")
     elif action.action == "adjust_energy":
         try:
             delta = float(action.value)
@@ -188,7 +188,7 @@ def evaluate_rules(state: Any) -> int:
         for agent in state.world.agents:
             if all(_check_condition(c, agent.resident, state.world) for c in rule.conditions):
                 for action in rule.actions:
-                    _apply_action(action, agent)
+                    _apply_action(action, agent, state.world)
                 rule.times_fired += 1
                 total_fired += 1
     return total_fired

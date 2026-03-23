@@ -2151,7 +2151,7 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
         if agent is None:
             continue
         if mod.mood is not None:
-            agent.resident.mood = mod.mood
+            branch_world.set_resident_mood(agent, mod.mood, "event")
         if mod.energy is not None:
             agent.resident.energy = mod.energy
         if mod.coins is not None:

@@ -108,8 +108,8 @@ def check_relationship_events(world: "World", state: object) -> list[dict]:
 
             # Update moods of the two participants
             from_mood, to_mood = _PARTICIPANT_MOODS[event_type]
-            from_agent.resident.mood = from_mood
-            to_agent.resident.mood = to_mood
+            world.set_resident_mood(from_agent, from_mood, "event")
+            world.set_resident_mood(to_agent, to_mood, "event")
 
             # Nudge nearby co-located residents
             nearby_mood = _NEARBY_MOOD[event_type]
@@ -120,7 +120,7 @@ def check_relationship_events(world: "World", state: object) -> list[dict]:
                         agent.resident.id not in (from_id, to_id)
                         and agent.resident.location == location
                     ):
-                        agent.resident.mood = nearby_mood
+                        world.set_resident_mood(agent, nearby_mood, "event")
 
             events.append(
                 {
