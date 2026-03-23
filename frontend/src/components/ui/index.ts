@@ -11,5 +11,7 @@ export { ScenePicker } from './ScenePicker'
 
 export { TimelineSlider } from './TimelineSlider'
 export { ToastProvider, useToast } from './ToastProvider'
+export { NotificationCenter } from './NotificationCenter'
+export { ActivityLog } from './ActivityLog'
 export { RightPanel } from './RightPanel'
 export { WelcomePage } from './WelcomePage'

@@ -13,6 +13,7 @@ import { SavesPanel } from './SavesPanel'
 import { SettingsPanel } from './SettingsPanel'
 import { TimelinePanel } from './TimelinePanel'
 import { ReportsPanel } from '../report'
+import { ActivityLog } from '../ui/ActivityLog'
 
 const StatsPanel = lazy(() =>
   import('./StatsPanel').then((module) => ({ default: module.StatsPanel })),
@@ -23,7 +24,7 @@ const HeatmapPanel = lazy(() =>
 
 const OPEN_SETTINGS_EVENT = 'populace:open-settings'
 
-type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings'
+type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity'
 
 interface ToolDef {
   key: ToolKey
@@ -46,7 +47,7 @@ function toneClass(_tone: string, active: boolean): string {
 }
 
 const SECONDARY_KEYS: ReadonlySet<ToolKey> = new Set([
-  'create', 'build', 'stats', 'dialogue', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings',
+  'create', 'build', 'stats', 'dialogue', 'activity', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings',
 ])
 
 export function Toolbar() {
@@ -113,6 +114,7 @@ export function Toolbar() {
     { key: 'build', label: t('toolbar.build'), icon: '\uD83C\uDFD7', tone: 'emerald' },
     { key: 'stats', label: t('toolbar.stats'), icon: '\uD83D\uDCCA', tone: 'cyan' },
     { key: 'dialogue', label: t('toolbar.dialogue_history'), icon: '\uD83D\uDCAC', tone: 'amber' },
+    { key: 'activity', label: t('toolbar.activity_log', '\u6D3B\u52A8\u65E5\u5FD7'), icon: '\uD83D\uDCDC', tone: 'cyan' },
     { key: 'saves', label: t('toolbar.saves'), icon: '\uD83D\uDCBE', tone: 'violet' },
     { key: 'heatmap', label: t('toolbar.heatmap'), icon: '\uD83D\uDFE5', tone: 'violet' },
     { key: 'compare', label: t('toolbar.compare'), icon: '\u2696\uFE0F', tone: 'amber' },
@@ -145,6 +147,7 @@ export function Toolbar() {
       )
     }
     if (activeTool === 'dialogue') return <DialogueHistory />
+    if (activeTool === 'activity') return <ActivityLog />
     if (activeTool === 'build') return <BuildPanel />
     if (activeTool === 'create') return <ResidentCreationWizard />
     if (activeTool === 'export') return <ExportPanel />

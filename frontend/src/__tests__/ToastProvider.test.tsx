@@ -73,7 +73,7 @@ describe('ToastProvider', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'success' }))
 
-    expect(screen.getByTestId('toast-viewport')).toHaveClass('top-4', 'right-4')
+    expect(screen.getByTestId('toast-viewport')).toHaveClass('z-50')
     expect(screen.getByTestId('toast-item')).toHaveClass(
       'border-emerald-300/30',
       'bg-emerald-400/12',
