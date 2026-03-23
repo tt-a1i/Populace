@@ -56,8 +56,7 @@ async def test_initiate_dialogue_returns_result(mock_world, mock_llm_eval):
 
 
 @pytest.mark.asyncio
-async def test_initiate_dialogue_llm_fail_returns_empty(mock_world):
-    """When LLM returns None, dialogue returns empty result."""
+async def test_initiate_dialogue_llm_fail_falls_back_to_template(mock_world):
     async def _fail(*args, **kwargs):
         return None
 
@@ -65,7 +64,8 @@ async def test_initiate_dialogue_llm_fail_returns_empty(mock_world):
         a = mock_world.agents[0]
         b = mock_world.agents[1]
         result = await initiate_dialogue(a, b, mock_world)
-    assert result.messages == []
+    assert len(result.messages) >= 2
+    assert any("小红" in message["text"] or "小明" in message["text"] for message in result.messages)
 
 
 def test_decay_reduces_intensity(mock_world):

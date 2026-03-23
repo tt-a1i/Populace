@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import random
-import re
 import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -17,6 +16,7 @@ from typing import TYPE_CHECKING
 _log = logging.getLogger(__name__)
 
 from engine._optional_backend import load_backend_attr
+from engine.dialogue import generate_template_dialogue, relation_type_for_agents
 from engine.types import Memory, RelationType, Relationship, RelationshipDelta, WorldConfig
 
 if TYPE_CHECKING:
@@ -360,46 +360,22 @@ async def initiate_dialogue(
     Returns:
         A :class:`DialogueResult` with messages and relationship_delta.
     """
-    messages: list[dict] = []
-    context_history = ""
     tick_time = world.simulation_time()
+    relation_type = relation_type_for_agents(agent_a, agent_b, world)
+    from engine.gossip import generate_gossip, spread_gossip
 
-    # Up to 3 rounds = 6 turns (A, B, A, B, A, B)
-    for round_idx in range(3):
-        for speaker, listener in ((agent_a, agent_b), (agent_b, agent_a)):
-            prompt_msgs = _build_dialogue_prompt_messages(
-                speaker,
-                listener,
-                context_history or "两人偶遇",
-            )
-            text = await speaker.call_llm(prompt_msgs, max_tokens=50)
-            if text is None:
-                # LLM failure → end dialogue early
-                break
-            text = text.strip()
-            if not text:
-                break
-            messages.append({"speaker_id": speaker.resident.id, "text": text})
-            context_history += f"{speaker.resident.name}：{text}\n"
-        else:
-            continue
-        break  # inner loop broke — exit outer loop too
-
-    if not messages:
-        return DialogueResult.empty()
-
-    # Evaluate relationship delta
-    delta = 0
-    eval_text = await agent_a.call_llm(_build_dialogue_eval_messages(context_history), max_tokens=10)
-    if eval_text is not None:
-        match = re.search(r'-?\d+', eval_text.strip())
-        if match:
-            delta = max(-10, min(10, int(match.group())))
-        else:
-            _log.warning("Could not parse dialogue score from LLM: %r", eval_text)
-            delta = 0
-
-    is_important = abs(delta) >= 5
+    gossip = generate_gossip(agent_a, world)
+    template = generate_template_dialogue(
+        agent_a,
+        agent_b,
+        world,
+        relation_type=relation_type,
+        gossip=gossip,
+    )
+    messages = template["messages"]
+    context_history = template["context_history"]
+    delta = int(template["relationship_delta"])
+    is_important = bool(template["is_important"])
 
     # Memorise important dialogues (spec §11)
     if is_important:
@@ -427,9 +403,6 @@ async def initiate_dialogue(
     agent_a.resident.energy = max(0.0, agent_a.resident.energy - 0.02)
     agent_b.resident.energy = max(0.0, agent_b.resident.energy - 0.02)
 
-    # Gossip: speaker A may share info about an absent third party
-    from engine.gossip import generate_gossip, spread_gossip
-    gossip = generate_gossip(agent_a, world)
     if gossip is not None:
         spread_gossip(agent_b, gossip, world)
 
