@@ -19,6 +19,7 @@ import { TutorialOverlay } from './components/ui/TutorialOverlay'
 import { KeyboardShortcutsPanel } from './components/ui/KeyboardShortcutsPanel'
 import { GlobalSearch } from './components/ui/GlobalSearch'
 import { NotificationCenter } from './components/ui/NotificationCenter'
+import { ScreenshotButton, ShareCardButton } from './components/ui/ScreenshotShare'
 import { SoundToggleButton } from './components/toolbar/SoundToggleButton'
 import { SpeedControl } from './components/toolbar/SpeedControl'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
@@ -279,6 +280,8 @@ function SimulationView() {
           <SoundToggleButton />
           <LanguageSwitcher />
           <ThemeToggle />
+          <ScreenshotButton />
+          <ShareCardButton />
           <NotificationCenter />
           <button
             type="button"
