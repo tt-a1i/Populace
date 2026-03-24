@@ -14,7 +14,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 from engine.generative_agent import GenerativeAgent
-from engine.types import Building, Item, Resident, WorldConfig, Zone, ZoneAtmosphere, ZoneBounds
+from engine.types import Building, Item, RelationType, Relationship, Resident, WorldConfig, Zone, ZoneAtmosphere, ZoneBounds
 from engine.world import World
 
 # Default template bundled with the backend
@@ -46,6 +46,8 @@ OUTFIT_COLORS = (
     "#0F766E",
     "#4B5563",
 )
+FAMILY_SURNAMES = ("林", "陈", "周", "许", "沈", "韩", "宋", "顾", "叶", "陆")
+FAMILY_TRAITS = ("重情重义", "沉稳谨慎", "热心助人", "开朗健谈", "敏锐细致", "务实可靠")
 
 
 def generate_resident_appearance(resident_id: str) -> dict[str, str]:
@@ -176,6 +178,8 @@ def load_scenario(
     # Initial relationships from template (spec §3: 预设初始社交网络)
     # -------------------------------------------------------------------------
     _load_initial_relationships(world, data)
+    _generate_families(world)
+    world.assign_initial_pets()
 
     return world
 
@@ -314,8 +318,84 @@ def load_scenario_from_dict(
                 world.enter_building(agent, home)
 
     _load_initial_relationships(world, data)
+    _generate_families(world)
+    world.assign_initial_pets()
 
     return world
+
+
+def _generate_families(world: World) -> None:
+    agents = sorted(world.agents, key=lambda agent: agent.resident.id)
+    if len(agents) < 2:
+        return
+
+    rng = hashlib.sha256("|".join(agent.resident.id for agent in agents).encode("utf-8")).digest()
+    family_count = min(5, max(3, (len(agents) + 2) // 3))
+    surnames = list(FAMILY_SURNAMES)
+    traits = list(FAMILY_TRAITS)
+    shift = rng[0] % len(surnames)
+    surnames = surnames[shift:] + surnames[:shift]
+    trait_shift = rng[1] % len(traits)
+    traits = traits[trait_shift:] + traits[:trait_shift]
+
+    buckets: list[list[Any]] = [[] for _ in range(family_count)]
+    for index, agent in enumerate(agents):
+        buckets[index % family_count].append(agent)
+
+    sim_time = world.simulation_time()
+    for index, bucket in enumerate(bucket for bucket in buckets if bucket):
+        surname = surnames[index % len(surnames)]
+        family_name = f"{surname}家"
+        family_trait = traits[index % len(traits)]
+        residents = [agent.resident for agent in bucket]
+
+        for resident_index, resident in enumerate(residents):
+            resident.family.family_name = family_name
+            if family_trait not in resident.personality:
+                resident.personality = f"{family_trait}、{resident.personality}"
+            if resident.age_days <= 0:
+                resident.age_days = 1800 - resident_index * 120
+
+        if len(residents) >= 2:
+            partners = residents[:2]
+            partners[0].family.partner_id = partners[1].id
+            partners[1].family.partner_id = partners[0].id
+            partners[0].age_days = max(partners[0].age_days, 2100)
+            partners[1].age_days = max(partners[1].age_days, 1980)
+
+        children = residents[2:]
+        for child_index, child in enumerate(children):
+            child.family.parent_ids = [resident.id for resident in residents[:2]]
+            child.family.sibling_ids = [other.id for other in children if other.id != child.id]
+            child.age_days = 180 + child_index * 120
+            for parent in residents[:2]:
+                parent.family.children_ids.append(child.id)
+
+        for resident in residents[:2]:
+            resident.family.sibling_ids = [other.id for other in residents[:2] if other.id != resident.id] if len(children) == 0 else []
+
+        for resident in residents:
+            for other in residents:
+                if resident.id == other.id:
+                    continue
+                resident.family.sibling_ids = sorted(set(resident.family.sibling_ids))
+                relationship = world.get_relationship(resident.id, other.id)
+                if relationship is None:
+                    relationship = Relationship(
+                        from_id=resident.id,
+                        to_id=other.id,
+                        type=RelationType.friendship,
+                        intensity=0.3,
+                        since=sim_time,
+                        familiarity=0.35,
+                        reason=f"family_bond:{family_name}",
+                    )
+                else:
+                    relationship.type = RelationType.friendship
+                    relationship.intensity = min(1.0, relationship.intensity + 0.3)
+                    relationship.familiarity = min(1.0, relationship.familiarity + 0.2)
+                    relationship.reason = relationship.reason or f"family_bond:{family_name}"
+                world.set_relationship(relationship)
 
 
 # ---------------------------------------------------------------------------

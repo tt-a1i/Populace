@@ -1,5 +1,6 @@
 import i18n from '../../i18n/config'
 import type { Building } from '../../types'
+import type { Zone } from '../../types'
 import type { ResidentPosition } from '../../stores/simulation'
 
 export const TILE_SIZE = 32
@@ -105,6 +106,15 @@ export function formatTileKind(tileKind: TileKind): string {
     default:
       return i18n.t('chrome.terrain_grass')
   }
+}
+
+export function zoneContainsTile(zone: Zone, tileX: number, tileY: number): boolean {
+  return (
+    tileX >= zone.bounds.x &&
+    tileX < zone.bounds.x + zone.bounds.width &&
+    tileY >= zone.bounds.y &&
+    tileY < zone.bounds.y + zone.bounds.height
+  )
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

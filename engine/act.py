@@ -16,6 +16,8 @@ import logging
 import random
 from typing import TYPE_CHECKING, List
 
+from engine.types import WeatherType
+
 _log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
@@ -51,7 +53,7 @@ def act(agent: "Agent", plan: dict, world: "World") -> None:
 
     action = plan.get("action", "idle")
 
-    if action == "move":
+    if action in {"move", "attend_class", "walk_pet"}:
         target = plan.get("target")
         if target is not None:
             _step_astar(agent, tuple(target), world)
@@ -106,6 +108,8 @@ def _step_astar(agent: "Agent", target: tuple, world: "World") -> None:
 
     # Advance up to 2 steps along the path; elderly residents move at half speed.
     max_steps = 1 if is_elderly(res) or getattr(res, "mental_state", "stable") == "depressed" else 2
+    if getattr(world, "weather", WeatherType.sunny) == WeatherType.snowy and max_steps > 1:
+        max_steps = 1 if random.random() < 0.3 else max_steps
     steps = min(max_steps, len(agent.current_path))
     for _ in range(steps):
         if not agent.current_path:
@@ -136,6 +140,8 @@ def _step_random(agent: "Agent", world: "World") -> None:
     ]
     walkable = [p for p in candidates if _is_walkable(p[0], p[1], world)]
     if walkable:
+        if getattr(world, "weather", WeatherType.sunny) == WeatherType.snowy and random.random() < 0.3:
+            return
         if getattr(res, "mental_state", "stable") == "depressed" and random.random() < 0.5:
             return
         res.x, res.y = random.choice(walkable)

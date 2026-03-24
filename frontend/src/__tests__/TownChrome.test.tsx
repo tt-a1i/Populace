@@ -3,13 +3,23 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
+  mockGetResidentAchievements,
+  mockGetResidentDiary,
+  mockGetResidentEducation,
+  mockGetResidentFamily,
   mockGetResidentMemories,
   mockGetResidentMoodLog,
+  mockGetResidentReputation,
   mockGetResidentRelationships,
   mockGetResidentSkills,
 } = vi.hoisted(() => ({
+  mockGetResidentAchievements: vi.fn(),
+  mockGetResidentDiary: vi.fn(),
+  mockGetResidentEducation: vi.fn(),
+  mockGetResidentFamily: vi.fn(),
   mockGetResidentMemories: vi.fn(),
   mockGetResidentMoodLog: vi.fn(),
+  mockGetResidentReputation: vi.fn(),
   mockGetResidentRelationships: vi.fn(),
   mockGetResidentSkills: vi.fn(),
 }))
@@ -18,8 +28,13 @@ vi.mock('../services/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/api')>()
   return {
     ...actual,
+    getResidentAchievements: mockGetResidentAchievements,
+    getResidentDiary: mockGetResidentDiary,
+    getResidentEducation: mockGetResidentEducation,
+    getResidentFamily: mockGetResidentFamily,
     getResidentMemories: mockGetResidentMemories,
     getResidentMoodLog: mockGetResidentMoodLog,
+    getResidentReputation: mockGetResidentReputation,
     getResidentRelationships: mockGetResidentRelationships,
     getResidentSkills: mockGetResidentSkills,
     tradeResidentItem: vi.fn(),
@@ -49,6 +64,7 @@ const residents: ResidentPosition[] = [
     goals: ['\u7ed3\u4ea4\u670b\u53cb'],
     dialogueText: '\u4eca\u5929\u771f\u70ed\u95f9\u3002',
     currentBuildingId: 'cafe',
+    reputation: 0.86,
   },
   {
     id: 'r2',
@@ -63,6 +79,7 @@ const residents: ResidentPosition[] = [
     mood: 'neutral',
     goals: ['\u89c2\u5bdf\u5c0f\u9547'],
     currentBuildingId: null,
+    reputation: 0.12,
   },
 ]
 
@@ -144,13 +161,32 @@ function buildProps(selectedResidentId: string | null) {
 
 describe('TownChrome', () => {
   beforeEach(() => {
+    mockGetResidentAchievements.mockReset()
+    mockGetResidentDiary.mockReset()
+    mockGetResidentEducation.mockReset()
+    mockGetResidentFamily.mockReset()
     mockGetResidentMemories.mockReset()
     mockGetResidentMoodLog.mockReset()
+    mockGetResidentReputation.mockReset()
     mockGetResidentRelationships.mockReset()
     mockGetResidentSkills.mockReset()
 
+    mockGetResidentAchievements.mockResolvedValue([])
+    mockGetResidentDiary.mockResolvedValue([])
+    mockGetResidentEducation.mockResolvedValue({
+      resident_id: 'r1',
+      resident_name: '小明',
+      education: { courses: [], knowledge_level: {}, course_history: [] },
+    })
+    mockGetResidentFamily.mockResolvedValue({
+      family_name: '测试家庭',
+      resident: { id: 'r1', name: '小明', relation: 'self', age_days: 800, deceased: false },
+      members: [],
+      tree: { root: { id: 'r1', name: '小明', relation: 'self', age_days: 800, deceased: false }, parents: [], siblings: [], spouse: null, children: [] },
+    })
     mockGetResidentMemories.mockResolvedValue([])
     mockGetResidentMoodLog.mockResolvedValue([])
+    mockGetResidentReputation.mockResolvedValue({ resident_id: 'r1', resident_name: '小明', reputation: 0.86, history: [] })
     mockGetResidentRelationships.mockResolvedValue([])
     mockGetResidentSkills.mockResolvedValue({ resident_id: 'r1', resident_name: '小明', skills: {} })
   })
@@ -248,6 +284,8 @@ describe('TownChrome', () => {
     // Relationships section shows after fetch resolves
     expect(await screen.findByText('A API \u5173\u7cfb')).toBeInTheDocument()
     expect(screen.getByText(/friendship/i)).toBeInTheDocument()
+    expect(screen.getByText(/声望/)).toBeInTheDocument()
+    expect(screen.getByText(/镇上名人/)).toBeInTheDocument()
   })
 
   it('renders a minimap dot for every resident and placeholder marker', () => {

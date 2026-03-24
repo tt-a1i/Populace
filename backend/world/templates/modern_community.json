@@ -12,6 +12,36 @@
       { "x": 0, "y": 0, "width": 6, "height": 6 }
     ]
   },
+  "zones": [
+    {
+      "id": "zone-residential-west",
+      "name": "住宅静巷",
+      "type": "residential",
+      "bounds": { "x": 0, "y": 0, "width": 18, "height": 14 },
+      "atmosphere": { "noise": 0.24, "safety": 0.84, "beauty": 0.68 }
+    },
+    {
+      "id": "zone-commercial-core",
+      "name": "商业活力带",
+      "type": "commercial",
+      "bounds": { "x": 18, "y": 0, "width": 22, "height": 14 },
+      "atmosphere": { "noise": 0.82, "safety": 0.62, "beauty": 0.58 }
+    },
+    {
+      "id": "zone-leisure-park",
+      "name": "休闲绿心",
+      "type": "leisure",
+      "bounds": { "x": 0, "y": 14, "width": 22, "height": 16 },
+      "atmosphere": { "noise": 0.45, "safety": 0.78, "beauty": 0.9 }
+    },
+    {
+      "id": "zone-education-east",
+      "name": "学堂街区",
+      "type": "education",
+      "bounds": { "x": 22, "y": 14, "width": 18, "height": 16 },
+      "atmosphere": { "noise": 0.33, "safety": 0.88, "beauty": 0.72 }
+    }
+  ],
   "buildings": [
     {
       "id": "home_a",

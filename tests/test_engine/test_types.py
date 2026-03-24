@@ -5,15 +5,20 @@ import pytest
 
 from engine.types import (
     Building,
+    DiaryEntry,
+    Education,
     Event,
     Item,
     Memory,
     MoodEntry,
+    Season,
     Reflection,
     RelationType,
     Relationship,
     Resident,
     TickState,
+    Weather,
+    WeatherType,
     WorldConfig,
 )
 
@@ -34,6 +39,10 @@ def test_resident_defaults():
     assert r.mood_history == []
     assert r.mental_state == "stable"
     assert r.low_mood_ticks == 0
+    assert r.memories == []
+    assert isinstance(r.education, Education)
+    assert r.education.courses == []
+    assert r.education.knowledge_level == {}
 
 
 def test_resident_serialisation():
@@ -41,6 +50,25 @@ def test_resident_serialisation():
     d = asdict(r)
     assert d["id"] == "r1"
     assert d["goals"] == ["交朋友"]
+
+
+def test_diary_entry_fields_round_trip():
+    entry = DiaryEntry(
+        id="d1",
+        date="Day 2",
+        day=2,
+        tick=96,
+        content="今天和朋友在咖啡馆聊了很久。",
+        tags=["social", "weather:sunny"],
+        mood_snapshot="happy",
+        highlight=True,
+    )
+
+    assert entry.day == 2
+    assert entry.content.startswith("今天")
+    assert entry.tags == ["social", "weather:sunny"]
+    assert entry.mood_snapshot == "happy"
+    assert entry.summary == entry.content
 
 
 def test_building_creation():
@@ -56,8 +84,21 @@ def test_item_creation():
 
 
 def test_memory_creation():
-    m = Memory(id="m1", content="遇见小红", timestamp="Day 1, 08:00", importance=0.8, emotion="happy")
+    m = Memory(
+        id="m1",
+        content="遇见小红",
+        timestamp="Day 1, 08:00",
+        importance=0.8,
+        emotion="happy",
+        tick=12,
+        type="first_meeting",
+        emotional_weight=0.9,
+        related_resident_ids=["r2"],
+    )
     assert m.importance == 0.8
+    assert m.type == "first_meeting"
+    assert m.emotional_weight == 0.9
+    assert m.related_resident_ids == ["r2"]
 
 
 def test_mood_entry_creation():
@@ -65,6 +106,20 @@ def test_mood_entry_creation():
     assert entry.tick == 12
     assert entry.mood == "sad"
     assert entry.cause == "weather"
+
+
+def test_weather_model_creation():
+    weather = Weather(current=WeatherType.rainy, season=Season.autumn, forecast=["cloudy", "rainy", "stormy"])
+    assert weather.current == WeatherType.rainy
+    assert weather.season == Season.autumn
+    assert weather.forecast[-1] == "stormy"
+
+
+def test_season_enum_values():
+    assert Season.spring.value == "spring"
+    assert Season.summer.value == "summer"
+    assert Season.autumn.value == "autumn"
+    assert Season.winter.value == "winter"
 
 
 def test_event_creation():

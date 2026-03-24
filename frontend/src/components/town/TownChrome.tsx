@@ -7,7 +7,7 @@ import {
   teleportResident,
 } from '../../services/api'
 import { BuildingDetailPanel } from '../toolbar/BuildingDetailPanel'
-import type { Building } from '../../types'
+import type { Building, Zone } from '../../types'
 import { ResidentStoryPanel } from './ResidentStoryPanel'
 import {
   MAP_HEIGHT,
@@ -41,6 +41,7 @@ interface TownChromeProps {
   messageFeed: Array<{ text: string }>
   contextMenu: TownContextMenuState | null
   inspection: TownInspectionState | null
+  selectedZone?: Zone | null
   placeholders: TownPlaceholder[]
   onCloseContextMenu: () => void
   onInjectEvent: () => void
@@ -48,6 +49,7 @@ interface TownChromeProps {
   onPlacePlaceholder: () => void
   onClearResidentSelection: () => void
   onDismissInspection: () => void
+  onDismissZone?: () => void
   onCancelFollow: () => void
 }
 
@@ -58,6 +60,7 @@ export function TownChrome({
   followedResidentId,
   contextMenu,
   inspection,
+  selectedZone = null,
   placeholders,
   onCloseContextMenu,
   onInjectEvent,
@@ -65,6 +68,7 @@ export function TownChrome({
   onPlacePlaceholder,
   onClearResidentSelection,
   onDismissInspection,
+  onDismissZone = () => {},
   onCancelFollow,
 }: TownChromeProps) {
   const { t } = useTranslation()
@@ -125,6 +129,51 @@ export function TownChrome({
               {t('building_detail.view_details')}
             </button>
           )}
+        </section>
+      )}
+
+      {selectedZone && (
+        <section
+          data-testid="town-zone-panel"
+          className="absolute left-3 top-56 z-20 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-white/10 bg-slate-950/85 px-3 py-3 text-slate-100 shadow-lg backdrop-blur-sm animate-[fadeIn_200ms_ease-out]"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.3em] text-emerald-100/70">Zone</p>
+              <h3 className="mt-2 font-mono text-lg font-bold text-white">{selectedZone.name}</h3>
+              <p className="mt-1 text-xs text-slate-400">{selectedZone.type}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onDismissZone}
+              aria-label={t('chrome.close')}
+              className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-300 transition duration-200 hover:bg-white/10 active:scale-95"
+            >
+              {t('chrome.close')}
+            </button>
+          </div>
+          <dl className="mt-4 grid gap-3 text-sm text-slate-300">
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-slate-500">居民</dt>
+              <dd>{selectedZone.resident_count}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-slate-500">建筑</dt>
+              <dd>{selectedZone.building_count}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-slate-500">Noise</dt>
+              <dd>{Math.round(selectedZone.atmosphere.noise * 100)}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-slate-500">Safety</dt>
+              <dd>{Math.round(selectedZone.atmosphere.safety * 100)}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-slate-500">Beauty</dt>
+              <dd>{Math.round(selectedZone.atmosphere.beauty * 100)}</dd>
+            </div>
+          </dl>
         </section>
       )}
 

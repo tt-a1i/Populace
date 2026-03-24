@@ -52,6 +52,13 @@ else:
         snowy = "snowy"
 
 
+    class Season(str, Enum):
+        spring = "spring"
+        summer = "summer"
+        autumn = "autumn"
+        winter = "winter"
+
+
     # ---------------------------------------------------------------------------
     # Neo4j node types (§4.5)
     # ---------------------------------------------------------------------------
@@ -62,7 +69,22 @@ else:
         id: str
         date: str      # e.g. "Day 3"
         tick: int      # tick at which the entry was generated
-        summary: str   # narrative diary text
+        summary: str = ""   # backward-compatible narrative text alias
+        day: int = 0
+        content: str = ""
+        tags: List[str] = field(default_factory=list)
+        mood_snapshot: str = "neutral"
+        highlight: bool = False
+
+        def __post_init__(self) -> None:
+            if not self.content and self.summary:
+                self.content = self.summary
+            if not self.summary and self.content:
+                self.summary = self.content
+            if self.day <= 0 and self.date.startswith("Day "):
+                day_token = self.date.split(",", 1)[0].replace("Day ", "").strip()
+                if day_token.isdigit():
+                    self.day = int(day_token)
 
     @dataclass
     class MoodEntry:
@@ -71,10 +93,91 @@ else:
         cause: str
 
     @dataclass
+    class ReputationEntry:
+        tick: int
+        source: str
+        delta: float
+        before: float
+        after: float
+
+    @dataclass
+    class Weather:
+        current: "WeatherType" = WeatherType.sunny
+        season: "Season" = Season.spring
+        forecast: List[str] = field(default_factory=list)
+
+    @dataclass
     class Item:
         name: str
         quantity: int = 1
         value: int = 0
+
+    @dataclass
+    class Pet:
+        id: str
+        name: str
+        species: str
+        owner_id: Optional[str] = None
+        mood: str = "calm"
+        hunger: float = 1.0
+        location: Optional[str] = None
+        x: int = 0
+        y: int = 0
+
+    @dataclass
+    class Course:
+        subject: str
+        name: str
+        building_id: Optional[str] = None
+        enrolled_tick: int = 0
+        attendance_count: int = 0
+
+    @dataclass
+    class CourseHistoryEntry:
+        tick: int
+        subject: str
+        course_name: str
+
+    @dataclass
+    class FamilyInfo:
+        parent_ids: List[str] = field(default_factory=list)
+        sibling_ids: List[str] = field(default_factory=list)
+        partner_id: Optional[str] = None
+        children_ids: List[str] = field(default_factory=list)
+        family_name: str = ""
+
+    @dataclass
+    class Festival:
+        name: str
+        type: str
+        start_tick: int
+        duration: int
+        location: str
+        participants: List[str] = field(default_factory=list)
+
+    @dataclass
+    class Education:
+        courses: List["Course"] = field(default_factory=list)
+        knowledge_level: Dict[str, float] = field(default_factory=dict)
+        course_history: List["CourseHistoryEntry"] = field(default_factory=list)
+
+    @dataclass
+    class Achievement:
+        id: str
+        name: str
+        description: str
+        category: str
+        unlocked_at_tick: int = 0
+        icon: str = "🏅"
+
+    @dataclass
+    class CrimeEvent:
+        type: str
+        perpetrator: str
+        victim: Optional[str]
+        location: str
+        tick: int
+        resolved: bool = False
 
     @dataclass
     class Resident:
@@ -103,6 +206,15 @@ else:
         mood_history: List["MoodEntry"] = field(default_factory=list)
         mental_state: str = "stable"
         low_mood_ticks: int = 0
+        safety_feeling: float = 1.0
+        flagged_for_crime: bool = False
+        reputation: float = 0.0
+        reputation_history: List["ReputationEntry"] = field(default_factory=list)
+        education: "Education" = field(default_factory=Education)
+        family: "FamilyInfo" = field(default_factory=FamilyInfo)
+        achievements: List["Achievement"] = field(default_factory=list)
+        memories: List["Memory"] = field(default_factory=list)
+        pets: List["Pet"] = field(default_factory=list)
         diary: List["DiaryEntry"] = field(default_factory=list)
 
 
@@ -148,7 +260,32 @@ else:
         timestamp: str
         importance: float
         emotion: str
+        tick: int = 0
+        type: str = "memoir"
+        emotional_weight: float = 0.0
+        related_resident_ids: List[str] = field(default_factory=list)
         source: str = "system"  # 'system' | 'heartbeat' | 'dialogue' | 'event' | 'gossip' | 'injected'
+
+        def __post_init__(self) -> None:
+            if self.tick <= 0 and self.timestamp.startswith("Day "):
+                day_token = self.timestamp.split(",", 1)[0].replace("Day ", "").strip()
+                if day_token.isdigit():
+                    self.tick = int(day_token)
+
+            if self.type == "memoir":
+                source_map = {
+                    "dialogue": "first_meeting",
+                    "gossip": "festival",
+                    "event": "festival",
+                    "injected": "gift",
+                }
+                self.type = source_map.get(self.source, "achievement" if self.emotion == "proud" else "memoir")
+
+            if self.emotional_weight == 0.0:
+                if self.emotion in {"happy", "excited", "ecstatic", "calm", "content", "proud"}:
+                    self.emotional_weight = round(max(0.1, self.importance), 3)
+                elif self.emotion in {"sad", "angry", "fearful", "tired"}:
+                    self.emotional_weight = round(-max(0.1, self.importance), 3)
 
 
     @dataclass
@@ -238,6 +375,9 @@ else:
         achievement_id: str
         achievement_name: str
         icon: str
+        resident_name: str = ""
+        category: str = ""
+        unlocked_at_tick: int = 0
 
 
     @dataclass
@@ -315,6 +455,12 @@ else:
         effects: List[str] = field(default_factory=list)
         effects: List[str] = field(default_factory=list)
 
+    @dataclass
+    class FestivalUpdate:
+        festival: "Festival"
+        status: str = "started"
+        memorial: Optional[str] = None
+
 
     @dataclass
     class TickState:
@@ -330,12 +476,13 @@ else:
         goals: List["GoalUpdate"] = field(default_factory=list)
         achievement_unlocks: List["AchievementUnlock"] = field(default_factory=list)
         relationship_events: List["RelationshipEvent"] = field(default_factory=list)
-        season: str = "spring"
+        season: str = Season.spring.value
         energy_updates: List["EnergyUpdate"] = field(default_factory=list)
         gossips: List["GossipUpdate"] = field(default_factory=list)
         population_events: List["PopulationEvent"] = field(default_factory=list)
         vote_updates: List["VoteUpdate"] = field(default_factory=list)
         vote_announcements: List["VoteUpdate"] = field(default_factory=list)
+        festival_updates: List["FestivalUpdate"] = field(default_factory=list)
 
 
     # ---------------------------------------------------------------------------

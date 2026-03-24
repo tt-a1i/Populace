@@ -137,6 +137,13 @@ class BuildingDetailResponse(BaseModel):
 
 
 class ResidentResponse(BaseModel):
+    class FamilyInfoResponse(BaseModel):
+        parent_ids: list[str] = Field(default_factory=list)
+        sibling_ids: list[str] = Field(default_factory=list)
+        partner_id: str | None = None
+        children_ids: list[str] = Field(default_factory=list)
+        family_name: str = ""
+
     id: str
     name: str
     personality: str
@@ -157,6 +164,9 @@ class ResidentResponse(BaseModel):
     inventory: list[dict[str, Any]] = Field(default_factory=list)
     energy: float = 1.0
     age_days: int = 0
+    reputation: float = 0.0
+    family: FamilyInfoResponse = Field(default_factory=FamilyInfoResponse)
+    education: "EducationResponse" = Field(default_factory=lambda: EducationResponse())
 
 
 class PopulationResidentResponse(BaseModel):
@@ -179,6 +189,7 @@ class PopulationResidentResponse(BaseModel):
     energy: float = 1.0
     age_days: int = 0
     goals: list[str] = Field(default_factory=list)
+    education: "EducationResponse" = Field(default_factory=lambda: EducationResponse())
 
 
 class MarketStatsResponse(BaseModel):
@@ -210,8 +221,13 @@ class PopulationHistoryEntryResponse(BaseModel):
 class DiaryEntryResponse(BaseModel):
     id: str
     date: str
+    day: int = 0
     tick: int
-    summary: str
+    summary: str = ""
+    content: str = ""
+    tags: list[str] = Field(default_factory=list)
+    mood_snapshot: str = "neutral"
+    highlight: bool = False
 
 
 class ResidentMemoryResponse(BaseModel):
@@ -239,6 +255,56 @@ class ResidentMoodLogEntryResponse(BaseModel):
     tick: int
     mood: str
     cause: str
+
+
+class ResidentAchievementResponse(BaseModel):
+    id: str
+    name: str
+    description: str
+    icon: str
+    category: str
+    unlocked: bool = False
+    unlocked_at_tick: int | None = None
+
+
+class AchievementLeaderboardEntryResponse(BaseModel):
+    resident_id: str
+    resident_name: str
+    unlocked_count: int = 0
+    achievements: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class CourseResponse(BaseModel):
+    subject: str
+    name: str
+    building_id: str | None = None
+    enrolled_tick: int = 0
+    attendance_count: int = 0
+
+
+class CourseHistoryEntryResponse(BaseModel):
+    tick: int
+    subject: str
+    course_name: str
+
+
+class EducationResponse(BaseModel):
+    courses: list[CourseResponse] = Field(default_factory=list)
+    knowledge_level: dict[str, float] = Field(default_factory=dict)
+    course_history: list[CourseHistoryEntryResponse] = Field(default_factory=list)
+
+
+class ResidentEducationResponse(BaseModel):
+    resident_id: str
+    resident_name: str
+    education: EducationResponse
+
+
+class WorldEducationCourseResponse(BaseModel):
+    subject: str
+    name: str
+    building_id: str | None = None
+    registration_count: int = 0
 
 
 class ResidentReflectionResponse(BaseModel):
@@ -274,9 +340,60 @@ class ZoneResponse(BaseModel):
     type: str
     bounds: ZoneBoundsResponse
     atmosphere: ZoneAtmosphereResponse
-    resident_count: int = 0
-    building_count: int = 0
+    resident_count: int
+    building_count: int
     dominant_building_types: list[str] = Field(default_factory=list)
+
+
+class CrimeEventResponse(BaseModel):
+    type: str
+    perpetrator: str
+    victim: str | None = None
+    location: str
+    tick: int
+    resolved: bool = False
+
+
+class SafetyHotspotResponse(BaseModel):
+    location: str
+    count: int
+    resolved_count: int = 0
+    intensity: float
+
+
+class SafetyStatsResponse(BaseModel):
+    safety_index: float
+    average_safety_feeling: float
+    total_crimes: int
+    unresolved_crimes: int
+    crimes_by_type: dict[str, int] = Field(default_factory=dict)
+    hotspots: list[SafetyHotspotResponse] = Field(default_factory=list)
+    flagged_residents: list[str] = Field(default_factory=list)
+    patrol_zones: list[str] = Field(default_factory=list)
+
+
+class ReputationHistoryEntryResponse(BaseModel):
+    tick: int
+    source: str
+    delta: float
+    before: float
+    after: float
+
+
+class ResidentReputationResponse(BaseModel):
+    resident_id: str
+    resident_name: str
+    reputation: float
+    title: str = ""
+    history: list[ReputationHistoryEntryResponse] = Field(default_factory=list)
+
+
+class ReputationRankingEntryResponse(BaseModel):
+    resident_id: str
+    resident_name: str
+    reputation: float
+    title: str = ""
+    recent_events: list[str] = Field(default_factory=list)
 
 
 class ScenarioMapResponse(BaseModel):
@@ -319,6 +436,32 @@ class ScenarioDataResponse(BaseModel):
 
 class WeatherResponse(BaseModel):
     weather: str
+    season: str
+    forecast: list[str] = Field(default_factory=list)
+
+
+class FestivalResponse(BaseModel):
+    name: str
+    type: str
+    start_tick: int
+    duration: int
+    location: str
+    participants: list[str] = Field(default_factory=list)
+    status: str = "active"
+    end_tick: int | None = None
+    memorial: str | None = None
+
+
+class FestivalListResponse(BaseModel):
+    current: list[FestivalResponse] = Field(default_factory=list)
+    history: list[FestivalResponse] = Field(default_factory=list)
+
+
+class AchievementLeaderboardEntryResponse(BaseModel):
+    resident_id: str
+    resident_name: str
+    unlocked_count: int
+    achievements: list[ResidentAchievementResponse] = Field(default_factory=list)
 
 
 class ReportSectionResponse(BaseModel):

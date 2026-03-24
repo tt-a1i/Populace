@@ -54,8 +54,12 @@ def test_diary_generated_by_world_tick():
     assert len(resident.diary) == 1
     assert entry.id == resident.diary[0].id
     assert entry.date == "Day 1"
+    assert entry.day == 1
     assert entry.tick == 0
-    assert "TestResident" in entry.summary
+    assert "TestResident" in entry.content
+    assert entry.summary == entry.content
+    assert isinstance(entry.tags, list)
+    assert entry.mood_snapshot == resident.mood
 
 
 def test_diary_entry_at_eod_tick():
@@ -76,10 +80,63 @@ def test_diary_entry_at_eod_tick():
     world.tick()
     assert len(resident.diary) == 1
     assert resident.diary[0].date == "Day 1"
+    assert resident.diary[0].day == 1
 
     # A second tick at 43+2=45 should NOT generate another entry
     world.tick()
     assert len(resident.diary) == 1
+
+
+def test_get_diary_supports_day_filter_and_pagination(client):
+    from engine.types import DiaryEntry
+
+    state = client.app.state.simulation_state
+    resident = state.world.agents[0].resident
+    original_diary = list(resident.diary)
+    try:
+        resident.diary = [
+            DiaryEntry(
+                id="d1",
+                date="Day 1",
+                day=1,
+                tick=44,
+                content="Day1 entry",
+                tags=["weather:sunny"],
+                mood_snapshot="calm",
+            ),
+            DiaryEntry(
+                id="d2",
+                date="Day 2",
+                day=2,
+                tick=92,
+                content="Day2 older entry",
+                tags=["work"],
+                mood_snapshot="tired",
+            ),
+            DiaryEntry(
+                id="d3",
+                date="Day 2",
+                day=2,
+                tick=93,
+                content="Day2 newer entry",
+                tags=["social", "highlight"],
+                mood_snapshot="happy",
+                highlight=True,
+            ),
+        ]
+
+        response = client.get(f"/api/residents/{resident.id}/diary?day=2&limit=1&offset=0")
+        assert response.status_code == 200
+        payload = response.json()
+        assert len(payload) == 1
+        assert payload[0]["id"] == "d3"
+        assert payload[0]["day"] == 2
+        assert payload[0]["content"] == "Day2 newer entry"
+        assert payload[0]["tags"] == ["social", "highlight"]
+        assert payload[0]["mood_snapshot"] == "happy"
+        assert payload[0]["highlight"] is True
+    finally:
+        resident.diary = original_diary
 
 
 def test_mood_contagion_nudges_mood():

@@ -74,3 +74,24 @@ def test_load_scenario_generates_deterministic_resident_appearance():
         assert hair_style in ALLOWED_HAIR_STYLES
         assert hair_color in ALLOWED_HAIR_COLORS
         assert outfit_color in ALLOWED_OUTFIT_COLORS
+
+
+def test_load_scenario_generates_family_clusters():
+    scenario = {
+        "buildings": [
+            {"id": "home_a", "type": "home", "name": "A", "capacity": 4, "position": [1, 1]},
+            {"id": "home_b", "type": "home", "name": "B", "capacity": 4, "position": [5, 5]},
+        ],
+        "residents": [
+            {"id": f"r{i}", "name": f"居民{i}", "personality": "外向热情", "home_id": "home_a" if i < 4 else "home_b", "x": i, "y": i}
+            for i in range(8)
+        ],
+        "map": {},
+    }
+
+    world = load_scenario_from_dict(scenario, config=WorldConfig(llm_call_probability=0.0))
+
+    family_names = {agent.resident.family.family_name for agent in world.agents if agent.resident.family.family_name}
+    assert 3 <= len(family_names) <= 5
+    assert any(agent.resident.family.children_ids or agent.resident.family.partner_id for agent in world.agents)
+    assert any(rel.reason.startswith("family_bond") for rel in world.relationships.values())

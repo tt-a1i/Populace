@@ -9,6 +9,7 @@ const { mockPushToast, mockPlay, simState, relState } = vi.hoisted(() => ({
     initFromSnapshot: vi.fn(),
     applyResidentOperation: vi.fn(),
     applyPopulationEvents: vi.fn(),
+    applyFestivalTick: vi.fn(),
   },
   relState: {
     updateFromTick: vi.fn(),
@@ -66,6 +67,7 @@ describe('useWebSocket notifications', () => {
     simState.initFromSnapshot.mockClear()
     simState.applyResidentOperation.mockClear()
     simState.applyPopulationEvents.mockClear()
+    simState.applyFestivalTick.mockClear()
     relState.updateFromTick.mockClear()
     relState.initFromSnapshot.mockClear()
     relState.setRelationshipsAbsolute.mockClear()
@@ -135,6 +137,20 @@ describe('useWebSocket notifications', () => {
                   summary: '老秦 在 501 天后离世。',
                 },
               ],
+              festival_updates: [
+                {
+                  status: 'started',
+                  festival: {
+                    name: '春日祭',
+                    type: 'spring',
+                    start_tick: 3,
+                    duration: 12,
+                    location: 'plaza',
+                    participants: ['a', 'b'],
+                  },
+                  memorial: null,
+                },
+              ],
             },
           }),
         }),
@@ -155,7 +171,11 @@ describe('useWebSocket notifications', () => {
     expect(mockPushToast).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'warning', title: '居民离世：老秦' }),
     )
+    expect(mockPushToast).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'success', title: '庆典开始：春日祭' }),
+    )
     expect(simState.applyPopulationEvents).toHaveBeenCalled()
+    expect(simState.applyFestivalTick).toHaveBeenCalled()
     expect(relState.applyPopulationEvents).toHaveBeenCalled()
 
     vi.useRealTimers()

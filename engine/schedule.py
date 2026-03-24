@@ -24,6 +24,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from engine.types import WeatherType
+
 if TYPE_CHECKING:
     from engine.world import World
 
@@ -134,6 +136,7 @@ class DailySchedule:
 
         phase = self.current_phase(hour)
         resident = agent.resident  # type: ignore[attr-defined]
+        weather = getattr(world, "weather", WeatherType.sunny)
 
         # Energy override: force home when energy is critically low
         energy = getattr(resident, "energy", 1.0)
@@ -148,6 +151,19 @@ class DailySchedule:
                         return {"action": "idle"}
                     if hasattr(resident, "current_goal"):
                         resident.current_goal = "精疲力竭，回家休息"
+                    return {"action": "move", "target": list(home_building.position)}
+
+        if weather == WeatherType.stormy:
+            home_id = getattr(resident, "home_building_id", None)
+            if home_id:
+                home_building = world.get_building(home_id)
+                if home_building is not None:
+                    if resident.location == home_id:
+                        if hasattr(resident, "current_goal"):
+                            resident.current_goal = "暴风雨中留在家里"
+                        return {"action": "idle"}
+                    if hasattr(resident, "current_goal"):
+                        resident.current_goal = "暴风雨来了，赶回家避风"
                     return {"action": "move", "target": list(home_building.position)}
 
         # Phase → default goal text (used when no specific building found)
@@ -192,13 +208,55 @@ class DailySchedule:
         # ------------------------------------------------------------------
         # Work / lunch / afternoon / evening: move toward preferred building
         # ------------------------------------------------------------------
+        if phase.name == "evening" and world.has_dog(resident):
+            park = next((building for building in world.buildings if building.type == "park"), None)
+            if park is not None:
+                if resident.location == park.id:
+                    _set_goal(f"在{park.name}遛狗")
+                    return {"action": "walk_pet"}
+                _set_goal(f"去{park.name}遛狗")
+                return {"action": "walk_pet", "target": list(park.position)}
+
+        if phase.name in {"work", "afternoon"} and world.has_school_building():
+            current_course = world.get_current_course(resident)
+            if current_course is not None:
+                school = next(
+                    (
+                        building
+                        for building in world.get_school_buildings()
+                        if current_course.building_id is None or building.id == current_course.building_id
+                    ),
+                    world.get_school_buildings()[0],
+                )
+                if resident.location == school.id:
+                    _set_goal(f"在{school.name}上{current_course.name}")
+                    return {"action": "attend_class", "course": current_course.subject}
+                _set_goal(f"去{school.name}上{current_course.name}")
+                return {
+                    "action": "attend_class",
+                    "target": list(school.position),
+                    "course": current_course.subject,
+                }
+
         for btype in phase.target_types:
+            if weather == WeatherType.rainy and btype == "park":
+                continue
             candidates = [
                 b for b in world.buildings
                 if b.type == btype and b.id != getattr(resident, "home_building_id", None)
             ]
             if not candidates:
                 continue
+            candidates = sorted(
+                candidates,
+                key=lambda building: (
+                    -world.score_zone_for_resident(
+                        resident,
+                        world.get_zone_at_position(*building.position) or world.zones[0],
+                    ),
+                    building.name,
+                ),
+            )
             # Prefer a building that isn't full
             for building in candidates:
                 occupants = len(world.get_occupants(building.id))
@@ -217,5 +275,17 @@ class DailySchedule:
             return {"action": "move", "target": list(target.position)}
 
         # Fallback: random wander
+        if weather == WeatherType.rainy:
+            rainy_indoor = next(
+                (
+                    building
+                    for building in world.buildings
+                    if building.type in {"cafe", "school", "shop", "home"}
+                ),
+                None,
+            )
+            if rainy_indoor is not None:
+                _set_goal(f"下雨了，去{rainy_indoor.name}避雨")
+                return {"action": "move", "target": list(rainy_indoor.position)}
         _set_goal(_PHASE_GOALS.get(phase.name, "四处逛逛"))
         return {"action": "move"}

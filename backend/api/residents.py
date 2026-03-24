@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import Counter
 from dataclasses import asdict
 from typing import Any, Optional
 
@@ -9,8 +8,11 @@ from pydantic import BaseModel, Field, field_validator
 
 from backend.api.schemas import (
     DiaryEntryResponse,
+    EducationResponse,
     ResidentMemoryResponse,
+    ResidentEducationResponse,
     ResidentMoodLogEntryResponse,
+    ResidentReputationResponse,
     ResidentReflectionResponse,
     ResidentRelationshipResponse,
     ResidentResponse,
@@ -118,6 +120,38 @@ async def get_resident_mood_log(resident_id: str, request: Request) -> list[Resi
     if agent is None:
         raise _NOT_FOUND
     return [ResidentMoodLogEntryResponse(**asdict(entry)) for entry in agent.resident.mood_history]
+
+
+@router.get(
+    "/{resident_id}/reputation",
+    response_model=ResidentReputationResponse,
+    responses=error_responses(404, 503),
+)
+async def get_resident_reputation(resident_id: str, request: Request) -> ResidentReputationResponse:
+    state = get_simulation_state(request)
+    profile = state.world.get_reputation_profile(resident_id)
+    if profile is None:
+        raise _NOT_FOUND
+    return ResidentReputationResponse(**profile)
+
+
+@router.get(
+    "/{resident_id}/education",
+    response_model=ResidentEducationResponse,
+    responses=error_responses(404, 503),
+)
+async def get_resident_education(resident_id: str, request: Request) -> ResidentEducationResponse:
+    state = get_simulation_state(request)
+    agent = _find_agent(state, resident_id)
+    if agent is None:
+        raise _NOT_FOUND
+
+    state.world.ensure_resident_education(agent.resident)
+    return ResidentEducationResponse(
+        resident_id=agent.resident.id,
+        resident_name=agent.resident.name,
+        education=EducationResponse(**asdict(agent.resident.education)),
+    )
 
 
 @router.get(
@@ -377,6 +411,7 @@ async def trade_resident_item(
 
     state._trade_history.append(
         {
+            "tick": state.world.current_tick,
             "seller_id": seller.resident.id,
             "buyer_id": buyer.resident.id,
             "item_name": payload.item_name,
@@ -415,13 +450,25 @@ async def get_resident_reflections(resident_id: str, request: Request) -> list[R
     response_model=list[DiaryEntryResponse],
     responses=error_responses(404, 503),
 )
-async def get_resident_diary(resident_id: str, request: Request) -> list[DiaryEntryResponse]:
-    """Return all diary entries accumulated by a resident."""
+async def get_resident_diary(
+    resident_id: str,
+    request: Request,
+    day: int | None = None,
+    limit: int = 30,
+    offset: int = 0,
+) -> list[DiaryEntryResponse]:
+    """Return diary entries, newest first, with optional day filter and pagination."""
     state = get_simulation_state(request)
     agent = _find_agent(state, resident_id)
     if agent is None:
         raise _NOT_FOUND
-    return [DiaryEntryResponse(**asdict(entry)) for entry in agent.resident.diary]
+    diary_entries = list(agent.resident.diary)
+    if day is not None:
+        diary_entries = [entry for entry in diary_entries if entry.day == day]
+
+    diary_entries.sort(key=lambda entry: (entry.day, entry.tick, entry.id), reverse=True)
+    page = diary_entries[max(0, offset): max(0, offset) + max(1, limit)]
+    return [DiaryEntryResponse(**asdict(entry)) for entry in page]
 
 
 class AttributeUpdateRequest(BaseModel):
@@ -627,8 +674,47 @@ class FamilyMemberResponse(BaseModel):
 class FamilyTreeResponse(BaseModel):
     root: FamilyMemberResponse
     parents: list[FamilyMemberResponse] = Field(default_factory=list)
+    siblings: list[FamilyMemberResponse] = Field(default_factory=list)
     spouse: FamilyMemberResponse | None = None
     children: list[FamilyMemberResponse] = Field(default_factory=list)
+
+
+class ResidentFamilyResponse(BaseModel):
+    family_name: str
+    resident: FamilyMemberResponse
+    members: list[FamilyMemberResponse] = Field(default_factory=list)
+    tree: FamilyTreeResponse
+
+
+@router.get(
+    "/{resident_id}/family",
+    response_model=ResidentFamilyResponse,
+    responses=error_responses(404, 503),
+)
+async def get_resident_family(resident_id: str, request: Request) -> ResidentFamilyResponse:
+    state = get_simulation_state(request)
+    agent = _find_agent(state, resident_id)
+    if agent is None:
+        raise _NOT_FOUND
+
+    tree = await get_family_tree(resident_id, request)
+    family_members = state.world.get_family_members(agent.resident)
+    members = [
+        FamilyMemberResponse(
+            id=member.id,
+            name=member.name,
+            age_days=member.age_days,
+            deceased=False,
+            relation="self" if member.id == resident_id else _family_relation_label(agent.resident, member),
+        )
+        for member in sorted(family_members, key=lambda item: (-item.age_days, item.name))
+    ]
+    return ResidentFamilyResponse(
+        family_name=agent.resident.family.family_name,
+        resident=tree.root,
+        members=members,
+        tree=tree,
+    )
 
 
 @router.get(
@@ -637,13 +723,11 @@ class FamilyTreeResponse(BaseModel):
     responses=error_responses(404, 503),
 )
 async def get_family_tree(resident_id: str, request: Request) -> FamilyTreeResponse:
-    """Build a family tree for a resident from relationships and population history."""
+    """Build a family tree for a resident from explicit family links."""
     state = get_simulation_state(request)
     agent = _find_agent(state, resident_id)
     if agent is None:
         raise _NOT_FOUND
-
-    alive_ids = {a.resident.id for a in state.world.agents}
 
     def _member(rid: str, relation: str) -> FamilyMemberResponse:
         a = _find_agent(state, rid)
@@ -667,61 +751,25 @@ async def get_family_tree(resident_id: str, request: Request) -> FamilyTreeRespo
         relation="self",
     )
 
-    # Scan relationships for parent-child bonds (reason contains "家庭纽带")
-    parents: list[FamilyMemberResponse] = []
-    children: list[FamilyMemberResponse] = []
-    seen_ids: set[str] = set()
+    family = agent.resident.family
+    parents = [_member(parent_id, "parent") for parent_id in family.parent_ids]
+    siblings = [_member(sibling_id, "sibling") for sibling_id in family.sibling_ids]
+    children = [_member(child_id, "child") for child_id in family.children_ids]
+    spouse = _member(family.partner_id, "spouse") if family.partner_id else None
 
-    for (from_id, to_id), rel in state.world.relationships.items():
-        if rel.reason and "家庭纽带" in rel.reason:
-            if to_id == resident_id and from_id not in seen_ids:
-                # from_id is a parent or child — determine by age
-                other = _find_agent(state, from_id)
-                if other and other.resident.age_days > agent.resident.age_days:
-                    parents.append(_member(from_id, "parent"))
-                elif other and other.resident.age_days < agent.resident.age_days:
-                    children.append(_member(from_id, "child"))
-                else:
-                    parents.append(_member(from_id, "parent"))
-                seen_ids.add(from_id)
-            elif from_id == resident_id and to_id not in seen_ids:
-                other = _find_agent(state, to_id)
-                if other and other.resident.age_days > agent.resident.age_days:
-                    parents.append(_member(to_id, "parent"))
-                elif other and other.resident.age_days < agent.resident.age_days:
-                    children.append(_member(to_id, "child"))
-                else:
-                    children.append(_member(to_id, "child"))
-                seen_ids.add(to_id)
+    return FamilyTreeResponse(root=root, parents=parents, siblings=siblings, spouse=spouse, children=children)
 
-    # Also scan timeline events for birth records
-    timeline = getattr(state, "_timeline_events", [])
-    for event in timeline:
-        meta = event.get("metadata", {})
-        if meta.get("event_type") == "birth":
-            if meta.get("resident_id") == resident_id:
-                for pid in meta.get("parent_ids", []):
-                    if pid not in seen_ids:
-                        parents.append(_member(pid, "parent"))
-                        seen_ids.add(pid)
-            elif resident_id in meta.get("parent_ids", []):
-                child_id = meta["resident_id"]
-                if child_id not in seen_ids:
-                    children.append(_member(child_id, "child"))
-                    seen_ids.add(child_id)
 
-    # Find spouse: bidirectional love relationship with highest intensity
-    spouse: FamilyMemberResponse | None = None
-    best_love = 0.0
-    for (from_id, to_id), rel in state.world.relationships.items():
-        if from_id == resident_id and rel.type.value == "love" and rel.intensity > best_love:
-            reverse_key = (to_id, from_id)
-            reverse = state.world.relationships.get(reverse_key)
-            if reverse and reverse.type.value == "love":
-                best_love = rel.intensity
-                spouse = _member(to_id, "spouse")
-
-    return FamilyTreeResponse(root=root, parents=parents, spouse=spouse, children=children)
+def _family_relation_label(root: Any, other: Any) -> str:
+    if other.id in root.family.parent_ids:
+        return "parent"
+    if other.id in root.family.children_ids:
+        return "child"
+    if other.id in root.family.sibling_ids:
+        return "sibling"
+    if other.id == root.family.partner_id:
+        return "spouse"
+    return "family"
 
 
 class TransferRequest(BaseModel):

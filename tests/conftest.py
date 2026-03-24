@@ -86,7 +86,7 @@ def mock_world(small_config: WorldConfig) -> World:
 
     # Agents
     world.add_agent(make_agent("a1", "小明", x=5, y=5))
-    world.add_agent(make_agent("a2", "小红", x=6, y=5))
+    world.add_agent(MockAgent(make_resident("a2", "小红", personality="内向、安静", x=6, y=5)))
     world.add_agent(make_agent("a3", "大强", x=15, y=15))
 
     return world

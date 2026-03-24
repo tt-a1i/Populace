@@ -102,6 +102,15 @@ vi.mock('../stores/simulation', () => ({
       weather: 'sunny',
       season: 'spring',
       speed: 1,
+      currentFestival: {
+        name: '春日祭',
+        type: 'spring',
+        start_tick: 3,
+        duration: 12,
+        location: 'plaza',
+        participants: ['a', 'b'],
+        status: 'active',
+      },
     }),
 }))
 
@@ -158,5 +167,17 @@ describe('App accessibility flow', () => {
     await user.click(screen.getByRole('button', { name: 'Enter' }))
 
     expect(screen.getByText('在线 3')).toBeInTheDocument()
+  })
+
+  it('shows the active festival banner in simulation view', async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Start' }))
+    await user.click(screen.getByRole('button', { name: 'Enter' }))
+
+    expect(screen.getByText('春日祭')).toBeInTheDocument()
+    expect(screen.getByText(/全镇集会/)).toBeInTheDocument()
   })
 })

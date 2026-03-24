@@ -263,8 +263,13 @@ export interface ResidentReflection {
 export interface ResidentDiaryEntry {
   id: string
   date: string
+  day: number
   tick: number
   summary: string
+  content: string
+  tags: string[]
+  mood_snapshot: string
+  highlight: boolean
 }
 
 export interface ResidentSkillsPayload {
@@ -277,6 +282,30 @@ export interface ResidentMoodLogEntry {
   tick: number
   mood: string
   cause: string
+}
+
+export interface EducationCourse {
+  subject: string
+  name: string
+  building_id?: string | null
+  enrolled_tick?: number
+  attendance_count?: number
+}
+
+export interface EducationHistoryEntry {
+  tick: number
+  subject: string
+  course_name: string
+}
+
+export interface ResidentEducationPayload {
+  resident_id: string
+  resident_name: string
+  education: {
+    courses: EducationCourse[]
+    knowledge_level: Record<string, number>
+    course_history: EducationHistoryEntry[]
+  }
 }
 
 export interface TradeResidentItemPayload {
@@ -367,8 +396,13 @@ export function getResidentReflections(id: string) {
   return request<ResidentReflection[]>(`/api/residents/${id}/reflections`)
 }
 
-export function getResidentDiary(id: string) {
-  return request<ResidentDiaryEntry[]>(`/api/residents/${id}/diary`)
+export function getResidentDiary(id: string, options?: { day?: number; limit?: number; offset?: number }) {
+  const params = new URLSearchParams()
+  if (options?.day !== undefined) params.set('day', String(options.day))
+  if (options?.limit !== undefined) params.set('limit', String(options.limit))
+  if (options?.offset !== undefined) params.set('offset', String(options.offset))
+  const query = params.toString()
+  return request<ResidentDiaryEntry[]>(`/api/residents/${id}/diary${query ? `?${query}` : ''}`)
 }
 
 export function getResidentSkills(id: string) {
@@ -377,6 +411,10 @@ export function getResidentSkills(id: string) {
 
 export function getResidentMoodLog(id: string) {
   return request<ResidentMoodLogEntry[]>(`/api/residents/${id}/mood-log`)
+}
+
+export function getResidentEducation(id: string) {
+  return request<ResidentEducationPayload>(`/api/residents/${id}/education`)
 }
 
 export function tradeResidentItem(id: string, payload: TradeResidentItemPayload) {
@@ -397,12 +435,78 @@ export interface FamilyMember {
 export interface FamilyTree {
   root: FamilyMember
   parents: FamilyMember[]
+  siblings: FamilyMember[]
   spouse: FamilyMember | null
   children: FamilyMember[]
 }
 
 export function getResidentFamilyTree(id: string) {
   return request<FamilyTree>(`/api/residents/${id}/family-tree`)
+}
+
+export interface ResidentFamily {
+  family_name: string
+  resident: FamilyMember
+  members: FamilyMember[]
+  tree: FamilyTree
+}
+
+export function getResidentFamily(id: string) {
+  return request<ResidentFamily>(`/api/residents/${id}/family`)
+}
+
+export interface WorldFamilyMember {
+  id: string
+  name: string
+  age_days: number
+  partner_id?: string | null
+  children_ids?: string[]
+}
+
+export interface WorldFamily {
+  family_name: string
+  member_count: number
+  average_mood: number
+  members: WorldFamilyMember[]
+}
+
+export function getFamilies() {
+  return request<WorldFamily[]>('/api/world/families')
+}
+
+export interface CrimeLogEntry {
+  type: string
+  perpetrator: string
+  victim: string | null
+  location: string
+  tick: number
+  resolved: boolean
+}
+
+export interface SafetyHotspot {
+  location: string
+  count: number
+  resolved_count: number
+  intensity: number
+}
+
+export interface SafetyStats {
+  safety_index: number
+  average_safety_feeling: number
+  total_crimes: number
+  unresolved_crimes: number
+  crimes_by_type: Record<string, number>
+  hotspots: SafetyHotspot[]
+  flagged_residents: string[]
+  patrol_zones: string[]
+}
+
+export function getCrimeLog() {
+  return request<CrimeLogEntry[]>('/api/world/crimes')
+}
+
+export function getSafetyStats() {
+  return request<SafetyStats>('/api/world/safety')
 }
 
 export interface RelationshipHistoryPoint {
@@ -496,6 +600,17 @@ export interface ZoneData {
   resident_count: number
   building_count: number
   dominant_building_types: string[]
+}
+
+export interface WorldEducationCourse {
+  subject: string
+  name: string
+  building_id?: string | null
+  registration_count: number
+}
+
+export function getWorldEducation() {
+  return request<WorldEducationCourse[]>('/api/world/education')
 }
 
 export function getZones() {
@@ -678,11 +793,24 @@ export interface ResidentAchievement {
   name: string
   description: string
   icon: string
+  category: string
   unlocked: boolean
+  unlocked_at_tick: number | null
+}
+
+export interface AchievementLeaderboardEntry {
+  resident_id: string
+  resident_name: string
+  unlocked_count: number
+  achievements: ResidentAchievement[]
 }
 
 export function getResidentAchievements(id: string) {
   return request<ResidentAchievement[]>(`/api/residents/${id}/achievements`)
+}
+
+export function getAchievementLeaderboard() {
+  return request<AchievementLeaderboardEntry[]>('/api/world/achievements/leaderboard')
 }
 
 export function transferCoins(fromId: string, toId: string, amount: number) {

@@ -76,6 +76,82 @@ def test_get_resident_mood_log(client):
     assert "cause" in payload[-1]
 
 
+def test_get_resident_memories_supports_pagination_and_type_filter(client):
+    residents = client.get("/api/residents").json()
+    rid = residents[0]["id"]
+    client.post(
+        f"/api/residents/{rid}/inject-memory",
+        json={"content": "第一次在广场认识了新朋友", "importance": 0.9, "emotion": "happy"},
+    )
+    client.post(
+        f"/api/residents/{rid}/inject-memory",
+        json={"content": "在节日上收到了礼物", "importance": 0.8, "emotion": "happy"},
+    )
+
+    filtered = client.get(f"/api/residents/{rid}/memories", params={"memory_type": "gift"})
+    assert filtered.status_code == 200
+    filtered_payload = filtered.json()
+    assert isinstance(filtered_payload, list)
+    assert all(memory["type"] == "gift" for memory in filtered_payload)
+
+    paged = client.get(f"/api/residents/{rid}/memories", params={"page": 1, "page_size": 1})
+    assert paged.status_code == 200
+    paged_payload = paged.json()
+    assert len(paged_payload) == 1
+    assert "emotional_weight" in paged_payload[0]
+
+
+def test_get_resident_reputation(client):
+    residents = client.get("/api/residents").json()
+    rid = residents[0]["id"]
+
+    response = client.get(f"/api/residents/{rid}/reputation")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["resident_id"] == rid
+    assert "reputation" in payload
+    assert "history" in payload
+
+
+def test_get_resident_education(client):
+    residents = client.get("/api/residents").json()
+    rid = residents[0]["id"]
+
+    response = client.get(f"/api/residents/{rid}/education")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["resident_id"] == rid
+    assert isinstance(payload["education"]["knowledge_level"], dict)
+    assert isinstance(payload["education"]["courses"], list)
+
+
+def test_get_resident_family_profile(client):
+    residents = client.get("/api/residents").json()
+    rid = residents[0]["id"]
+
+    response = client.get(f"/api/residents/{rid}/family")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["resident"]["id"] == rid
+    assert "family_name" in payload
+    assert "members" in payload
+
+
+def test_get_resident_family_tree(client):
+    residents = client.get("/api/residents").json()
+    rid = residents[0]["id"]
+
+    response = client.get(f"/api/residents/{rid}/family-tree")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["root"]["id"] == rid
+    assert "siblings" in payload
+
+
 # ---------------------------------------------------------------------------
 # POST /api/residents/create
 # ---------------------------------------------------------------------------
@@ -281,7 +357,7 @@ def test_get_achievements_returns_list(client):
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
-    assert len(data) == 5
+    assert len(data) == 8
 
 
 def test_achievements_have_required_fields(client):
@@ -294,7 +370,9 @@ def test_achievements_have_required_fields(client):
         assert "name" in ach
         assert "description" in ach
         assert "icon" in ach
+        assert "category" in ach
         assert "unlocked" in ach
+        assert "unlocked_at_tick" in ach
         assert isinstance(ach["unlocked"], bool)
 
 
@@ -313,28 +391,43 @@ def test_achievements_not_found_for_invalid_resident(client):
     assert response.status_code == 404
 
 
-def test_rich_500_unlocks_when_coins_reach_500(client):
-    """Directly set coins to 500 via god-mode attributes and check achievement."""
+def test_shopping_maniac_unlocks_when_trade_count_reaches_20(client):
     residents = client.get("/api/residents").json()
     rid = residents[0]["id"]
-
-    # Give resident enough coins via direct attribute patch + coins workaround
-    # We use the transfer endpoint to add coins from another resident... but
-    # more directly: simulate via the achievements state by giving coins.
-    # Set coins to 500 by patching (using the existing PATCH endpoint coins not exposed,
-    # so we test via check_and_unlock logic indirectly).
-    # Instead, create a resident with coins = 500 manually
     state = client.app.state.simulation_state
-    agent = next((a for a in state.world.agents if a.resident.id == rid), None)
-    assert agent is not None
+    original_history = list(getattr(state, "_trade_history", []))
+    original_store = {key: set(value) for key, value in getattr(state, "_achievements_store", {}).items()}
+    original_meta = dict(getattr(state, "_achievement_unlock_meta", {}))
+    try:
+        state._trade_history = [
+            {"seller_id": rid, "buyer_id": f"buyer-{index}", "item_name": "coffee", "quantity": 1, "total_price": 5}
+            for index in range(20)
+        ]
+        from engine.achievements import check_and_unlock
+        unlocks = check_and_unlock(state)
+        unlocked_ids = [u["achievement_id"] for u in unlocks if u["resident_id"] == rid]
+        assert "shopping_maniac" in unlocked_ids
+    finally:
+        state._trade_history = original_history
+        state._achievements_store = original_store
+        state._achievement_unlock_meta = original_meta
 
-    original_coins = agent.resident.coins
-    agent.resident.coins = 500
 
-    from backend.api.achievements import check_and_unlock
-    unlocks = check_and_unlock(state, set())
-    unlocked_ids = [u["achievement_id"] for u in unlocks if u["resident_id"] == rid]
-    assert "rich_500" in unlocked_ids
+def test_resident_achievements_include_unlock_tick_for_unlocked_badge(client):
+    residents = client.get("/api/residents").json()
+    rid = residents[0]["id"]
+    state = client.app.state.simulation_state
 
-    # Restore
-    agent.resident.coins = original_coins
+    original_store = {key: set(value) for key, value in getattr(state, "_achievements_store", {}).items()}
+    original_meta = dict(getattr(state, "_achievement_unlock_meta", {}))
+    try:
+        state._achievements_store.setdefault(rid, set()).add("shopping_maniac")
+        state._achievement_unlock_meta[(rid, "shopping_maniac")] = 42
+        data = client.get(f"/api/residents/{rid}/achievements").json()
+        unlocked = next(item for item in data if item["id"] == "shopping_maniac")
+        assert unlocked["unlocked"] is True
+        assert unlocked["unlocked_at_tick"] == 42
+        assert unlocked["category"] == "economy"
+    finally:
+        state._achievements_store = original_store
+        state._achievement_unlock_meta = original_meta

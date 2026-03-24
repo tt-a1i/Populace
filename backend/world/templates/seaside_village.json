@@ -12,6 +12,36 @@
       { "x": 0, "y": 0, "width": 40, "height": 8 }
     ]
   },
+  "zones": [
+    {
+      "id": "zone-residential-cottages",
+      "name": "渔舍区",
+      "type": "residential",
+      "bounds": { "x": 0, "y": 18, "width": 20, "height": 12 },
+      "atmosphere": { "noise": 0.22, "safety": 0.76, "beauty": 0.74 }
+    },
+    {
+      "id": "zone-commercial-harbor",
+      "name": "港市区",
+      "type": "commercial",
+      "bounds": { "x": 0, "y": 8, "width": 20, "height": 10 },
+      "atmosphere": { "noise": 0.79, "safety": 0.58, "beauty": 0.63 }
+    },
+    {
+      "id": "zone-leisure-shore",
+      "name": "海风步道",
+      "type": "leisure",
+      "bounds": { "x": 20, "y": 18, "width": 20, "height": 12 },
+      "atmosphere": { "noise": 0.48, "safety": 0.7, "beauty": 0.94 }
+    },
+    {
+      "id": "zone-education-lighthouse",
+      "name": "灯塔学区",
+      "type": "education",
+      "bounds": { "x": 20, "y": 8, "width": 20, "height": 10 },
+      "atmosphere": { "noise": 0.31, "safety": 0.86, "beauty": 0.8 }
+    }
+  ],
   "buildings": [
     {
       "id": "harbor",

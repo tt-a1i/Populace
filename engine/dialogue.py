@@ -100,6 +100,8 @@ def build_dialogue_context(
         "time_of_day": time_of_day,
         "time_label": _TIME_OF_DAY_LABELS[time_of_day],
         "environment_line": f"{_SEASON_LINES[season]}，{_WEATHER_LINES[weather]}。",
+        "festival_line": getattr(world, "active_festival_dialogue_hint", "") or "",
+        "shared_memory_line": world.get_shared_memory_prompt(speaker.resident, listener.resident),
         "speaker_mood_line": f"{speaker.resident.name}现在心情偏{_MOOD_LABELS.get(speaker.resident.mood, speaker.resident.mood or '平稳')}。",
         "listener_mood_line": f"{listener.resident.name}看起来有些{_MOOD_LABELS.get(listener.resident.mood, listener.resident.mood or '平稳')}。",
     }
@@ -146,6 +148,11 @@ def generate_template_dialogue(
             f"{speaker.resident.name}，{listener_reaction}。"
             f" 你今天像是有点{speaker_mood}，我这边倒是有些{listener_mood}。"
         )
+
+    if context["festival_line"]:
+        first_line = f"{first_line} {context['festival_line']}"
+    if context["shared_memory_line"]:
+        first_line = f"{first_line} {context['shared_memory_line']}。"
 
     third_line = (
         f"{speaker.resident.name}说：我刚路过街口，忽然觉得{context['speaker_mood_line']}"

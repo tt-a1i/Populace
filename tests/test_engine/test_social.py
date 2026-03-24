@@ -6,6 +6,7 @@ import pytest
 from engine.social import (
     DialogueResult,
     decay_relationships,
+    maybe_conduct_knowledge_teaching,
     maybe_conduct_skill_teaching,
     evolve_relationship,
     initiate_dialogue,
@@ -84,6 +85,23 @@ async def test_initiate_dialogue_can_comfort_depressed_friend(mock_world):
     assert a.resident.mental_state in {"depressed", "stable"}
 
 
+@pytest.mark.asyncio
+async def test_initiate_dialogue_records_shared_memory_and_reuses_it_in_dialogue(mock_world):
+    a = mock_world.agents[0]
+    b = mock_world.agents[1]
+
+    result = await initiate_dialogue(a, b, mock_world)
+
+    assert a.resident.memories
+    assert b.resident.memories
+    shared = [memory for memory in a.resident.memories if b.resident.id in memory.related_resident_ids]
+    assert shared
+
+    follow_up = await initiate_dialogue(a, b, mock_world)
+
+    assert any("还记得" in message["text"] or "上次" in message["text"] for message in follow_up.messages)
+
+
 def test_decay_reduces_intensity(mock_world):
     from engine.types import Relationship as Rel
     mock_world.set_relationship(Rel(
@@ -145,5 +163,30 @@ def test_skill_teaching_boosts_student_and_friendship(mock_world):
     assert taught is True
     assert student.resident.skills["trading"] > 0.1
     assert teacher.resident.skills["teaching"] > 0.95
+    assert teacher.resident.reputation == pytest.approx(0.05)
     assert mock_world.get_relationship("a1", "a2") is not None
     assert mock_world.get_relationship("a2", "a1") is not None
+
+
+def test_knowledge_teaching_requires_friendship_and_closes_gap(mock_world):
+    teacher = mock_world.agents[0]
+    student = mock_world.agents[1]
+    mock_world.set_relationship(
+        Relationship(
+            from_id=teacher.resident.id,
+            to_id=student.resident.id,
+            type=RelationType.friendship,
+            intensity=0.7,
+            since="t",
+            familiarity=0.5,
+        )
+    )
+    teacher.resident.education.knowledge_level["social"] = 0.9
+    student.resident.education.knowledge_level["social"] = 0.1
+
+    taught = maybe_conduct_knowledge_teaching(mock_world, teacher, student)
+
+    assert taught is True
+    assert student.resident.education.knowledge_level["social"] > 0.1
+    assert teacher.resident.reputation == pytest.approx(0.05)
+    assert student.resident.education.course_history[-1].subject == "social"

@@ -16,6 +16,36 @@
       { "x": 11, "y": 14, "width": 11, "height": 2 }
     ]
   },
+  "zones": [
+    {
+      "id": "zone-residential-ridge",
+      "name": "山居聚落",
+      "type": "residential",
+      "bounds": { "x": 6, "y": 16, "width": 18, "height": 14 },
+      "atmosphere": { "noise": 0.18, "safety": 0.81, "beauty": 0.86 }
+    },
+    {
+      "id": "zone-commercial-crafts",
+      "name": "工坊街",
+      "type": "commercial",
+      "bounds": { "x": 14, "y": 8, "width": 18, "height": 10 },
+      "atmosphere": { "noise": 0.74, "safety": 0.61, "beauty": 0.6 }
+    },
+    {
+      "id": "zone-leisure-hot-spring",
+      "name": "温泉缓坡",
+      "type": "leisure",
+      "bounds": { "x": 24, "y": 18, "width": 16, "height": 12 },
+      "atmosphere": { "noise": 0.36, "safety": 0.75, "beauty": 0.95 }
+    },
+    {
+      "id": "zone-education-shrine",
+      "name": "山神庙学区",
+      "type": "education",
+      "bounds": { "x": 20, "y": 4, "width": 16, "height": 12 },
+      "atmosphere": { "noise": 0.26, "safety": 0.9, "beauty": 0.78 }
+    }
+  ],
   "buildings": [
     {
       "id": "hunter_lodge",

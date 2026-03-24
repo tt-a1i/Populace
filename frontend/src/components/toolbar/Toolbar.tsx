@@ -11,7 +11,10 @@ import { QuestPanel } from './QuestPanel'
 import { ResidentCreationWizard } from './ResidentCreationWizard'
 import { SavesPanel } from './SavesPanel'
 import { SettingsPanel } from './SettingsPanel'
+import { SecurityPanel } from './SecurityPanel'
 import { TimelinePanel } from './TimelinePanel'
+import { VotePanel } from './VotePanel'
+import { FamilyPanel } from './FamilyPanel'
 import { ReportsPanel } from '../report'
 import { ActivityLog } from '../ui/ActivityLog'
 import { DashboardView } from './DashboardView'
@@ -32,7 +35,7 @@ const HeatmapPanel = lazy(() =>
 
 const OPEN_SETTINGS_EVENT = 'populace:open-settings'
 
-type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard' | 'leaderboard' | 'achievements' | 'newspaper' | 'fullreport' | 'whatif' | 'mapeditor' | 'rules' | 'knowledge'
+type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'votes' | 'security' | 'family' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard' | 'leaderboard' | 'achievements' | 'newspaper' | 'fullreport' | 'whatif' | 'mapeditor' | 'rules' | 'knowledge'
 
 interface ToolDef {
   key: ToolKey
@@ -56,6 +59,7 @@ function toneClass(_tone: string, active: boolean): string {
 
 const SECONDARY_KEYS: ReadonlySet<ToolKey> = new Set([
   'create', 'build', 'stats', 'dialogue', 'activity', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings', 'dashboard', 'leaderboard', 'achievements', 'newspaper', 'fullreport', 'whatif', 'mapeditor', 'rules', 'knowledge',
+  'votes', 'security', 'family',
 ])
 
 export function Toolbar() {
@@ -120,6 +124,9 @@ export function Toolbar() {
   const secondaryTools: ToolDef[] = [
     { key: 'create', label: t('toolbar.create'), icon: '\uD83E\uDDD1', tone: 'emerald' },
     { key: 'build', label: t('toolbar.build'), icon: '\uD83C\uDFD7', tone: 'emerald' },
+    { key: 'votes', label: t('toolbar.votes', { defaultValue: '社区投票' }), icon: '\uD83D\uDDD3\uFE0F', tone: 'amber' },
+    { key: 'security', label: t('toolbar.security', { defaultValue: '治安面板' }), icon: '\uD83D\uDEE1\uFE0F', tone: 'rose' },
+    { key: 'family', label: t('toolbar.family', { defaultValue: '家族谱系' }), icon: '\uD83C\uDF33', tone: 'emerald' },
     { key: 'stats', label: t('toolbar.stats'), icon: '\uD83D\uDCCA', tone: 'cyan' },
     { key: 'dialogue', label: t('toolbar.dialogue_history'), icon: '\uD83D\uDCAC', tone: 'amber' },
     { key: 'activity', label: t('toolbar.activity_log', '\u6D3B\u52A8\u65E5\u5FD7'), icon: '\uD83D\uDCDC', tone: 'cyan' },
@@ -165,6 +172,9 @@ export function Toolbar() {
     if (activeTool === 'dialogue') return <DialogueHistory />
     if (activeTool === 'activity') return <ActivityLog />
     if (activeTool === 'build') return <BuildPanel />
+    if (activeTool === 'votes') return <VotePanel />
+    if (activeTool === 'security') return <SecurityPanel />
+    if (activeTool === 'family') return <FamilyPanel />
     if (activeTool === 'create') return <ResidentCreationWizard />
     if (activeTool === 'export') return <ExportPanel />
     if (activeTool === 'heatmap') {

@@ -124,6 +124,8 @@ export interface Resident {
   inventory?: Item[]
   energy?: number
   age_days?: number
+  safety_feeling?: number
+  flagged_for_crime?: boolean
 }
 
 export interface Building {

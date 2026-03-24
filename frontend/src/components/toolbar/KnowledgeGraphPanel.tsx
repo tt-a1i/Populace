@@ -6,6 +6,7 @@ import {
   forceLink,
   forceManyBody,
   forceSimulation,
+  type Simulation,
   type SimulationLinkDatum,
   type SimulationNodeDatum,
 } from 'd3-force'
@@ -15,8 +16,6 @@ import { zoom, zoomIdentity } from 'd3-zoom'
 
 import {
   type KnowledgeGraphData,
-  type KnowledgeGraphEdge,
-  type KnowledgeGraphNode,
   getKnowledgeGraph,
 } from '../../services/api'
 import { PanelShell } from '../ui/PanelShell'
@@ -65,7 +64,7 @@ export function KnowledgeGraphPanel() {
   const [error, setError] = useState('')
   const [sinceTick, setSinceTick] = useState(0)
   const [untilTick, setUntilTick] = useState('')
-  const simulationRef = useRef<ReturnType<typeof forceSimulation> | null>(null)
+  const simulationRef = useRef<Simulation<GraphNode, undefined> | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)

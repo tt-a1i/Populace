@@ -1,9 +1,10 @@
 """Tests for World state management."""
+import uuid
 from types import SimpleNamespace
 
 import pytest
 
-from engine.types import Building, MovementUpdate, TickState, WorldConfig
+from engine.types import Building, Memory, MovementUpdate, RelationType, Relationship, TickState, WorldConfig
 from engine.world import World
 
 from tests.conftest import make_agent
@@ -204,6 +205,33 @@ def test_work_building_improves_skill_and_income(mock_world):
     assert any(item.name == "coffee" for item in agent.resident.inventory)
 
 
+def test_school_class_increases_knowledge_and_history(mock_world):
+    school = Building(id="school1", type="school", name="学院", capacity=8, position=(8, 8))
+    mock_world.add_building(school)
+    agent = mock_world.agents[0]
+    agent.resident.location = school.id
+
+    mock_world.apply_building_effects(agent)
+
+    assert agent.resident.education.courses
+    subject = agent.resident.education.courses[0].subject
+    assert agent.resident.education.knowledge_level[subject] >= 0.05
+    assert agent.resident.education.course_history[-1].subject == subject
+
+
+def test_social_knowledge_boosts_social_probability(mock_world):
+    agent_a = mock_world.agents[0]
+    agent_b = mock_world.agents[1]
+
+    baseline = mock_world.get_social_probability(agent_a, agent_b)
+    agent_a.resident.education.knowledge_level["social"] = 0.9
+    agent_b.resident.education.knowledge_level["social"] = 0.9
+
+    boosted = mock_world.get_social_probability(agent_a, agent_b)
+
+    assert boosted > baseline
+
+
 def test_set_resident_mood_records_history(mock_world):
     agent = mock_world.agents[0]
 
@@ -242,3 +270,141 @@ def test_depressed_resident_has_lower_social_probability(mock_world):
     reduced = mock_world.get_social_probability(agent_a, agent_b)
 
     assert reduced < baseline
+
+
+def test_stormy_weather_sends_residents_home(mock_world):
+    home = mock_world.get_building("home1")
+    agent = mock_world.agents[0]
+    agent.resident.home_building_id = home.id
+    agent.resident.location = None
+    agent.resident.x = 1
+    agent.resident.y = 1
+    mock_world.weather = __import__("engine.types", fromlist=["WeatherType"]).WeatherType.stormy
+
+    tick_state = mock_world.tick()
+
+    assert tick_state.events
+    assert any("暴风雨" in event.description or "回家" in event.description for event in tick_state.events)
+    assert agent.resident.location == home.id or (agent.resident.x, agent.resident.y) == home.position
+
+
+def test_decay_resident_memories_reduces_negative_weight(mock_world):
+    resident = mock_world.agents[0].resident
+    resident.memories.append(
+        Memory(
+            id=str(uuid.uuid4()),
+            content="和小红大吵了一架",
+            timestamp=mock_world.simulation_time(),
+            importance=0.8,
+            emotion="sad",
+            tick=0,
+            type="argument",
+            emotional_weight=-1.0,
+            related_resident_ids=["a2"],
+        )
+    )
+
+    mock_world.current_tick = 100
+    mock_world.decay_resident_memories()
+
+    assert resident.memories[0].emotional_weight == pytest.approx(-0.9)
+
+
+def test_recall_positive_memory_improves_low_mood(mock_world):
+    agent = mock_world.agents[0]
+    agent.resident.mood = "sad"
+    agent.resident.memories.append(
+        Memory(
+            id=str(uuid.uuid4()),
+            content="去年节日里和朋友一起看烟火",
+            timestamp=mock_world.simulation_time(),
+            importance=0.7,
+            emotion="happy",
+            tick=0,
+            type="festival",
+            emotional_weight=0.8,
+            related_resident_ids=["a2"],
+        )
+    )
+
+    recalled = mock_world.recall_comforting_memory(agent)
+
+    assert recalled is not None
+    assert recalled.type == "festival"
+    assert agent.resident.mood in {"tired", "neutral", "calm", "content", "happy"}
+
+
+def test_process_crime_tick_reduces_victim_mood_and_town_safety(mock_world, monkeypatch):
+    perpetrator = mock_world.agents[0]
+    victim = mock_world.agents[1]
+    perpetrator.resident.mood = "sad"
+    perpetrator.resident.energy = 0.05
+    perpetrator.resident.coins = 0
+    victim.resident.mood = "happy"
+
+    mock_world.set_relationship(
+        Relationship(
+            from_id=perpetrator.resident.id,
+            to_id=victim.resident.id,
+            type=RelationType.dislike,
+            intensity=0.95,
+            familiarity=0.0,
+        )
+    )
+
+    monkeypatch.setattr("engine.world.random.random", lambda: 0.0)
+    events = mock_world.process_crime_tick()
+
+    assert events
+    latest = events[-1]
+    assert latest.perpetrator == perpetrator.resident.id
+    assert latest.victim == victim.resident.id
+    assert latest.type in {"theft", "vandalism", "conflict"}
+    assert perpetrator.resident.flagged_for_crime is True
+    assert perpetrator.resident.reputation == pytest.approx(-0.3)
+    assert mock_world.mood_score(victim.resident.mood) < mock_world.mood_score("happy")
+    assert all(agent.resident.safety_feeling < 1.0 for agent in mock_world.agents)
+
+
+def test_police_station_patrol_halves_crime_probability(mock_world, monkeypatch):
+    perpetrator = mock_world.agents[0]
+    perpetrator.resident.location = None
+    perpetrator.resident.x = 3
+    perpetrator.resident.y = 3
+    perpetrator.resident.mood = "sad"
+    perpetrator.resident.energy = 0.1
+    perpetrator.resident.coins = 0
+    mock_world.add_building(Building(id="police1", type="police_station", name="治安站", capacity=4, position=(3, 3)))
+
+    monkeypatch.setattr(mock_world, "_crime_pressure", lambda _agent: 0.4)
+    monkeypatch.setattr("engine.world.random.random", lambda: 0.3)
+
+    events = mock_world.process_crime_tick()
+
+    assert events == []
+
+
+def test_adjust_reputation_clamps_and_tracks_history(mock_world):
+    agent = mock_world.agents[0]
+
+    mock_world.adjust_resident_reputation(agent.resident.id, 0.9, "helped_other")
+    mock_world.adjust_resident_reputation(agent.resident.id, 0.3, "social_active")
+
+    assert agent.resident.reputation == 1.0
+    assert agent.resident.reputation_history[-1].source == "social_active"
+    assert agent.resident.reputation_history[-1].after == 1.0
+    assert mock_world.is_town_celebrity(agent.resident) is True
+
+
+def test_social_probability_prefers_high_reputation_and_avoids_low_reputation(mock_world):
+    initiator = mock_world.agents[0]
+    respected = mock_world.agents[1]
+    avoided = mock_world.agents[2]
+
+    respected.resident.reputation = 0.9
+    avoided.resident.reputation = -0.8
+
+    high_probability = mock_world.get_social_probability(initiator, respected)
+    low_probability = mock_world.get_social_probability(initiator, avoided)
+
+    assert high_probability > low_probability

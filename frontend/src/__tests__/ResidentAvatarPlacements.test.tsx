@@ -2,30 +2,114 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../services/api', () => ({
-  getResidentAchievements: vi.fn().mockResolvedValue([{ unlocked: true }]),
-  getResidentRelationships: vi.fn().mockResolvedValue([{ from_id: 'a', to_id: 'b', type: 'friendship', intensity: 0.8, familiarity: 0.5, reason: 'shared tea', since: 'today', counterpart_name: 'Ben', direction: 'outgoing' }]),
-  getResidentMemories: vi.fn().mockResolvedValue([]),
-  getResidentMoodLog: vi.fn().mockResolvedValue([
+const {
+  mockGetResidentAchievements,
+  mockGetResidentRelationships,
+  mockGetResidentMemories,
+  mockGetResidentMoodLog,
+  mockGetResidentDiary,
+  mockGetResidentEducation,
+  mockGetResidentSkills,
+  mockGenerateMemoir,
+  mockInjectResidentMemory,
+  mockPatchResidentAttributes,
+  mockTradeResidentItem,
+  mockGetResidentFamily,
+  mockGetResidentFamilyTree,
+  mockChatWithResident,
+} = vi.hoisted(() => ({
+  mockGetResidentAchievements: vi.fn().mockResolvedValue([
+    {
+      id: 'social_star',
+      name: '人气王',
+      description: '被 10+ 居民认识',
+      icon: '🌟',
+      category: 'social',
+      unlocked: true,
+      unlocked_at_tick: 32,
+    },
+    {
+      id: 'explorer',
+      name: '探索者',
+      description: '访问过所有区域',
+      icon: '🧭',
+      category: 'exploration',
+      unlocked: false,
+      unlocked_at_tick: null,
+    },
+  ]),
+  mockGetResidentRelationships: vi.fn().mockResolvedValue([{ from_id: 'a', to_id: 'b', type: 'friendship', intensity: 0.8, familiarity: 0.5, reason: 'shared tea', since: 'today', counterpart_name: 'Ben', direction: 'outgoing' }]),
+  mockGetResidentMemories: vi.fn().mockResolvedValue([]),
+  mockGetResidentMoodLog: vi.fn().mockResolvedValue([
     { tick: 8, mood: 'sad', cause: 'weather' },
     { tick: 12, mood: 'calm', cause: 'social' },
   ]),
-  getResidentSkills: vi.fn().mockResolvedValue({
+  mockGetResidentDiary: vi.fn().mockResolvedValue([
+    {
+      id: 'd1',
+      date: 'Day 2',
+      day: 2,
+      tick: 92,
+      content: '**认识了新朋友**，还一起聊了咖啡和天气。',
+      tags: ['social', 'weather:sunny', 'highlight'],
+      mood_snapshot: 'happy',
+      highlight: true,
+    },
+  ]),
+  mockGetResidentEducation: vi.fn().mockResolvedValue({
+    resident_id: 'a',
+    resident_name: 'Ada',
+    education: {
+      courses: [{ subject: 'social', name: 'Social Studio', attendance_count: 3 }],
+      knowledge_level: { social: 0.76, crafting: 0.42, art: 0.55 },
+      course_history: [{ tick: 18, subject: 'social', course_name: 'Social Studio' }],
+    },
+  }),
+  mockGetResidentSkills: vi.fn().mockResolvedValue({
     resident_id: 'a',
     skills: { cooking: 0.82, teaching: 0.45, trading: 0.16 },
   }),
-  generateMemoir: vi.fn(),
-  injectResidentMemory: vi.fn(),
-  patchResidentAttributes: vi.fn(),
-  tradeResidentItem: vi.fn().mockResolvedValue({
+  mockGenerateMemoir: vi.fn(),
+  mockInjectResidentMemory: vi.fn(),
+  mockPatchResidentAttributes: vi.fn(),
+  mockTradeResidentItem: vi.fn().mockResolvedValue({
     seller_resident: { id: 'a', coins: 125, inventory: [] },
     buyer_resident: { id: 'b', coins: 90, inventory: [{ name: 'coffee', quantity: 1, value: 5 }] },
     item_name: 'coffee',
     quantity: 1,
     total_price: 5,
   }),
-  getResidentFamilyTree: vi.fn().mockResolvedValue({ self: { id: '', name: '', age_days: 0, deceased: false, relation: 'self' }, parents: [], children: [], siblings: [], partner: null }),
-  chatWithResident: vi.fn().mockResolvedValue({ reply: 'hello', resident_id: 'r1', resident_name: 'test' }),
+  mockGetResidentFamily: vi.fn().mockResolvedValue({
+    family_name: 'Ada Family',
+    resident: { id: 'a', name: 'Ada', age_days: 12, deceased: false, relation: 'self' },
+    members: [],
+    tree: {
+      root: { id: 'a', name: 'Ada', age_days: 12, deceased: false, relation: 'self' },
+      parents: [],
+      children: [],
+      siblings: [],
+      spouse: null,
+    },
+  }),
+  mockGetResidentFamilyTree: vi.fn().mockResolvedValue({ self: { id: '', name: '', age_days: 0, deceased: false, relation: 'self' }, parents: [], children: [], siblings: [], partner: null }),
+  mockChatWithResident: vi.fn().mockResolvedValue({ reply: 'hello', resident_id: 'r1', resident_name: 'test' }),
+}))
+
+vi.mock('../services/api', () => ({
+  getResidentAchievements: mockGetResidentAchievements,
+  getResidentRelationships: mockGetResidentRelationships,
+  getResidentMemories: mockGetResidentMemories,
+  getResidentMoodLog: mockGetResidentMoodLog,
+  getResidentDiary: mockGetResidentDiary,
+  getResidentEducation: mockGetResidentEducation,
+  getResidentSkills: mockGetResidentSkills,
+  generateMemoir: mockGenerateMemoir,
+  injectResidentMemory: mockInjectResidentMemory,
+  patchResidentAttributes: mockPatchResidentAttributes,
+  tradeResidentItem: mockTradeResidentItem,
+  getResidentFamily: mockGetResidentFamily,
+  getResidentFamilyTree: mockGetResidentFamilyTree,
+  chatWithResident: mockChatWithResident,
 }))
 
 import { ComparePanel } from '../components/toolbar/ComparePanel'
@@ -152,8 +236,42 @@ describe('resident avatar placements', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/sad/i)).toBeInTheDocument()
-      expect(screen.getByText(/weather/i)).toBeInTheDocument()
-      expect(screen.getByText(/social/i)).toBeInTheDocument()
+      expect(screen.getByText(/^weather$/i)).toBeInTheDocument()
+      expect(screen.getAllByText(/^social$/i).length).toBeGreaterThan(0)
+    })
+  })
+
+  it('renders a memoir tab with resident memory cards', async () => {
+    mockGetResidentMemories.mockResolvedValueOnce([
+      {
+        id: 'memory-1',
+        content: '第一次在广场遇见了 Ben，还一起聊了天气。',
+        timestamp: 'Day 1, 08:00',
+        importance: 0.9,
+        emotion: 'happy',
+        tick: 4,
+        type: 'first_meeting',
+        emotional_weight: 0.8,
+        related_resident_ids: ['b'],
+      },
+    ])
+
+    const user = userEvent.setup()
+
+    render(
+      <ResidentStoryPanel
+        residentId="a"
+        residents={useSimulationStore.getState().residents}
+        buildings={[]}
+        onClose={() => undefined}
+      />,
+    )
+
+    await user.click(screen.getByRole('tab', { name: /回忆录|memoir/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/第一次在广场遇见了 ben/i)).toBeInTheDocument()
+      expect(screen.getByText(/first_meeting/i)).toBeInTheDocument()
     })
   })
 
@@ -175,6 +293,70 @@ describe('resident avatar placements', () => {
       expect(screen.getByText(/coffee/i)).toBeInTheDocument()
       expect(screen.getByText(/book/i)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /交易|trade/i })).toBeInTheDocument()
+    })
+  })
+
+  it('renders a diary timeline with mood icon and tags', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <ResidentStoryPanel
+        residentId="a"
+        residents={useSimulationStore.getState().residents}
+        buildings={[]}
+        onClose={() => undefined}
+      />,
+    )
+
+    await user.click(screen.getByRole('tab', { name: /日记|diary/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/认识了新朋友/i)).toBeInTheDocument()
+      expect(screen.getAllByText(/^social$/i).length).toBeGreaterThan(0)
+      expect(screen.getByText(/^weather:sunny$/i)).toBeInTheDocument()
+      expect(screen.getAllByText(/^happy$/i).length).toBeGreaterThan(0)
+    })
+  })
+
+  it('renders achievements tab with unlocked and locked badges', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <ResidentStoryPanel
+        residentId="a"
+        residents={useSimulationStore.getState().residents}
+        buildings={[]}
+        onClose={() => undefined}
+      />,
+    )
+
+    await user.click(screen.getByRole('tab', { name: /成就|achievements/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/探索者/i)).toBeInTheDocument()
+      expect(screen.getByText(/人气王/i)).toBeInTheDocument()
+      expect(screen.getByText(/#32/i)).toBeInTheDocument()
+    })
+  })
+
+  it('renders an education tab with radar data and course history', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <ResidentStoryPanel
+        residentId="a"
+        residents={useSimulationStore.getState().residents}
+        buildings={[]}
+        onClose={() => undefined}
+      />,
+    )
+
+    await user.click(screen.getByRole('tab', { name: /学业|studies/i }))
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/social studio/i).length).toBeGreaterThan(0)
+      expect(screen.getByText(/crafting/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/education-radar/i)).toBeInTheDocument()
     })
   })
 })

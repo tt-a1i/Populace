@@ -179,26 +179,31 @@ def test_world_has_season_attribute():
     assert world.season == "spring"
 
 
-def test_season_changes_at_240_ticks():
-    """Season changes from spring to summer after 240 ticks."""
-    from engine.types import WorldConfig
+def test_season_changes_at_100_ticks():
+    """Season changes from spring to summer after 100 ticks."""
+    from engine.types import Season, WorldConfig
     from engine.world import World
 
     world = World(WorldConfig())
-    # Advance to tick 240 by calling tick() directly on current_tick
-    world.current_tick = 239
-    tick_state = world.tick()  # tick becomes 240
-    assert world.season == "summer"
-    assert tick_state.season == "summer"
+    world.current_tick = 99
+    tick_state = world.tick()
+    assert world.season == Season.summer
+    assert tick_state.season == Season.summer.value
 
 
 def test_season_cycles_correctly():
     """Season cycles: spring→summer→autumn→winter→spring."""
-    from engine.types import WorldConfig
+    from engine.types import Season, WorldConfig
     from engine.world import World
 
     world = World(WorldConfig())
-    seasons_expected = {0: "spring", 240: "summer", 480: "autumn", 720: "winter", 960: "spring"}
+    seasons_expected = {
+        0: Season.spring,
+        100: Season.summer,
+        200: Season.autumn,
+        300: Season.winter,
+        400: Season.spring,
+    }
 
     for tick, expected_season in seasons_expected.items():
         world.current_tick = tick
@@ -212,7 +217,7 @@ def test_tick_state_contains_season():
     from engine.world import World
 
     world = World(WorldConfig())
-    world.current_tick = 239
+    world.current_tick = 99
     ts = world.tick()
     assert ts.season == "summer"
 
@@ -229,7 +234,7 @@ def test_season_affects_weather_probability():
 
     weathers_seen: set[str] = set()
     for _ in range(500):
-        world.current_tick = 720 + _  # Keep in winter range
+        world.current_tick = 300 + _  # Keep in winter range
         world.tick()
         weathers_seen.add(world.weather.value)
 

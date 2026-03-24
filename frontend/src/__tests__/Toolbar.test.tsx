@@ -21,6 +21,12 @@ vi.mock('../components/toolbar/SavesPanel', () => ({
 vi.mock('../components/toolbar/StatsPanel', () => ({
   StatsPanel: () => <div data-testid="stats-panel">StatsPanel</div>,
 }))
+vi.mock('../components/toolbar/ReputationPanel', () => ({
+  ReputationPanel: () => <div data-testid="reputation-panel">ReputationPanel</div>,
+}))
+vi.mock('../components/toolbar/SecurityPanel', () => ({
+  SecurityPanel: () => <div data-testid="security-panel">SecurityPanel</div>,
+}))
 vi.mock('../components/report', () => ({
   ReportsPanel: () => <div data-testid="reports-panel">ReportsPanel</div>,
 }))
@@ -113,6 +119,8 @@ describe('Toolbar', () => {
     await userEvent.click(screen.getByTestId('more-toggle'))
     expect(screen.getByTestId('secondary-row')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /建造模式/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /治安面板|治安/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /声望排行榜|声望/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /数据统计/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /对话记录/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /创建居民/ })).toBeInTheDocument()
@@ -190,6 +198,20 @@ describe('Toolbar', () => {
     await userEvent.click(screen.getByTestId('more-toggle'))
     await userEvent.click(screen.getByRole('button', { name: /对话记录/ }))
     expect(screen.getByTestId('dialogue-history-panel')).toBeInTheDocument()
+  })
+
+  it('switches to SecurityPanel when 治安面板 is clicked', async () => {
+    render(<Toolbar />)
+    await userEvent.click(screen.getByTestId('more-toggle'))
+    await userEvent.click(screen.getByRole('button', { name: /治安面板|治安/ }))
+    expect(screen.getByTestId('security-panel')).toBeInTheDocument()
+  })
+
+  it('switches to ReputationPanel when 声望排行榜 is clicked', async () => {
+    render(<Toolbar />)
+    await userEvent.click(screen.getByTestId('more-toggle'))
+    await userEvent.click(screen.getByRole('button', { name: /声望排行榜|声望/ }))
+    expect(screen.getByTestId('reputation-panel')).toBeInTheDocument()
   })
 
   // Sound toggle is now in App.tsx HUD, not in Toolbar

@@ -104,6 +104,8 @@ def spread_gossip(listener: "Agent", gossip: dict, world: "World") -> None:
     rel.familiarity = round(min(1.0, rel.familiarity + 0.03), 4)
     world.set_relationship(rel)
     world.shift_resident_mood(listener, 1 if is_positive else -1, "gossip")
+    if not is_positive:
+        world.adjust_resident_reputation(target_id, -0.1, "negative_gossip")
 
     mem = Memory(
         id=str(uuid.uuid4()),

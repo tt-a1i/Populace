@@ -45,7 +45,7 @@ from backend.api.schemas import (
 )
 from backend.core.simulation import SimulationLoop
 from backend.llm.client import validate_llm_config
-from engine.types import EventUpdate, RelationType, VoteUpdate
+from engine.types import EventUpdate, Festival, FestivalUpdate, RelationType, VoteUpdate
 
 
 router = APIRouter(prefix="/api/simulation", tags=["simulation"])
@@ -72,6 +72,63 @@ _MOOD_SCORES = {
     "fearful": -0.7,
 }
 
+_FESTIVAL_BLUEPRINTS: dict[str, dict[str, Any]] = {
+    "spring": {
+        "name": "春日祭",
+        "description": "春日祭开场，全镇居民涌向广场起舞，气氛一下子热了起来。",
+        "focus": "全镇集会 + 舞蹈",
+        "duration": 12,
+        "social_multiplier": 3.0,
+        "goal": "参加春日祭",
+        "timeline_type": "festival_spring",
+    },
+    "summer": {
+        "name": "夏日烧烤",
+        "description": "夏日烧烤已经点火，大家围在户外分享食物和笑声。",
+        "focus": "户外聚餐 + 社交加速",
+        "duration": 10,
+        "social_multiplier": 3.0,
+        "goal": "参加夏日烧烤",
+        "timeline_type": "festival_summer",
+    },
+    "autumn": {
+        "name": "秋收感恩",
+        "description": "秋收感恩开始了，居民们交换收成与礼物，彼此的关系更近一步。",
+        "focus": "分享物品 + 友谊加成",
+        "duration": 10,
+        "social_multiplier": 3.0,
+        "goal": "参加秋收感恩",
+        "timeline_type": "festival_autumn",
+    },
+    "winter": {
+        "name": "冬日篝火",
+        "description": "冬日篝火点亮了夜色，居民围炉夜话，也更愿意回到家人身边。",
+        "focus": "围炉夜话 + 家族团聚",
+        "duration": 10,
+        "social_multiplier": 3.0,
+        "goal": "参加冬日篝火",
+        "timeline_type": "festival_winter",
+    },
+    "birthday": {
+        "name": "生日小聚",
+        "description": "生日小聚开始了，几位亲近的居民围在一起送上祝福。",
+        "focus": "生日庆祝",
+        "duration": 6,
+        "social_multiplier": 2.0,
+        "goal": "参加生日小聚",
+        "timeline_type": "festival_birthday",
+    },
+    "achievement": {
+        "name": "成就庆典",
+        "description": "一场小范围庆典围绕着新的成就展开，朋友和家人都来祝贺。",
+        "focus": "成就达成庆祝",
+        "duration": 6,
+        "social_multiplier": 2.0,
+        "goal": "参加成就庆典",
+        "timeline_type": "festival_achievement",
+    },
+}
+
 
 def _mood_score(mood: str | None) -> float:
     if not mood:
@@ -92,8 +149,8 @@ class SimulationState:
         self._max_experiment_history_ticks = max(200, self.world.config.tick_per_day * 30)
         # Dialogue tasks fired in previous ticks; results are harvested each tick
         self._pending_dialogues: list[asyncio.Task] = []
-        # Maps dialogue task → (resident_a_id, resident_b_id) — replaces dynamic attrs
-        self._dialogue_pair_ids: dict[asyncio.Task, tuple[str, str]] = {}
+        # Maps dialogue task → dialogue metadata used when harvesting results.
+        self._dialogue_pair_ids: dict[asyncio.Task, dict[str, Any]] = {}
         # frozenset pairs of resident ids that have an in-flight dialogue task
         self._active_dialogue_pairs: set[frozenset] = set()
         # Active persistent events: list of dicts with remaining_ticks, radius, description
@@ -106,6 +163,11 @@ class SimulationState:
         # Achievement tracking
         self._achievements_store: dict[str, set[str]] = {}
         self._buildings_visited: dict[str, set[str]] = {}
+        self._zones_visited: dict[str, set[str]] = {}
+        self._achievement_unlock_meta: dict[tuple[str, str], int] = {}
+        self._mood_positive_streaks: dict[str, int] = {}
+        self._work_streaks: dict[str, int] = {}
+        self._comfort_counts: dict[str, int] = {}
         self._rel_events_fired: set = set()
         # World timeline: list of timeline event dicts (max 500)
         self._world_timeline: list[dict[str, Any]] = []
@@ -113,6 +175,8 @@ class SimulationState:
         self._trade_history: list[dict[str, Any]] = []
         self._active_votes: list[dict[str, Any]] = []
         self._vote_history: list[dict[str, Any]] = []
+        self._active_festivals: list[dict[str, Any]] = []
+        self._festival_history: list[dict[str, Any]] = []
         self.building_visit_log: list[dict[str, Any]] = []
         self._timeline_id_counter: int = 0
         # Quest system
@@ -263,12 +327,19 @@ class SimulationState:
         self._dialogue_history = []
         self._achievements_store = {}
         self._buildings_visited = {}
+        self._zones_visited = {}
+        self._achievement_unlock_meta = {}
+        self._mood_positive_streaks = {}
+        self._work_streaks = {}
+        self._comfort_counts = {}
         self._rel_events_fired = set()
         self._world_timeline = []
         self._population_history = []
         self._trade_history = []
         self._active_votes = []
         self._vote_history = []
+        self._active_festivals = []
+        self._festival_history = []
         self._timeline_id_counter = 0
         self._active_quests = []
         self._completed_quests = []
@@ -357,6 +428,10 @@ class SimulationState:
             "total_relationship_change_count": getattr(self, "_total_relationship_change_count", 0),
             "dialogue_history": list(getattr(self, "_dialogue_history", [])),
             "achievements": {k: list(v) for k, v in getattr(self, "_achievements_store", {}).items()},
+            "achievement_unlock_meta": {
+                f"{resident_id}::{achievement_id}": tick
+                for (resident_id, achievement_id), tick in getattr(self, "_achievement_unlock_meta", {}).items()
+            },
             "mood_history": list(getattr(self, "_mood_history", [])),
             "active_events": list(getattr(self, "_active_events", [])),
             "world_timeline": list(getattr(self, "_world_timeline", [])),
@@ -364,12 +439,19 @@ class SimulationState:
             "trade_history": list(getattr(self, "_trade_history", [])),
             "active_votes": list(getattr(self, "_active_votes", [])),
             "vote_history": list(getattr(self, "_vote_history", [])),
+            "active_festivals": list(getattr(self, "_active_festivals", [])),
+            "festival_history": list(getattr(self, "_festival_history", [])),
             "timeline_id_counter": getattr(self, "_timeline_id_counter", 0),
             "rel_events_fired": [list(x) for x in getattr(self, "_rel_events_fired", set())],
             "buildings_visited": {k: list(v) for k, v in getattr(self, "_buildings_visited", {}).items()},
+            "zones_visited": {k: list(v) for k, v in getattr(self, "_zones_visited", {}).items()},
+            "mood_positive_streaks": dict(getattr(self, "_mood_positive_streaks", {})),
+            "work_streaks": dict(getattr(self, "_work_streaks", {})),
+            "comfort_counts": dict(getattr(self, "_comfort_counts", {})),
             "active_quests": list(getattr(self, "_active_quests", [])),
             "completed_quests": list(getattr(self, "_completed_quests", [])),
             "replay_snapshots": list(getattr(self, "_replay_snapshots", [])),
+            "stray_pets": [_asdict(pet) for pet in getattr(self.world, "stray_pets", [])],
         }
 
     async def load_state(self, data: dict[str, Any]) -> None:
@@ -378,7 +460,8 @@ class SimulationState:
         from engine.generative_agent import GenerativeAgent
         from engine.memory import MemoryStream
         from engine.types import (
-            Building, DiaryEntry, Item, Memory, MoodEntry, Reflection, Relationship, RelationType, Resident, WorldConfig,
+            Achievement, Building, Course, CourseHistoryEntry, DiaryEntry, Education, Item, Memory, MoodEntry, Reflection,
+            Pet, Relationship, RelationType, Resident, WorldConfig,
         )
         from engine.world import World
 
@@ -396,12 +479,19 @@ class SimulationState:
         self._dialogue_history = []
         self._achievements_store = {}
         self._buildings_visited = {}
+        self._zones_visited = {}
+        self._achievement_unlock_meta = {}
+        self._mood_positive_streaks = {}
+        self._work_streaks = {}
+        self._comfort_counts = {}
         self._rel_events_fired = set()
         self._world_timeline = []
         self._population_history = []
         self._trade_history = []
         self._active_votes = []
         self._vote_history = []
+        self._active_festivals = []
+        self._festival_history = []
         self._timeline_id_counter = 0
         self._active_quests = []
         self._completed_quests = []
@@ -446,16 +536,24 @@ class SimulationState:
                 occupation=res_data.get("occupation", "unemployed"),
                 skills=dict(res_data.get("skills", {})),
                 inventory=[Item(**item) for item in res_data.get("inventory", [])],
+                pets=[Pet(**pet) for pet in res_data.get("pets", [])],
                 energy=float(res_data.get("energy", 1.0)),
                 age_days=int(res_data.get("age_days", 0)),
                 mood_history=[MoodEntry(**entry) for entry in res_data.get("mood_history", [])],
                 mental_state=res_data.get("mental_state", "stable"),
                 low_mood_ticks=int(res_data.get("low_mood_ticks", 0)),
+                education=Education(
+                    courses=[Course(**course) for course in res_data.get("education", {}).get("courses", [])],
+                    knowledge_level=dict(res_data.get("education", {}).get("knowledge_level", {})),
+                    course_history=[
+                        CourseHistoryEntry(**entry)
+                        for entry in res_data.get("education", {}).get("course_history", [])
+                    ],
+                ),
             )
+            resident.achievements = [Achievement(**entry) for entry in res_data.get("achievements", [])]
             for d in res_data.get("diary", []):
-                resident.diary.append(DiaryEntry(
-                    id=d["id"], date=d["date"], tick=d["tick"], summary=d["summary"],
-                ))
+                resident.diary.append(DiaryEntry(**d))
             agent = GenerativeAgent(resident)
 
             ms = MemoryStream(config)
@@ -473,6 +571,9 @@ class SimulationState:
                 agent._building_ticks_remaining = ad["building_ticks_remaining"]
 
             world.add_agent(agent)
+
+        world.stray_pets = [Pet(**pet) for pet in data.get("stray_pets", [])]
+        world._rebuild_pet_registry()
 
         # Restore relationships
         for rel_data in data.get("relationships", []):
@@ -500,6 +601,11 @@ class SimulationState:
         self._total_relationship_change_count = data.get("total_relationship_change_count", 0)
         self._dialogue_history = list(data.get("dialogue_history", []))
         self._achievements_store = {k: set(v) for k, v in data.get("achievements", {}).items()}
+        self._achievement_unlock_meta = {}
+        for key, tick in data.get("achievement_unlock_meta", {}).items():
+            resident_id, _, achievement_id = key.partition("::")
+            if resident_id and achievement_id:
+                self._achievement_unlock_meta[(resident_id, achievement_id)] = int(tick)
         self._mood_history = list(data.get("mood_history", []))
         self._active_events = list(data.get("active_events", []))
         self._world_timeline = list(data.get("world_timeline", []))
@@ -507,9 +613,15 @@ class SimulationState:
         self._trade_history = list(data.get("trade_history", []))
         self._active_votes = list(data.get("active_votes", []))
         self._vote_history = list(data.get("vote_history", []))
+        self._active_festivals = list(data.get("active_festivals", []))
+        self._festival_history = list(data.get("festival_history", []))
         self._timeline_id_counter = data.get("timeline_id_counter", 0)
         self._rel_events_fired = {tuple(x) for x in data.get("rel_events_fired", [])}
         self._buildings_visited = {k: set(v) for k, v in data.get("buildings_visited", {}).items()}
+        self._zones_visited = {k: set(v) for k, v in data.get("zones_visited", {}).items()}
+        self._mood_positive_streaks = {k: int(v) for k, v in data.get("mood_positive_streaks", {}).items()}
+        self._work_streaks = {k: int(v) for k, v in data.get("work_streaks", {}).items()}
+        self._comfort_counts = {k: int(v) for k, v in data.get("comfort_counts", {}).items()}
         self._active_quests = list(data.get("active_quests", []))
         self._completed_quests = list(data.get("completed_quests", []))
         self._replay_snapshots = list(data.get("replay_snapshots", []))
@@ -666,6 +778,8 @@ class SimulationState:
             ],
             "active_votes": list(getattr(self, "_active_votes", [])),
             "vote_history": list(getattr(self, "_vote_history", []))[-20:],
+            "active_festivals": list(getattr(self, "_active_festivals", [])),
+            "festival_history": list(getattr(self, "_festival_history", []))[-20:],
         }
 
     def _build_replay_snapshot(self) -> dict[str, Any]:
@@ -906,6 +1020,7 @@ class SimulationState:
                 votes_by_resident[resident_id] = selected_option
                 vote["counts"][selected_option] += 1
                 vote["total_votes"] = len(votes_by_resident)
+                self.world.adjust_resident_reputation(resident_id, 0.02, "vote_participation")
 
             should_finalize = self.world.current_tick >= vote["end_tick"] or len(votes_by_resident) >= len(self.world.agents)
             if should_finalize:
@@ -960,9 +1075,12 @@ class SimulationState:
             return
 
         self._ensure_stats_counters()
+        dialogue_counts: dict[str, int] = {}
         for dialogue in dialogue_updates:
             from_agent = agents_by_id.get(dialogue.from_id)
             to_agent = agents_by_id.get(dialogue.to_id)
+            dialogue_counts[dialogue.from_id] = dialogue_counts.get(dialogue.from_id, 0) + 1
+            dialogue_counts[dialogue.to_id] = dialogue_counts.get(dialogue.to_id, 0) + 1
             self._dialogue_history.append(
                 {
                     "id": f"dlg-{self.world.current_tick}-{len(self._dialogue_history) + 1}",
@@ -976,6 +1094,10 @@ class SimulationState:
                     "kind": dialogue.kind,
                 }
             )
+
+        for resident_id, count in dialogue_counts.items():
+            if count >= 2:
+                self.world.adjust_resident_reputation(resident_id, 0.01, "social_active")
 
         if len(self._dialogue_history) > 500:
             self._dialogue_history = self._dialogue_history[-500:]
@@ -1185,8 +1307,11 @@ class SimulationState:
 
         for task in self._pending_dialogues:
             if task.done():
-                # Look up pair_ids first, clean up in finally
-                pair_ids = self._dialogue_pair_ids.get(task)
+                dialogue_meta = self._dialogue_pair_ids.get(task)
+                if isinstance(dialogue_meta, tuple):
+                    pair_ids = dialogue_meta
+                else:
+                    pair_ids = None if dialogue_meta is None else dialogue_meta.get("pair")
                 try:
                     result: DialogueResult = task.result()
                     if pair_ids is not None:
@@ -1223,6 +1348,10 @@ class SimulationState:
                                     is_positive=result.gossip["is_positive"],
                                 )
                             )
+                        if isinstance(dialogue_meta, dict) and dialogue_meta.get("comforter_id"):
+                            from engine.achievements import record_comfort_action
+
+                            record_comfort_action(self, dialogue_meta["comforter_id"])
                 except Exception:
                     _log.warning("Dialogue task failed: %s", task.get_name(), exc_info=True)
                 finally:
@@ -1252,6 +1381,8 @@ class SimulationState:
                 if relationship is None or relationship.type not in {RelationType.friendship, RelationType.trust, RelationType.love}:
                     continue
                 score = float(relationship.intensity) + float(relationship.familiarity)
+                if self.world.are_family(candidate.resident, depressed_agent.resident):
+                    score += 0.45
                 if score > comfort_score:
                     comforter = candidate
                     comfort_score = score
@@ -1262,7 +1393,10 @@ class SimulationState:
                 continue
             seen_pairs.add(pair)
             task = asyncio.create_task(initiate_dialogue(comforter, depressed_agent, self.world, comfort_target_id=depressed_agent.resident.id))
-            self._dialogue_pair_ids[task] = (comforter.resident.id, depressed_agent.resident.id)
+            self._dialogue_pair_ids[task] = {
+                "pair": (comforter.resident.id, depressed_agent.resident.id),
+                "comforter_id": comforter.resident.id,
+            }
             self._active_dialogue_pairs.add(pair)
             self._pending_dialogues.append(task)
             dialogue_count += 1
@@ -1294,7 +1428,7 @@ class SimulationState:
                 if not should_start:
                     continue
                 task = asyncio.create_task(initiate_dialogue(a, b, self.world))
-                self._dialogue_pair_ids[task] = (a.resident.id, b.resident.id)
+                self._dialogue_pair_ids[task] = {"pair": (a.resident.id, b.resident.id)}
                 self._active_dialogue_pairs.add(pair)
                 self._pending_dialogues.append(task)
                 dialogue_count += 1
@@ -1351,6 +1485,18 @@ class SimulationState:
         self._total_dialogue_count += len(tick_state.dialogues)
         self._total_relationship_change_count += len(tick_state.relationships)
 
+        eod_tick_in_day = 22 * max(1, self.world.config.tick_per_day // 24)
+        if self.world.current_tick % self.world.config.tick_per_day == eod_tick_in_day:
+            from engine.diary import build_state_diary_context, generate_diary_entry
+
+            day_number = self.world.current_tick // self.world.config.tick_per_day + 1
+            for agent in self.world.agents:
+                generate_diary_entry(
+                    agent,
+                    self.world,
+                    day_context=build_state_diary_context(self, agent.resident.id, day_number),
+                )
+
         # Record mood snapshot every tick (keep last 100 ticks × N agents)
         current_tick = self.world.current_tick
         if not hasattr(self, "_mood_history"):
@@ -1382,24 +1528,18 @@ class SimulationState:
             self.world.pending_events.clear()
 
         # --- Achievement checks ---
-        # Ensure tracking dicts exist (guard for test environments)
-        if not hasattr(self, "_achievements_store"):
-            self._achievements_store = {}
-        if not hasattr(self, "_buildings_visited"):
-            self._buildings_visited = {}
-        # Track buildings entered this tick for the explorer achievement
-        for agent in self.world.agents:
-            if agent.resident.location is not None:
-                self._buildings_visited.setdefault(agent.resident.id, set()).add(
-                    agent.resident.location
-                )
-        dialogue_resident_ids = {d.from_id for d in tick_state.dialogues} | {
-            d.to_id for d in tick_state.dialogues
-        }
-        from backend.api.achievements import check_and_unlock as _check_achievements
+        from engine.achievements import check_and_unlock as _check_achievements
+        from engine.achievements import sync_tracking_for_tick as _sync_achievement_tracking
         from engine.types import AchievementUnlock
-        for unlock in _check_achievements(self, dialogue_resident_ids):
+
+        _sync_achievement_tracking(self)
+        for unlock in _check_achievements(self):
             tick_state.achievement_unlocks.append(AchievementUnlock(**unlock))
+            tick_state.events.append(
+                EventUpdate(
+                    description=f"全镇公告：{unlock.get('resident_name', '')} 解锁了成就「{unlock.get('achievement_name', '')}」"
+                )
+            )
             self._add_timeline_event(
                 "achievement",
                 f"成就解锁：{unlock.get('resident_name', '')} — {unlock.get('achievement_name', '')}",
@@ -1408,8 +1548,64 @@ class SimulationState:
                     "resident_name": unlock.get("resident_name", ""),
                     "achievement_id": unlock.get("achievement_id", ""),
                     "achievement_name": unlock.get("achievement_name", ""),
+                    "category": unlock.get("category", ""),
+                    "unlocked_at_tick": unlock.get("unlocked_at_tick", 0),
                 },
             )
+        family_event_descriptions: list[str] = []
+        current_tick = self.world.current_tick
+        families = self.world.list_families()
+        if current_tick % 50 == 0:
+            for family in families:
+                if family["member_count"] < 3:
+                    continue
+                description = f"{family['family_name']} 举办了家庭聚餐，家人们短暂放下分歧围坐交流。"
+                family_event_descriptions.append(description)
+                self._add_timeline_event("family_dinner", description, {"family_name": family["family_name"]})
+                for member in family["members"]:
+                    agent = self.world.get_agent(member["id"])
+                    if agent is not None:
+                        self.world.shift_resident_mood(agent, 1, "family_event")
+
+        for unlock in tick_state.achievement_unlocks:
+            agent = self.world.get_agent(unlock.resident_id)
+            if agent is None or not agent.resident.family.family_name:
+                continue
+            family_name = agent.resident.family.family_name
+            description = f"{family_name} 为 {agent.resident.name} 的成就举行了家族庆祝。"
+            family_event_descriptions.append(description)
+            self._add_timeline_event("family_celebration", description, {"family_name": family_name, "resident_id": unlock.resident_id})
+            for member in self.world.get_family_members(agent.resident):
+                related_agent = self.world.get_agent(member.id)
+                if related_agent is not None:
+                    self.world.shift_resident_mood(related_agent, 1, "family_event")
+
+        dispute_triggered = False
+        for family in families:
+            if dispute_triggered:
+                break
+            member_ids = [member["id"] for member in family["members"]]
+            for from_id in member_ids:
+                for to_id in member_ids:
+                    if from_id == to_id:
+                        continue
+                    relationship = self.world.get_relationship(from_id, to_id)
+                    if relationship is None:
+                        continue
+                    if relationship.type.value in {"rivalry", "dislike"} or relationship.intensity < 0.15:
+                        description = f"{family['family_name']} 爆发家族纷争，{from_id} 与 {to_id} 的旧矛盾再次被提起。"
+                        family_event_descriptions.append(description)
+                        self._add_timeline_event("family_dispute", description, {"family_name": family["family_name"], "from_id": from_id, "to_id": to_id})
+                        for resident_id in {from_id, to_id}:
+                            agent = self.world.get_agent(resident_id)
+                            if agent is not None:
+                                self.world.shift_resident_mood(agent, -1, "family_event")
+                        dispute_triggered = True
+                        break
+                if dispute_triggered:
+                    break
+
+        tick_state.events.extend(EventUpdate(description=description) for description in family_event_descriptions)
 
         # --- Relationship milestone events ---
         if not hasattr(self, "_rel_events_fired"):
@@ -2044,8 +2240,12 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
     from engine.generative_agent import GenerativeAgent
     from engine.memory import MemoryStream
     from engine.types import (
+        Achievement,
         Building,
+        Course,
+        CourseHistoryEntry,
         DiaryEntry,
+        Education,
         Event as EngineEvent,
         Item,
         Memory,
@@ -2110,11 +2310,18 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
             mood_history=[MoodEntry(**entry) for entry in res_data.get("mood_history", [])],
             mental_state=res_data.get("mental_state", "stable"),
             low_mood_ticks=int(res_data.get("low_mood_ticks", 0)),
+            education=Education(
+                courses=[Course(**course) for course in res_data.get("education", {}).get("courses", [])],
+                knowledge_level=dict(res_data.get("education", {}).get("knowledge_level", {})),
+                course_history=[
+                    CourseHistoryEntry(**entry)
+                    for entry in res_data.get("education", {}).get("course_history", [])
+                ],
+            ),
         )
+        resident.achievements = [Achievement(**entry) for entry in res_data.get("achievements", [])]
         for d in res_data.get("diary", []):
-            resident.diary.append(DiaryEntry(
-                id=d["id"], date=d["date"], tick=d["tick"], summary=d["summary"],
-            ))
+            resident.diary.append(DiaryEntry(**d))
         agent = GenerativeAgent(resident)
         ms = MemoryStream(config)
         for m in ad.get("memories", []):

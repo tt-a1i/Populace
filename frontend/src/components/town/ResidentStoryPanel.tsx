@@ -4,11 +4,17 @@ import { useTranslation } from 'react-i18next'
 import { useSimulationStore } from '../../stores/simulation'
 
 import {
+  type EducationHistoryEntry,
   type Item,
+  type ResidentAchievement,
+  type ResidentDiaryEntry,
   type ResidentMemory,
   type ResidentMoodLogEntry,
   type ResidentRelationship,
   generateMemoir,
+  getResidentAchievements,
+  getResidentDiary,
+  getResidentEducation,
   getResidentMemories,
   getResidentMoodLog,
   getResidentRelationships,
@@ -32,6 +38,8 @@ const MOOD_EMOJI: Record<string, string> = {
   fearful: '\u{1F628}',
   tired: '\u{1F634}',
 }
+
+const DIARY_TAG_CLASS = 'rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-0.5 text-[10px] text-amber-100'
 
 const REL_ICON: Record<string, string> = {
   love: '\u{1F495}',
@@ -68,20 +76,12 @@ type TabKey =
   | 'diary'
   | 'relations'
   | 'skills'
+  | 'education'
   | 'mood_log'
   | 'backpack'
   | 'family'
   | 'achievements'
   | 'schedule'
-
-const MOCK_ACHIEVEMENTS = [
-  { id: 'first_friend', icon: '\u{1F91D}', label: '\u521D\u8BC6', unlocked: true },
-  { id: 'explorer', icon: '\u{1F9ED}', label: '\u63A2\u7D22\u8005', unlocked: true },
-  { id: 'wealthy', icon: '\u{1F4B0}', label: '\u5BCC\u6709', unlocked: false },
-  { id: 'beloved', icon: '\u{1F495}', label: '\u53D7\u7231\u6234', unlocked: false },
-  { id: 'wise', icon: '\u{1F989}', label: '\u667A\u8005', unlocked: true },
-  { id: 'storyteller', icon: '\u{1F4D6}', label: '\u8BB2\u8FF0\u8005', unlocked: false },
-]
 
 interface ResidentStoryPanelProps {
   residentId: string
@@ -130,6 +130,18 @@ function skillLevelLabel(level: number, t: (key: string) => string): string {
   return t('resident_panel.skill_level_novice')
 }
 
+function educationPolygonPoints(values: number[], radius: number, center: number): string {
+  return values
+    .map((value, index) => {
+      const angle = -Math.PI / 2 + (Math.PI * 2 * index) / values.length
+      const distance = radius * value
+      const x = center + Math.cos(angle) * distance
+      const y = center + Math.sin(angle) * distance
+      return `${x},${y}`
+    })
+    .join(' ')
+}
+
 export function ResidentStoryPanel({
   residentId,
   residents,
@@ -140,9 +152,14 @@ export function ResidentStoryPanel({
   const { pushToast } = useToast()
 
   const [memories, setMemories] = useState<ResidentMemory[]>([])
+  const [diaryEntries, setDiaryEntries] = useState<ResidentDiaryEntry[]>([])
   const [relationships, setRelationships] = useState<ResidentRelationship[]>([])
   const [skills, setSkills] = useState<Record<string, number>>({})
+  const [knowledgeLevel, setKnowledgeLevel] = useState<Record<string, number>>({})
+  const [courseHistory, setCourseHistory] = useState<EducationHistoryEntry[]>([])
+  const [courses, setCourses] = useState<Array<{ subject: string; name: string; attendance_count?: number }>>([])
   const [moodLog, setMoodLog] = useState<ResidentMoodLogEntry[]>([])
+  const [achievements, setAchievements] = useState<ResidentAchievement[]>([])
   const [memoirBusy, setMemoirBusy] = useState(false)
   const [tradeBusy, setTradeBusy] = useState(false)
   const [showChat, setShowChat] = useState(false)
@@ -155,6 +172,7 @@ export function ResidentStoryPanel({
       { key: 'diary' as const, label: t('resident_panel.tab_diary') },
       { key: 'relations' as const, label: t('resident_panel.tab_relations') },
       { key: 'skills' as const, label: t('resident_panel.tab_skills') },
+      { key: 'education' as const, label: t('resident_panel.tab_education', '学业') },
       { key: 'mood_log' as const, label: t('resident_panel.tab_mood_log', 'Mood Log') },
       { key: 'backpack' as const, label: t('resident_panel.tab_backpack', 'Backpack') },
       { key: 'schedule' as const, label: t('resident_panel.tab_schedule') },
@@ -199,6 +217,36 @@ export function ResidentStoryPanel({
         if (!cancelled) setMoodLog([])
       })
 
+    void getResidentDiary(residentId, { limit: 12 })
+      .then((data) => {
+        if (!cancelled) setDiaryEntries(data)
+      })
+      .catch(() => {
+        if (!cancelled) setDiaryEntries([])
+      })
+
+    void getResidentAchievements(residentId)
+      .then((data) => {
+        if (!cancelled) setAchievements(data)
+      })
+      .catch(() => {
+        if (!cancelled) setAchievements([])
+      })
+
+    void getResidentEducation(residentId)
+      .then((data) => {
+        if (cancelled) return
+        setKnowledgeLevel(data.education?.knowledge_level ?? {})
+        setCourseHistory(data.education?.course_history ?? [])
+        setCourses(data.education?.courses ?? [])
+      })
+      .catch(() => {
+        if (cancelled) return
+        setKnowledgeLevel({})
+        setCourseHistory([])
+        setCourses([])
+      })
+
     return () => {
       cancelled = true
     }
@@ -230,6 +278,8 @@ export function ResidentStoryPanel({
   const sortedSkills = Object.entries(skills)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
+  const knowledgeEntries = Object.entries(knowledgeLevel)
+  const radarValues = knowledgeEntries.map(([, value]) => Math.max(0.05, value))
   const inventoryItems = resident.inventory ?? []
 
   const activity = describeActivity(resident.currentBuildingId, buildings, t)
@@ -359,9 +409,45 @@ export function ResidentStoryPanel({
 
         {/* Diary — placeholder */}
         <div className={activeTab === 'diary' ? '' : 'hidden'}>
-          <div className="flex h-32 items-center justify-center">
-            <p className="text-sm text-slate-500">{'\u6682\u65E0\u65E5\u8BB0\u6761\u76EE'}</p>
-          </div>
+          {diaryEntries.length > 0 ? (
+            <div className="relative pl-5">
+              <div className="absolute left-[7px] top-1 bottom-1 w-px bg-white/10" />
+              <div className="space-y-3">
+                {diaryEntries.map((entry) => (
+                  <div key={entry.id} className="relative">
+                    <div className="absolute -left-5 top-2.5 h-2 w-2 rounded-full border-2 border-amber-300/40 bg-slate-900" />
+                    <div className="rounded-xl border border-white/6 bg-slate-900/50 px-3 py-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-slate-500">
+                          {entry.date} · #{entry.tick}
+                        </span>
+                        <span className="flex items-center gap-1 text-sm text-white">
+                          <span>{MOOD_EMOJI[entry.mood_snapshot] ?? '📝'}</span>
+                          <span>{entry.mood_snapshot}</span>
+                        </span>
+                      </div>
+                      <p className={`mt-1 text-[13px] leading-relaxed ${entry.highlight ? 'font-semibold text-amber-50' : 'text-slate-300'}`}>
+                        {entry.content}
+                      </p>
+                      {entry.tags.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {entry.tags.map((tag) => (
+                            <span key={`${entry.id}-${tag}`} className={DIARY_TAG_CLASS}>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-32 items-center justify-center">
+              <p className="text-sm text-slate-500">{t('resident_panel.no_diary', '暂无日记条目')}</p>
+            </div>
+          )}
         </div>
 
         {/* Relations — colored badges + intensity bars */}
@@ -432,6 +518,84 @@ export function ResidentStoryPanel({
             </div>
           ) : (
             <p className="text-sm text-slate-500">{t('resident_panel.no_skills')}</p>
+          )}
+        </div>
+
+        <div className={activeTab === 'education' ? '' : 'hidden'}>
+          {knowledgeEntries.length > 0 ? (
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-white/6 bg-slate-900/50 px-3 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                      {t('resident_panel.knowledge_radar', 'Knowledge Radar')}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {courses.map((course) => (
+                        <span
+                          key={`${course.subject}-${course.name}`}
+                          className="rounded-full border border-fuchsia-300/20 bg-fuchsia-300/10 px-2 py-0.5 text-[10px] text-fuchsia-100"
+                        >
+                          {course.name} · {course.attendance_count ?? 0}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <svg viewBox="0 0 160 160" className="h-36 w-36 shrink-0" aria-label="education-radar">
+                    <polygon
+                      points={educationPolygonPoints(new Array(Math.max(radarValues.length, 3)).fill(1), 52, 80)}
+                      fill="rgba(148,163,184,0.08)"
+                      stroke="rgba(148,163,184,0.25)"
+                    />
+                    <polygon
+                      points={educationPolygonPoints(radarValues, 52, 80)}
+                      fill="rgba(34,211,238,0.22)"
+                      stroke="rgba(45,212,191,0.8)"
+                      strokeWidth="2"
+                    />
+                  </svg>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {knowledgeEntries.map(([subject, value]) => (
+                    <div key={subject} className="rounded-xl border border-white/6 bg-black/10 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm capitalize text-white">{subject}</span>
+                        <span className="text-[10px] text-cyan-200">{Math.round(value * 100)}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/6 bg-slate-900/50 px-3 py-3">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                  {t('resident_panel.course_history', 'Course History')}
+                </p>
+                {courseHistory.length > 0 ? (
+                  <div className="mt-2 space-y-2">
+                    {[...courseHistory].reverse().slice(0, 6).map((entry) => (
+                      <div
+                        key={`${entry.tick}-${entry.subject}-${entry.course_name}`}
+                        className="rounded-xl border border-white/6 bg-black/10 px-3 py-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm text-white">{entry.course_name}</span>
+                          <span className="text-[10px] text-slate-500">#{entry.tick}</span>
+                        </div>
+                        <p className="mt-1 text-xs capitalize text-slate-300">{entry.subject}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-slate-500">
+                    {t('resident_panel.no_course_history', 'No course history yet')}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">
+              {t('resident_panel.no_education', 'No education data yet')}
+            </p>
           )}
         </div>
 
@@ -528,30 +692,35 @@ export function ResidentStoryPanel({
 
         {/* Achievements — 2x3 grid */}
         <div className={activeTab === 'achievements' ? '' : 'hidden'}>
-          <div className="grid grid-cols-3 gap-2">
-            {MOCK_ACHIEVEMENTS.map((ach) => (
-              <div
-                key={ach.id}
-                className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-center transition duration-300 ${
-                  ach.unlocked
-                    ? 'border-amber-400/20 bg-amber-400/5'
-                    : 'border-white/6 bg-white/[0.02] opacity-40'
-                }`}
-                style={
-                  ach.unlocked
-                    ? { animation: 'achievementShine 2s ease-in-out infinite' }
-                    : undefined
-                }
-              >
-                <span className="text-xl">{ach.unlocked ? ach.icon : '\u{1F512}'}</span>
-                <span
-                  className={`text-[10px] font-medium ${ach.unlocked ? 'text-amber-200' : 'text-slate-500'}`}
+          {achievements.length > 0 ? (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {achievements.map((achievement) => (
+                <div
+                  key={achievement.id}
+                  className={`flex min-h-[92px] flex-col items-center justify-center gap-1.5 rounded-xl border px-2 py-3 text-center transition duration-300 ${
+                    achievement.unlocked
+                      ? 'border-amber-400/20 bg-amber-400/5'
+                      : 'border-white/6 bg-white/[0.02] opacity-40 grayscale'
+                  }`}
+                  title={achievement.description}
                 >
-                  {ach.label}
-                </span>
-              </div>
-            ))}
-          </div>
+                  <span className="text-xl">{achievement.unlocked ? achievement.icon : '\u{1F512}'}</span>
+                  <span
+                    className={`text-[10px] font-medium ${achievement.unlocked ? 'text-amber-200' : 'text-slate-500'}`}
+                  >
+                    {achievement.name}
+                  </span>
+                  <span className="text-[9px] text-slate-500">
+                    {achievement.unlocked && achievement.unlocked_at_tick != null
+                      ? `#${achievement.unlocked_at_tick}`
+                      : t('resident_panel.achievement_locked', 'Locked')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">{t('resident_panel.no_achievements', 'No achievements yet')}</p>
+          )}
         </div>
       </div>
 

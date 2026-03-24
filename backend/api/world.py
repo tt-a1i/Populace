@@ -12,23 +12,111 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from backend.api.schemas import (
     ActiveWorldEventResponse,
+    AchievementLeaderboardEntryResponse,
     BuildingDetailResponse,
     BuildingOccupantInfo,
     BuildingResponse,
     BuildingVisitRecord,
+    CrimeEventResponse,
     PresetEventResponse,
+    ReputationRankingEntryResponse,
+    SafetyHotspotResponse,
+    SafetyStatsResponse,
     ScenarioDataResponse,
     WeatherResponse,
+    WorldEducationCourseResponse,
     WorldEventResponse,
+    ZoneResponse,
     api_error,
     error_responses,
 )
 from backend.api.simulation import get_simulation_state
 from engine.pathfinding import PathCache
 from engine.types import Building, WeatherType
+from engine.weather import build_forecast, normalize_season
 
 
 router = APIRouter(prefix="/api/world", tags=["world"])
+
+class VoteRequest(BaseModel):
+    issue: str = Field(min_length=2, max_length=120)
+    options: list[str] = Field(min_length=2, max_length=8)
+    duration_ticks: int = Field(ge=1, le=240, default=8)
+
+    @field_validator("issue", mode="before")
+    @classmethod
+    def strip_issue(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip()
+        return value
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def normalize_options(cls, value: Any) -> Any:
+        if isinstance(value, list):
+            normalized = [item.strip() for item in value if isinstance(item, str) and item.strip()]
+            deduped: list[str] = []
+            for item in normalized:
+                if item not in deduped:
+                    deduped.append(item)
+            return deduped
+        return value
+
+
+class VoteResponse(BaseModel):
+    id: str
+    issue: str
+    options: list[str]
+    counts: dict[str, int]
+    status: str
+    start_tick: int
+    end_tick: int
+    winning_option: str | None = None
+    result_announced: bool = False
+    total_votes: int = 0
+    effects: list[str] = Field(default_factory=list)
+
+
+class WorldFamilyMemberResponse(BaseModel):
+    id: str
+    name: str
+    age_days: int = 0
+    partner_id: str | None = None
+    children_ids: list[str] = Field(default_factory=list)
+
+
+class WorldFamilyResponse(BaseModel):
+    family_name: str
+    member_count: int = 0
+    average_mood: float = 0.0
+    members: list[WorldFamilyMemberResponse] = Field(default_factory=list)
+
+
+class CrimeEventResponse(BaseModel):
+    type: str
+    perpetrator: str
+    victim: str | None = None
+    location: str
+    tick: int
+    resolved: bool = False
+
+
+class SafetyHotspotResponse(BaseModel):
+    location: str
+    count: int
+    resolved_count: int = 0
+    intensity: float = 0.0
+
+
+class SafetyStatsResponse(BaseModel):
+    safety_index: float
+    average_safety_feeling: float
+    total_crimes: int
+    unresolved_crimes: int
+    crimes_by_type: dict[str, int] = Field(default_factory=dict)
+    hotspots: list[SafetyHotspotResponse] = Field(default_factory=list)
+    flagged_residents: list[str] = Field(default_factory=list)
+    patrol_zones: list[str] = Field(default_factory=list)
 
 
 class WorldEventRequest(BaseModel):
@@ -92,6 +180,79 @@ async def list_preset_events(request: Request) -> list[PresetEventResponse]:  # 
     """Return all available preset events."""
     from backend.world.events import PRESET_EVENTS
     return [PresetEventResponse(**event) for event in PRESET_EVENTS]
+
+
+@router.post(
+    "/vote",
+    response_model=VoteResponse,
+    responses=error_responses(422, 503),
+)
+async def create_vote(payload: VoteRequest, request: Request) -> VoteResponse:
+    state = get_simulation_state(request)
+    vote = state.create_vote(payload.issue, payload.options, payload.duration_ticks)
+    return VoteResponse(**vote)
+
+
+@router.get(
+    "/votes/active",
+    response_model=list[VoteResponse],
+    responses=error_responses(503),
+)
+async def get_active_votes(request: Request) -> list[VoteResponse]:
+    state = get_simulation_state(request)
+    return [VoteResponse(**vote) for vote in state.get_active_votes()]
+
+
+@router.get(
+    "/votes/history",
+    response_model=list[VoteResponse],
+    responses=error_responses(503),
+)
+async def get_vote_history(request: Request) -> list[VoteResponse]:
+    state = get_simulation_state(request)
+    return [VoteResponse(**vote) for vote in state.get_vote_history()]
+
+
+@router.get(
+    "/crimes",
+    response_model=list[CrimeEventResponse],
+    responses=error_responses(503),
+)
+async def get_crimes(request: Request) -> list[CrimeEventResponse]:
+    state = get_simulation_state(request)
+    return [CrimeEventResponse(**asdict(event)) for event in state.world.get_crime_log()]
+
+
+@router.get(
+    "/safety",
+    response_model=SafetyStatsResponse,
+    responses=error_responses(503),
+)
+async def get_safety(request: Request) -> SafetyStatsResponse:
+    state = get_simulation_state(request)
+    return SafetyStatsResponse(**state.world.get_safety_stats())
+
+
+@router.get(
+    "/reputation/rankings",
+    response_model=list[ReputationRankingEntryResponse],
+    responses=error_responses(503),
+)
+async def get_reputation_rankings(request: Request) -> list[ReputationRankingEntryResponse]:
+    state = get_simulation_state(request)
+    return [ReputationRankingEntryResponse(**row) for row in state.world.get_reputation_rankings()]
+
+
+@router.get(
+    "/achievements/leaderboard",
+    response_model=list[AchievementLeaderboardEntryResponse],
+    responses=error_responses(503),
+)
+async def get_achievement_leaderboard(request: Request) -> list[AchievementLeaderboardEntryResponse]:
+    from engine.achievements import build_leaderboard
+
+    state = get_simulation_state(request)
+    return [AchievementLeaderboardEntryResponse(**row) for row in build_leaderboard(state)]
 
 
 class GenerateScenarioRequest(BaseModel):
@@ -197,6 +358,56 @@ def _mock_scenario(description: str) -> dict[str, Any]:
         "buildings": buildings,
         "residents": residents,
     }
+
+
+@router.get(
+    "/education",
+    response_model=list[WorldEducationCourseResponse],
+    responses=error_responses(503),
+)
+async def get_world_education(request: Request) -> list[WorldEducationCourseResponse]:
+    state = get_simulation_state(request)
+    return [WorldEducationCourseResponse(**item) for item in state.world.get_education_overview()]
+
+
+@router.get(
+    "/zones",
+    response_model=list[ZoneResponse],
+    responses=error_responses(503),
+)
+async def list_zones(request: Request) -> list[ZoneResponse]:
+    state = get_simulation_state(request)
+    return [ZoneResponse(**zone_stats) for zone_stats in state.world.list_zone_stats()]
+
+
+@router.get(
+    "/families",
+    response_model=list[WorldFamilyResponse],
+    responses=error_responses(503),
+)
+async def list_families(request: Request) -> list[WorldFamilyResponse]:
+    state = get_simulation_state(request)
+    return [WorldFamilyResponse(**family) for family in state.world.list_families()]
+
+
+@router.get(
+    "/crimes",
+    response_model=list[CrimeEventResponse],
+    responses=error_responses(503),
+)
+async def list_crimes(request: Request) -> list[CrimeEventResponse]:
+    state = get_simulation_state(request)
+    return [CrimeEventResponse(**asdict(event)) for event in state.world.get_crime_log()]
+
+
+@router.get(
+    "/safety",
+    response_model=SafetyStatsResponse,
+    responses=error_responses(503),
+)
+async def get_safety_stats(request: Request) -> SafetyStatsResponse:
+    state = get_simulation_state(request)
+    return SafetyStatsResponse(**state.world.get_safety_stats())
 
 
 @router.get(
@@ -379,7 +590,11 @@ async def set_weather(payload: SetWeatherRequest, request: Request) -> WeatherRe
             f"天气变化：{weather_labels.get(old_weather, old_weather)} → {weather_labels.get(weather.value, weather.value)}",
             {"from": old_weather, "to": weather.value},
         )
-    return WeatherResponse(weather=weather.value)
+    return WeatherResponse(
+        weather=weather.value,
+        season=normalize_season(state.world.season).value,
+        forecast=list(getattr(state.world, "weather_forecast", [])) or build_forecast(state.world.season),
+    )
 
 
 @router.get(
@@ -390,4 +605,8 @@ async def set_weather(payload: SetWeatherRequest, request: Request) -> WeatherRe
 async def get_weather(request: Request) -> WeatherResponse:
     """Return the current weather."""
     state = get_simulation_state(request)
-    return WeatherResponse(weather=state.world.weather.value)
+    return WeatherResponse(
+        weather=state.world.weather.value,
+        season=normalize_season(state.world.season).value,
+        forecast=list(getattr(state.world, "weather_forecast", [])) or build_forecast(state.world.season),
+    )

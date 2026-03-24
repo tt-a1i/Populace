@@ -1,7 +1,7 @@
 import { Application, Container, Graphics, Rectangle, Text } from 'pixi.js'
 
 import { useSimulationStore, type ResidentPosition, type SimulationSpeed } from '../../stores/simulation'
-import type { Building } from '../../types'
+import type { Building, Zone } from '../../types'
 import { ResidentSprite, type ResidentHoverInfo } from './ResidentSprite'
 import { ResidentSpritePool } from './ResidentSpritePool'
 import { MilestoneEffect } from './effects/MilestoneEffect'
@@ -61,6 +61,7 @@ export class TownRenderer {
   private readonly app: Application
   private readonly world = new Container()
   private readonly tileLayer = new Container()
+  private readonly zoneLayer = new Container()
   private readonly buildingLayer = new Container()
   private readonly residentLayer = new Container()
   private readonly effectLayer = new Container()
@@ -76,6 +77,7 @@ export class TownRenderer {
       }),
   )
   private readonly tileGraphics = new Graphics()
+  private readonly zoneGraphics = new Graphics()
   private readonly buildingGraphics = new Graphics()
   private readonly buildingLabelLayer = new Container()
   private readonly buildingCapacityLayer = new Container()
@@ -101,6 +103,8 @@ export class TownRenderer {
   private readonly hintLabel: Text
   private highlightedResidentIds = new Set<string>()
   private currentBuildings: Array<Building & { occupants?: number }> = []
+  private currentZones: Zone[] = []
+  private selectedZoneId: string | null = null
   private placeholderBuildings: PlaceholderBuilding[] = []
   private readonly vignetteGraphics = new Graphics()
   private readonly waterOverlay = new Graphics()
@@ -165,16 +169,18 @@ export class TownRenderer {
     this.app.stage.addChild(this.world, this.uiLayer)
     this.world.sortableChildren = true
     this.world.hitArea = new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
-    this.world.addChild(this.tileLayer, this.buildingLayer, this.residentLayer, this.effectLayer)
+    this.world.addChild(this.tileLayer, this.zoneLayer, this.buildingLayer, this.residentLayer, this.effectLayer)
 
     this.tileLayer.zIndex = 0
-    this.buildingLayer.zIndex = 1
-    this.residentLayer.zIndex = 2
-    this.effectLayer.zIndex = 3
+    this.zoneLayer.zIndex = 1
+    this.buildingLayer.zIndex = 2
+    this.residentLayer.zIndex = 3
+    this.effectLayer.zIndex = 4
     this.uiLayer.zIndex = 4
     this.residentLayer.sortableChildren = true
 
     this.tileLayer.addChild(this.tileGraphics)
+    this.zoneLayer.addChild(this.zoneGraphics)
     this.buildingLayer.addChild(
       this.buildingGraphics,
       this.placeholderGraphics,
@@ -264,6 +270,7 @@ export class TownRenderer {
     this.uiLayer.addChild(this.hudLabel, this.hintLabel, this.tooltipContainer, this.buildingHoverTooltip)
 
     this.drawTiles()
+    this.drawZones()
     this.drawBuildings()
     this.drawAmbientAccent()
     this.drawVignette()
@@ -444,6 +451,16 @@ export class TownRenderer {
 
     this.updateBuildingLabelsForZoom()
     this.drawPlaceholderBuildings()
+  }
+
+  syncZones(zones: Zone[]): void {
+    this.currentZones = zones
+    this.drawZones()
+  }
+
+  setSelectedZone(zoneId: string | null): void {
+    this.selectedZoneId = zoneId
+    this.drawZones()
   }
 
   /** Adapt building POI labels to current zoom level */
@@ -753,6 +770,7 @@ export class TownRenderer {
 
   redrawTiles(): void {
     this.drawTiles()
+    this.drawZones()
   }
 
   destroy(): void {
@@ -1216,6 +1234,42 @@ export class TownRenderer {
           }
         }
       }
+    }
+  }
+
+  private drawZones(): void {
+    this.zoneGraphics.clear()
+
+    for (const zone of this.currentZones) {
+      const x = zone.bounds.x * TILE_SIZE
+      const y = zone.bounds.y * TILE_SIZE
+      const width = zone.bounds.width * TILE_SIZE
+      const height = zone.bounds.height * TILE_SIZE
+      const color = this.getZoneColor(zone.type)
+      const isSelected = this.selectedZoneId === zone.id
+
+      this.zoneGraphics.roundRect(x, y, width, height, 16)
+      this.zoneGraphics.fill({ color, alpha: isSelected ? 0.26 : 0.14 })
+      this.zoneGraphics.roundRect(x, y, width, height, 16)
+      this.zoneGraphics.stroke({
+        color,
+        width: isSelected ? 3 : 1.5,
+        alpha: isSelected ? 0.72 : 0.34,
+      })
+    }
+  }
+
+  private getZoneColor(zoneType: string): number {
+    switch (zoneType) {
+      case 'commercial':
+        return 0xf97316
+      case 'leisure':
+        return 0x22c55e
+      case 'education':
+        return 0x38bdf8
+      case 'residential':
+      default:
+        return 0xa78bfa
     }
   }
 

@@ -17,7 +17,7 @@ _log = logging.getLogger(__name__)
 
 from engine._optional_backend import load_backend_attr
 from engine.dialogue import generate_template_dialogue, relation_type_for_agents
-from engine.types import Memory, RelationType, Relationship, RelationshipDelta, WorldConfig
+from engine.types import CourseHistoryEntry, Memory, RelationType, Relationship, RelationshipDelta, WorldConfig
 
 if TYPE_CHECKING:
     from engine.agent import Agent
@@ -179,7 +179,11 @@ def should_interact(agent_a: "Agent", agent_b: "Agent", world: "World") -> bool:
         relation_bonus = relationship.familiarity * 0.10 + relationship.intensity * 0.15
     # Average extroversion bonus: up to +0.30
     extroversion_bonus = ((ext_a + ext_b) / 2) * 0.30
-    probability = min(0.95, max(0.05, 0.15 + extroversion_bonus + relation_bonus))
+    social_knowledge = (
+        float(agent_a.resident.education.knowledge_level.get("social", 0.0))
+        + float(agent_b.resident.education.knowledge_level.get("social", 0.0))
+    ) / 2
+    probability = min(0.95, max(0.05, 0.15 + extroversion_bonus + relation_bonus + social_knowledge * 0.12))
     return random.random() < probability
 
 
@@ -277,6 +281,52 @@ def maybe_conduct_skill_teaching(
     student_skills[candidate_name] = round(min(1.0, student_current + student_gain), 4)
     teacher_skills["teaching"] = round(min(1.0, teacher_teaching + teacher_gain), 4)
     _boost_teaching_friendship(world, teacher.resident.id, student.resident.id, world.simulation_time())
+    world.adjust_resident_reputation(teacher.resident.id, 0.05, "skill_teaching")
+    return True
+
+
+def maybe_conduct_knowledge_teaching(
+    world: "World",
+    teacher: "Agent",
+    student: "Agent",
+) -> bool:
+    relationship = world.get_relationship(teacher.resident.id, student.resident.id)
+    inverse_relationship = world.get_relationship(student.resident.id, teacher.resident.id)
+    friendship_score = max(
+        relationship.intensity if relationship and relationship.type is RelationType.friendship else 0.0,
+        inverse_relationship.intensity if inverse_relationship and inverse_relationship.type is RelationType.friendship else 0.0,
+    )
+    if friendship_score <= 0.5:
+        return False
+
+    teacher_knowledge = teacher.resident.education.knowledge_level
+    student_knowledge = student.resident.education.knowledge_level
+    candidate_subject = ""
+    largest_gap = 0.0
+
+    for subject, teacher_level in teacher_knowledge.items():
+        gap = teacher_level - float(student_knowledge.get(subject, 0.0))
+        if teacher_level >= 0.4 and gap >= 0.2 and gap > largest_gap:
+            candidate_subject = subject
+            largest_gap = gap
+
+    if not candidate_subject:
+        return False
+
+    student_knowledge[candidate_subject] = round(
+        min(1.0, float(student_knowledge.get(candidate_subject, 0.0)) + min(0.06, largest_gap * 0.2)),
+        4,
+    )
+    student.resident.education.course_history.append(
+        CourseHistoryEntry(
+            tick=world.current_tick,
+            subject=candidate_subject,
+            course_name=f"Peer lesson: {candidate_subject}",
+        )
+    )
+    student.resident.education.course_history = student.resident.education.course_history[-20:]
+    _boost_teaching_friendship(world, teacher.resident.id, student.resident.id, world.simulation_time())
+    world.adjust_resident_reputation(teacher.resident.id, 0.05, "knowledge_teaching")
     return True
 
 
@@ -416,6 +466,7 @@ async def initiate_dialogue(
     tick_time = world.simulation_time()
     relation_type = relation_type_for_agents(agent_a, agent_b, world)
     from engine.gossip import generate_gossip, spread_gossip
+    had_shared_memory = bool(world.get_shared_memories(agent_a.resident, agent_b.resident))
 
     gossip = None if comfort_target_id else generate_gossip(agent_a, world)
     if comfort_target_id and comfort_target_id in {agent_a.resident.id, agent_b.resident.id}:
@@ -445,6 +496,7 @@ async def initiate_dialogue(
         if world.mood_score(comfort_target.resident.mood) < 0:
             world.set_resident_mood(comfort_target, "calm", "social")
         world.shift_resident_mood(comforter, 1, "social")
+        world.adjust_resident_reputation(comforter.resident.id, 0.05, "comforted_other")
     else:
         template = generate_template_dialogue(
             agent_a,
@@ -485,12 +537,45 @@ async def initiate_dialogue(
             source="dialogue",
         )
         agent_b.memory_stream.add(mem_b)
+        if comfort_target_id:
+            memory_type = "loss"
+            memory_weight = 0.7
+        elif getattr(world, "active_festival", None):
+            memory_type = "festival"
+            memory_weight = 0.8
+        elif delta < 0:
+            memory_type = "argument"
+            memory_weight = -0.8
+        elif not had_shared_memory:
+            memory_type = "first_meeting"
+            memory_weight = 0.75
+        else:
+            memory_type = "achievement"
+            memory_weight = 0.45
+        world.remember_resident_memory(
+            agent_a.resident,
+            memory_type=memory_type,
+            content=f"和{agent_b.resident.name}{'一起度过了节日' if memory_type == 'festival' else '有过一次重要交谈'}",
+            emotional_weight=memory_weight,
+            related_resident_ids=[agent_b.resident.id],
+        )
+        world.remember_resident_memory(
+            agent_b.resident,
+            memory_type=memory_type,
+            content=f"和{agent_a.resident.name}{'一起度过了节日' if memory_type == 'festival' else '有过一次重要交谈'}",
+            emotional_weight=memory_weight,
+            related_resident_ids=[agent_a.resident.id],
+        )
 
     # Social interaction costs energy for both participants
     agent_a.resident.energy = max(0.0, agent_a.resident.energy - 0.02)
     agent_b.resident.energy = max(0.0, agent_b.resident.energy - 0.02)
 
-    taught = maybe_conduct_skill_teaching(world, agent_a, agent_b)
+    taught = maybe_conduct_knowledge_teaching(world, agent_a, agent_b)
+    if not taught:
+        taught = maybe_conduct_knowledge_teaching(world, agent_b, agent_a)
+    if not taught:
+        taught = maybe_conduct_skill_teaching(world, agent_a, agent_b)
     if not taught:
         maybe_conduct_skill_teaching(world, agent_b, agent_a)
 

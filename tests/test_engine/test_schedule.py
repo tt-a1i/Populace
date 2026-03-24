@@ -132,6 +132,20 @@ def test_rule_plan_work_targets_shop(world_with_buildings):
     assert plan.get("target") != [5, 5]
 
 
+def test_rule_plan_inserts_attend_class_when_school_exists(world_with_buildings):
+    sched = DailySchedule("外向")
+    world_with_buildings.add_building(Building(id="school1", type="school", name="学院", capacity=8, position=(8, 8)))
+    agent = make_agent("a2", "小雨", x=0, y=0)
+    agent.resident.home_building_id = "home1"
+    world_with_buildings.add_agent(agent)
+    world_with_buildings.current_tick = 18
+
+    plan = sched.rule_plan(agent, world_with_buildings)
+
+    assert plan["action"] == "attend_class"
+    assert plan.get("target") == [8, 8]
+
+
 def test_rule_plan_idle_when_already_at_destination(world_with_buildings):
     """Agent already inside the schedule-target building returns idle."""
     sched = DailySchedule("内向")

@@ -50,6 +50,7 @@ vi.mock('../components/town/TownRenderer', () => ({
     setPlaceholderBuildings = vi.fn()
     syncZones = vi.fn()
     setSelectedZone = vi.fn()
+    setActiveFestival = vi.fn()
     showEventRadii = vi.fn()
     drawRelationshipLines = vi.fn()
     setHeatmapEnabled = vi.fn()
@@ -115,6 +116,15 @@ vi.mock('../stores/simulation', () => ({
         hoveredPairIds: null,
         weather: 'sunny',
         season: 'spring',
+        currentFestival: {
+          name: '春日祭',
+          type: 'spring',
+          start_tick: 3,
+          duration: 12,
+          location: 'cafe',
+          participants: ['r1'],
+          status: 'active',
+        },
         messageFeed: [],
         replayFrozenFrame: null,
         getFrameByTick: vi.fn().mockReturnValue(null),
@@ -159,6 +169,15 @@ vi.mock('../stores/simulation', () => ({
         hoveredPairIds: null,
         weather: 'sunny',
         season: 'spring',
+        currentFestival: {
+          name: '春日祭',
+          type: 'spring',
+          start_tick: 3,
+          duration: 12,
+          location: 'cafe',
+          participants: ['r1'],
+          status: 'active',
+        },
       }),
     },
   ),
@@ -278,5 +297,19 @@ describe('TownCanvas', () => {
     await user.pointer([{ target: shell, keys: '[MouseLeft]', coords: { x: 40, y: 40 } }])
 
     expect(await screen.findByTestId('town-zone-panel')).toHaveTextContent('商业活力带')
+  })
+
+  it('forwards the active festival marker to the renderer', async () => {
+    render(<TownCanvas />)
+
+    const rendererInstances = (await import('../components/town/TownRenderer')).TownRenderer as unknown as {
+      instances: Array<{ setActiveFestival: ReturnType<typeof vi.fn> }>
+    }
+
+    await waitFor(() => {
+      expect(rendererInstances.instances[0]?.setActiveFestival).toHaveBeenCalledWith(
+        expect.objectContaining({ name: '春日祭', location: 'cafe' }),
+      )
+    })
   })
 })
