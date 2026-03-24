@@ -27,6 +27,9 @@ vi.mock('../components/toolbar/ReputationPanel', () => ({
 vi.mock('../components/toolbar/SecurityPanel', () => ({
   SecurityPanel: () => <div data-testid="security-panel">SecurityPanel</div>,
 }))
+vi.mock('../components/toolbar/EconomyPanel', () => ({
+  EconomyPanel: () => <div data-testid="economy-panel">EconomyPanel</div>,
+}))
 vi.mock('../components/report', () => ({
   ReportsPanel: () => <div data-testid="reports-panel">ReportsPanel</div>,
 }))
@@ -120,6 +123,7 @@ describe('Toolbar', () => {
     expect(screen.getByTestId('secondary-row')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /建造模式/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /治安面板|治安/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /经济面板|经济/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /声望排行榜|声望/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /数据统计/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /对话记录/ })).toBeInTheDocument()
@@ -205,6 +209,13 @@ describe('Toolbar', () => {
     await userEvent.click(screen.getByTestId('more-toggle'))
     await userEvent.click(screen.getByRole('button', { name: /治安面板|治安/ }))
     expect(screen.getByTestId('security-panel')).toBeInTheDocument()
+  })
+
+  it('switches to EconomyPanel when 经济面板 is clicked', async () => {
+    render(<Toolbar />)
+    await userEvent.click(screen.getByTestId('more-toggle'))
+    await userEvent.click(screen.getByRole('button', { name: /经济面板|经济/ }))
+    expect(screen.getByTestId('economy-panel')).toBeInTheDocument()
   })
 
   it('switches to ReputationPanel when 声望排行榜 is clicked', async () => {

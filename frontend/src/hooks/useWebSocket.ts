@@ -86,6 +86,10 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
     ((s: SimulationSnapshot & { applyPopulationEvents?: (events: PopulationEvent[]) => void }) =>
       s.applyPopulationEvents) as never,
   ) as ((events: PopulationEvent[]) => void) | undefined
+  const simApplyFestivalTick = useSimulationStore(
+    ((s: SimulationSnapshot & { applyFestivalTick?: (updates: Array<{ status: string; festival: Record<string, unknown>; memorial?: string | null }>) => void }) =>
+      s.applyFestivalTick) as never,
+  ) as ((updates: Array<{ status: string; festival: Record<string, unknown>; memorial?: string | null }>) => void) | undefined
   const relUpdateFromTick = useRelationshipsStore((s) => s.updateFromTick)
   const relInitFromSnapshot = useRelationshipsStore((s) => s.initFromSnapshot)
   const relSetAbsolute = useRelationshipsStore((s) => s.setRelationshipsAbsolute)
@@ -145,6 +149,11 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
             const achievementUnlocks = queuedTick.achievement_unlocks ?? []
             const relationshipEvents = queuedTick.relationship_events ?? []
             const populationEvents = queuedTick.population_events ?? []
+            const festivalUpdates = (((queuedTick as unknown) as Record<string, unknown>).festival_updates ?? []) as Array<{
+              status: string
+              festival: { name: string; type: string }
+              memorial?: string | null
+            }>
             sawDialogue = sawDialogue || dialogues.length > 0
             sawRelationshipDelta = sawRelationshipDelta || relationships.length > 0
             simUpdateFromTick(queuedTick)
@@ -154,6 +163,9 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
             })
             if (typeof simApplyPopulationEvents === 'function') {
               simApplyPopulationEvents(populationEvents)
+            }
+            if (typeof simApplyFestivalTick === 'function') {
+              simApplyFestivalTick(festivalUpdates)
             }
             if (typeof relApplyPopulationEvents === 'function') {
               relApplyPopulationEvents(populationEvents)
@@ -227,6 +239,24 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
                   }),
                 })
                 play('event')
+              }
+              for (const update of festivalUpdates) {
+                if (update.status === 'started') {
+                  pushToast({
+                    type: 'success',
+                    category: 'default',
+                    title: `庆典开始：${update.festival.name}`,
+                    description: `${update.festival.name} 正在进行，居民正朝庆典现场汇聚。`,
+                  })
+                  play('event')
+                } else if (update.status === 'ended') {
+                  pushToast({
+                    type: 'success',
+                    category: 'default',
+                    title: `庆典落幕：${update.festival.name}`,
+                    description: update.memorial ?? `${update.festival.name} 留下了一段新的共同回忆。`,
+                  })
+                }
               }
             }
             if (relationshipEvents.length > 0) {

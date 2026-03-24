@@ -392,6 +392,9 @@ class SimulationState:
         agents_data = []
         for agent in self.world.agents:
             res = agent.resident
+            job = getattr(res, "job", None)
+            if job is not None and getattr(res, "occupation", "") and getattr(job, "title", "") != getattr(res, "occupation", ""):
+                job.title = str(res.occupation)
             memories = [_asdict(m) for m in agent.memory_stream.all]
             reflections = [_asdict(r) for r in agent.reflections]
             agents_data.append({
@@ -460,7 +463,7 @@ class SimulationState:
         from engine.generative_agent import GenerativeAgent
         from engine.memory import MemoryStream
         from engine.types import (
-            Achievement, Building, Course, CourseHistoryEntry, DiaryEntry, Education, Item, Memory, MoodEntry, Reflection,
+            Achievement, Building, Course, CourseHistoryEntry, DiaryEntry, Education, Item, Job, Memory, MoodEntry, Reflection,
             Pet, Relationship, RelationType, Resident, WorldConfig,
         )
         from engine.world import World
@@ -534,6 +537,8 @@ class SimulationState:
                 current_goal=res_data.get("current_goal"),
                 coins=res_data.get("coins", 100),
                 occupation=res_data.get("occupation", "unemployed"),
+                wallet=float(res_data.get("wallet", 0.0)),
+                job=Job(**res_data.get("job", {})) if res_data.get("job") else Job(),
                 skills=dict(res_data.get("skills", {})),
                 inventory=[Item(**item) for item in res_data.get("inventory", [])],
                 pets=[Pet(**pet) for pet in res_data.get("pets", [])],
@@ -1149,6 +1154,180 @@ class SimulationState:
         """Return current active (multi-tick) events with remaining duration."""
         return list(self._active_events)
 
+    def _ensure_festival_state(self) -> None:
+        if not hasattr(self, "_active_festivals"):
+            self._active_festivals = []
+        if not hasattr(self, "_festival_history"):
+            self._festival_history = []
+
+    def get_festivals(self) -> dict[str, list[dict[str, Any]]]:
+        self._ensure_festival_state()
+        current = sorted(
+            [dict(item) for item in self._active_festivals],
+            key=lambda item: item.get("start_tick", 0),
+            reverse=True,
+        )
+        history = sorted(
+            [dict(item) for item in self._festival_history],
+            key=lambda item: item.get("start_tick", 0),
+            reverse=True,
+        )
+        return {"current": current, "history": history}
+
+    def _festival_location_id(self, festival_type: str) -> str:
+        preferred_building_types = {
+            "spring": ["park", "plaza", "cafe", "school"],
+            "summer": ["park", "cafe", "market", "plaza"],
+            "autumn": ["market", "farm", "park", "cafe"],
+            "winter": ["home", "cafe", "school", "plaza"],
+            "birthday": ["home", "cafe", "park"],
+            "achievement": ["school", "cafe", "park", "plaza"],
+        }.get(festival_type, ["plaza", "park", "cafe", "home"])
+        for building_type in preferred_building_types:
+            building = next((item for item in self.world.buildings if item.type == building_type), None)
+            if building is not None:
+                return building.id
+        return self.world.buildings[0].id if self.world.buildings else "town-square"
+
+    def _festival_participants_for_type(
+        self,
+        festival_type: str,
+        anchor_resident_id: str | None = None,
+    ) -> list[str]:
+        if festival_type in {"spring", "summer", "autumn", "winter"}:
+            return [agent.resident.id for agent in self.world.agents]
+        if anchor_resident_id is None:
+            return []
+
+        participant_ids = {anchor_resident_id}
+        anchor_agent = self.world.get_agent(anchor_resident_id)
+        if anchor_agent is None:
+            return sorted(participant_ids)
+
+        family_members = self.world.get_family_members(anchor_agent.resident)
+        participant_ids.update(member.id for member in family_members)
+        related = [
+            rel
+            for rel in self.world.relationships.values()
+            if rel.from_id == anchor_resident_id
+            and rel.type in {RelationType.friendship, RelationType.trust, RelationType.love}
+        ]
+        related.sort(key=lambda rel: rel.intensity + rel.familiarity, reverse=True)
+        participant_ids.update(rel.to_id for rel in related[:3])
+        return sorted(participant_ids)
+
+    def _has_overlapping_festival(self, festival_type: str, start_tick: int) -> bool:
+        self._ensure_festival_state()
+        all_festivals = list(self._active_festivals) + list(self._festival_history)
+        for festival in all_festivals:
+            if festival.get("type") != festival_type:
+                continue
+            if festival_type in {"spring", "summer", "autumn", "winter"} and festival.get("start_tick") // 100 == start_tick // 100:
+                return True
+            if festival.get("start_tick") == start_tick:
+                return True
+        return False
+
+    def _start_festival(
+        self,
+        festival_type: str,
+        *,
+        start_tick: int,
+        anchor_resident_id: str | None = None,
+        custom_name: str | None = None,
+    ) -> dict[str, Any] | None:
+        blueprint = _FESTIVAL_BLUEPRINTS.get(festival_type)
+        if blueprint is None or self._has_overlapping_festival(festival_type, start_tick):
+            return None
+        self._ensure_festival_state()
+
+        participant_ids = self._festival_participants_for_type(festival_type, anchor_resident_id)
+        if not participant_ids:
+            return None
+
+        festival = Festival(
+            name=custom_name or str(blueprint["name"]),
+            type=festival_type,
+            start_tick=start_tick,
+            duration=int(blueprint["duration"]),
+            location=self._festival_location_id(festival_type),
+            participants=participant_ids,
+        )
+        festival_payload = asdict(festival)
+        festival_payload["status"] = "active"
+        festival_payload["end_tick"] = start_tick + festival.duration
+        festival_payload["focus"] = blueprint["focus"]
+        festival_payload["social_multiplier"] = blueprint["social_multiplier"]
+        festival_payload["goal"] = blueprint["goal"]
+        festival_payload["description"] = blueprint["description"]
+        self._active_festivals.append(festival_payload)
+
+        for resident_id in participant_ids:
+            agent = self.world.get_agent(resident_id)
+            if agent is None:
+                continue
+            agent.resident.current_goal = str(blueprint["goal"])
+            self.world.shift_resident_mood(agent, 1, "festival")
+
+        self._add_timeline_event(
+            str(blueprint["timeline_type"]),
+            str(blueprint["description"]),
+            {
+                "name": festival.name,
+                "type": festival.type,
+                "location": festival.location,
+                "participants": list(festival.participants),
+            },
+        )
+        return festival_payload
+
+    def _close_finished_festivals(self, tick_state: Any) -> None:
+        self._ensure_festival_state()
+        remaining: list[dict[str, Any]] = []
+        for festival in self._active_festivals:
+            if self.world.current_tick < int(festival.get("end_tick", 0)):
+                remaining.append(festival)
+                continue
+
+            completed = dict(festival)
+            completed["status"] = "completed"
+            completed["end_tick"] = int(completed.get("end_tick", self.world.current_tick))
+            memorial = f"{completed['name']} 落幕，居民把这段庆典余温写进了小镇记忆。"
+            completed["memorial"] = memorial
+            self._festival_history.append(completed)
+            tick_state.events.append(EventUpdate(description=memorial))
+            tick_state.festival_updates.append(
+                FestivalUpdate(
+                    festival=Festival(
+                        name=completed["name"],
+                        type=completed["type"],
+                        start_tick=int(completed["start_tick"]),
+                        duration=int(completed["duration"]),
+                        location=completed["location"],
+                        participants=list(completed.get("participants", [])),
+                    ),
+                    status="ended",
+                    memorial=memorial,
+                )
+            )
+            self._add_timeline_event(
+                "festival_memorial",
+                memorial,
+                {"name": completed["name"], "type": completed["type"], "location": completed["location"]},
+            )
+        self._festival_history = self._festival_history[-100:]
+        self._active_festivals = remaining
+
+    def _festival_social_multiplier(self, resident_ids: tuple[str, str] | None = None) -> float:
+        self._ensure_festival_state()
+        multiplier = 1.0
+        for festival in self._active_festivals:
+            participants = set(festival.get("participants", []))
+            if resident_ids is not None and not set(resident_ids).issubset(participants):
+                continue
+            multiplier = max(multiplier, float(festival.get("social_multiplier", 1.0)))
+        return multiplier
+
     async def _tick(self) -> Any:
         import inspect
         import random
@@ -1158,10 +1337,57 @@ class SimulationState:
         from engine.types import Event as EngineEvent, WeatherType
 
         tick_start = time.monotonic()
+        if not hasattr(self, "_events"):
+            self._events = []
+        if not hasattr(self, "_active_events"):
+            self._active_events = []
+        if not hasattr(self, "_pending_dialogues"):
+            self._pending_dialogues = []
+        if not hasattr(self, "_dialogue_pair_ids"):
+            self._dialogue_pair_ids = {}
+        if not hasattr(self, "_active_dialogue_pairs"):
+            self._active_dialogue_pairs = set()
+        if not hasattr(self, "_dialogue_history"):
+            self._dialogue_history = []
+        if not hasattr(self, "_population_history"):
+            self._population_history = []
+        if not hasattr(self, "_trade_history"):
+            self._trade_history = []
+        if not hasattr(self, "_world_timeline"):
+            self._world_timeline = []
+        if not hasattr(self, "_timeline_id_counter"):
+            self._timeline_id_counter = 0
+        if not hasattr(self, "_replay_snapshots"):
+            self._replay_snapshots = []
+        if not hasattr(self, "_mood_history"):
+            self._mood_history = []
+        if not hasattr(self, "_active_votes"):
+            self._active_votes = []
+        if not hasattr(self, "_vote_history"):
+            self._vote_history = []
+        if not hasattr(self, "_achievement_unlock_meta"):
+            self._achievement_unlock_meta = {}
+        if not hasattr(self, "_buildings_visited"):
+            self._buildings_visited = {}
+        if not hasattr(self, "_zones_visited"):
+            self._zones_visited = {}
+        if not hasattr(self, "_mood_positive_streaks"):
+            self._mood_positive_streaks = {}
+        if not hasattr(self, "_work_streaks"):
+            self._work_streaks = {}
+        if not hasattr(self, "_comfort_counts"):
+            self._comfort_counts = {}
+        if not hasattr(self, "_rel_events_fired"):
+            self._rel_events_fired = set()
+        if not hasattr(self, "_active_festivals"):
+            self._active_festivals = []
+        if not hasattr(self, "_festival_history"):
+            self._festival_history = []
 
         queued_events = list(self._events)
         weather = self.world.weather
         tick_time = self.world.simulation_time()
+        world_rng = getattr(self.world, "rng", random)
 
         # Inject user-queued events into world.pending_events so agent.perceive() picks them up
         for ev in queued_events:
@@ -1195,12 +1421,27 @@ class SimulationState:
                 source="system",
             ))
 
+        active_festival = getattr(self, "_active_festivals", [None])[0] if getattr(self, "_active_festivals", []) else None
+        if active_festival is not None:
+            self.world.pending_events.append(
+                EngineEvent(
+                    id=str(uuid.uuid4()),
+                    description=str(active_festival.get("description", active_festival.get("name", "庆典进行中"))),
+                    timestamp=tick_time,
+                    source="system",
+                )
+            )
+            for resident_id in active_festival.get("participants", []):
+                agent = self.world.get_agent(resident_id)
+                if agent is not None:
+                    agent.resident.current_goal = str(active_festival.get("goal", f"参加{active_festival.get('name', '庆典')}"))
+
         cfg = self.world.config
 
         # Select LLM vs rule-based agents (spec §8)
         llm_candidates = [
             a for a in self.world.agents
-            if random.random() < cfg.llm_call_probability
+            if world_rng.random() < cfg.llm_call_probability
         ]
         llm_agents = set(llm_candidates[: cfg.max_concurrent_llm_calls])
 
@@ -1266,13 +1507,17 @@ class SimulationState:
                 p = result
 
             # Weather behaviour modifiers (spec §14)
-            if weather is WeatherType.stormy and random.random() < 0.70:
+            if weather is WeatherType.stormy and world_rng.random() < 0.70:
                 # Stormy: agents flee to their own home building
                 home_id = agent.resident.home_building_id
                 if home_id and agent.resident.location is None:
                     home_building = self.world.get_building(home_id)
                     if home_building is not None:
                         p = {"action": "move", "target": list(home_building.position)}
+            elif active_festival is not None and agent.resident.id in active_festival.get("participants", []):
+                festival_building = self.world.get_building(str(active_festival.get("location", "")))
+                if festival_building is not None:
+                    p = {"action": "move", "target": list(festival_building.position)}
 
             return agent, p
 
@@ -1368,10 +1613,11 @@ class SimulationState:
         # Skip pairs that already have an in-flight task
         seen_pairs: set = set(self._active_dialogue_pairs)
         dialogue_count = 0
+        max_dialogues_this_tick = max(1, int(round(cfg.max_dialogues_per_tick * self._festival_social_multiplier())))
 
         depressed_agents = [agent for agent in self.world.agents if getattr(agent.resident, "mental_state", "stable") == "depressed"]
         for depressed_agent in depressed_agents:
-            if dialogue_count >= cfg.max_dialogues_per_tick:
+            if dialogue_count >= max_dialogues_this_tick:
                 break
             nearby = self.world.get_social_candidates(depressed_agent)
             comforter = None
@@ -1402,7 +1648,7 @@ class SimulationState:
             dialogue_count += 1
 
         for a in self.world.agents:
-            if dialogue_count >= cfg.max_dialogues_per_tick:
+            if dialogue_count >= max_dialogues_this_tick:
                 break
             nearby = self.world.get_social_candidates(a)
             for b in nearby:
@@ -1410,9 +1656,9 @@ class SimulationState:
                 if pair in seen_pairs:
                     continue
                 seen_pairs.add(pair)
-                if dialogue_count >= cfg.max_dialogues_per_tick:
+                if dialogue_count >= max_dialogues_this_tick:
                     break
-                probability = self.world.get_social_probability(a, b)
+                probability = self.world.get_social_probability(a, b) * self._festival_social_multiplier((a.resident.id, b.resident.id))
                 if weather is WeatherType.stormy:
                     probability -= 0.30
                 elif weather is WeatherType.snowy:
@@ -1424,7 +1670,7 @@ class SimulationState:
                     )
                     probability += 0.20 if in_cafe else -0.10
 
-                should_start = random.random() < max(0.0, min(0.95, probability))
+                should_start = world_rng.random() < max(0.0, min(0.95, probability))
                 if not should_start:
                     continue
                 task = asyncio.create_task(initiate_dialogue(a, b, self.world))
@@ -1476,6 +1722,49 @@ class SimulationState:
                         "parent_names": list(population_event.parent_names),
                     },
                 )
+            for agent in self.world.agents:
+                if agent.resident.age_days > 0 and agent.resident.age_days % 360 == 0:
+                    birthday_festival = self._start_festival(
+                        "birthday",
+                        start_tick=self.world.current_tick,
+                        anchor_resident_id=agent.resident.id,
+                        custom_name=f"{agent.resident.name}的生日小聚",
+                    )
+                    if birthday_festival is None:
+                        continue
+                    tick_state.events.append(EventUpdate(description=f"{agent.resident.name} 迎来了生日小聚。"))
+                    tick_state.festival_updates.append(
+                        FestivalUpdate(
+                            festival=Festival(
+                                name=birthday_festival["name"],
+                                type=birthday_festival["type"],
+                                start_tick=int(birthday_festival["start_tick"]),
+                                duration=int(birthday_festival["duration"]),
+                                location=birthday_festival["location"],
+                                participants=list(birthday_festival.get("participants", [])),
+                            ),
+                            status="started",
+                        )
+                    )
+        seasonal_festival = self._start_festival(
+            str(self.world.season.value if hasattr(self.world.season, "value") else self.world.season),
+            start_tick=self.world.current_tick,
+        )
+        if seasonal_festival is not None:
+            tick_state.events.append(EventUpdate(description=str(seasonal_festival.get("description", seasonal_festival["name"]))))
+            tick_state.festival_updates.append(
+                FestivalUpdate(
+                    festival=Festival(
+                        name=seasonal_festival["name"],
+                        type=seasonal_festival["type"],
+                        start_tick=int(seasonal_festival["start_tick"]),
+                        duration=int(seasonal_festival["duration"]),
+                        location=seasonal_festival["location"],
+                        participants=list(seasonal_festival.get("participants", [])),
+                    ),
+                    status="started",
+                )
+            )
         tick_state.dialogues.extend(dialogue_updates)
         tick_state.relationships.extend(relationship_deltas)
         tick_state.gossips.extend(gossip_updates)
@@ -1552,6 +1841,27 @@ class SimulationState:
                     "unlocked_at_tick": unlock.get("unlocked_at_tick", 0),
                 },
             )
+            achievement_festival = self._start_festival(
+                "achievement",
+                start_tick=self.world.current_tick,
+                anchor_resident_id=unlock.get("resident_id", ""),
+                custom_name=f"{unlock.get('resident_name', '居民')}的成就庆典",
+            )
+            if achievement_festival is not None:
+                tick_state.events.append(EventUpdate(description=f"{achievement_festival['name']} 已开始。"))
+                tick_state.festival_updates.append(
+                    FestivalUpdate(
+                        festival=Festival(
+                            name=achievement_festival["name"],
+                            type=achievement_festival["type"],
+                            start_tick=int(achievement_festival["start_tick"]),
+                            duration=int(achievement_festival["duration"]),
+                            location=achievement_festival["location"],
+                            participants=list(achievement_festival.get("participants", [])),
+                        ),
+                        status="started",
+                    )
+                )
         family_event_descriptions: list[str] = []
         current_tick = self.world.current_tick
         families = self.world.list_families()
@@ -1606,6 +1916,7 @@ class SimulationState:
                     break
 
         tick_state.events.extend(EventUpdate(description=description) for description in family_event_descriptions)
+        self._close_finished_festivals(tick_state)
 
         # --- Relationship milestone events ---
         if not hasattr(self, "_rel_events_fired"):
@@ -2248,8 +2559,10 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
         Education,
         Event as EngineEvent,
         Item,
+        Job,
         Memory,
         MoodEntry,
+        Pet,
         Reflection,
         Relationship,
         RelationType,
@@ -2303,8 +2616,11 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
             current_goal=res_data.get("current_goal"),
             coins=res_data.get("coins", 100),
             occupation=res_data.get("occupation", "unemployed"),
+            wallet=float(res_data.get("wallet", 0.0)),
+            job=Job(**res_data.get("job", {})) if res_data.get("job") else Job(),
             skills=dict(res_data.get("skills", {})),
             inventory=[Item(**item) for item in res_data.get("inventory", [])],
+            pets=[Pet(**pet) for pet in res_data.get("pets", [])],
             energy=float(res_data.get("energy", 1.0)),
             age_days=int(res_data.get("age_days", 0)),
             mood_history=[MoodEntry(**entry) for entry in res_data.get("mood_history", [])],
@@ -2334,6 +2650,9 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
         if ad.get("building_ticks_remaining") is not None:
             agent._building_ticks_remaining = ad["building_ticks_remaining"]
         branch_world.add_agent(agent)
+
+    branch_world.stray_pets = [Pet(**pet) for pet in saved.get("stray_pets", [])]
+    branch_world._rebuild_pet_registry()
 
     for rel_data in saved.get("relationships", []):
         branch_world.relationships[(rel_data["from_id"], rel_data["to_id"])] = Relationship(

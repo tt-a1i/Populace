@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from engine.schedule import DailySchedule, SchedulePhase
-from engine.types import Building, WorldConfig
+from engine.types import Building, Pet, WorldConfig
 from engine.world import World
 
 from tests.conftest import make_agent
@@ -144,6 +144,21 @@ def test_rule_plan_inserts_attend_class_when_school_exists(world_with_buildings)
 
     assert plan["action"] == "attend_class"
     assert plan.get("target") == [8, 8]
+
+
+def test_rule_plan_inserts_walk_pet_for_dog_owner(world_with_buildings):
+    sched = DailySchedule("外向")
+    world_with_buildings.add_building(Building(id="park1", type="park", name="中央公园", capacity=20, position=(12, 12)))
+    agent = make_agent("a3", "阿黄", x=0, y=0)
+    agent.resident.home_building_id = "home1"
+    agent.resident.pets = [Pet(id="pet-1", name="旺财", species="dog", owner_id="a3")]
+    world_with_buildings.add_agent(agent)
+    world_with_buildings.current_tick = 36
+
+    plan = sched.rule_plan(agent, world_with_buildings)
+
+    assert plan["action"] == "walk_pet"
+    assert plan.get("target") == [12, 12]
 
 
 def test_rule_plan_idle_when_already_at_destination(world_with_buildings):

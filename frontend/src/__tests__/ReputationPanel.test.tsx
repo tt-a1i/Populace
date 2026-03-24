@@ -37,10 +37,10 @@ describe('ReputationPanel', () => {
 
     render(<ReputationPanel />)
 
-    expect(await screen.findByText('小明')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '小明' })).toBeInTheDocument()
     expect(screen.getByText('镇上名人')).toBeInTheDocument()
     expect(screen.getByText('0.92')).toBeInTheDocument()
-    expect(screen.getByText('小红')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '小红' })).toBeInTheDocument()
   })
 
   it('refreshes the rankings', async () => {

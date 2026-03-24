@@ -162,6 +162,14 @@ else:
         course_history: List["CourseHistoryEntry"] = field(default_factory=list)
 
     @dataclass
+    class Job:
+        title: str = "unemployed"
+        workplace_id: Optional[str] = None
+        salary: float = 0.0
+        work_hours: List[int] = field(default_factory=lambda: [8, 12, 13, 17])
+        satisfaction: float = 0.5
+
+    @dataclass
     class Achievement:
         id: str
         name: str
@@ -199,6 +207,8 @@ else:
         current_goal: Optional[str] = None   # active short-term goal text
         coins: int = 100
         occupation: str = "unemployed"
+        wallet: float = 0.0
+        job: "Job" = field(default_factory=Job)
         skills: Dict[str, float] = field(default_factory=dict)
         inventory: List["Item"] = field(default_factory=list)
         energy: float = 1.0

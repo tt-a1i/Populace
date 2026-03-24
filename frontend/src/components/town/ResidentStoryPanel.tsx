@@ -6,8 +6,10 @@ import { useSimulationStore } from '../../stores/simulation'
 import {
   type EducationHistoryEntry,
   type Item,
+  type Pet,
   type ResidentAchievement,
   type ResidentDiaryEntry,
+  type ResidentJobPayload,
   type ResidentMemory,
   type ResidentMoodLogEntry,
   type ResidentRelationship,
@@ -15,8 +17,10 @@ import {
   getResidentAchievements,
   getResidentDiary,
   getResidentEducation,
+  getResidentJob,
   getResidentMemories,
   getResidentMoodLog,
+  getResidentPets,
   getResidentRelationships,
   getResidentSkills,
   injectResidentMemory,
@@ -77,6 +81,7 @@ type TabKey =
   | 'relations'
   | 'skills'
   | 'education'
+  | 'pets'
   | 'mood_log'
   | 'backpack'
   | 'family'
@@ -94,7 +99,9 @@ interface ResidentStoryPanelProps {
     coins?: number
     skills?: Record<string, number>
     inventory?: Item[]
+    pets?: Pet[]
     energy?: number
+    reputation?: number
     currentGoal?: string | null
     currentBuildingId?: string | null
     skinColor?: string | null
@@ -104,10 +111,6 @@ interface ResidentStoryPanelProps {
   }>
   buildings: Array<{ id: string; name: string; type: string }>
   onClose: () => void
-}
-
-function isHeartbeat(content: string): boolean {
-  return content.startsWith('Tick ') || content.includes('mood=')
 }
 
 function describeActivity(
@@ -159,7 +162,9 @@ export function ResidentStoryPanel({
   const [courseHistory, setCourseHistory] = useState<EducationHistoryEntry[]>([])
   const [courses, setCourses] = useState<Array<{ subject: string; name: string; attendance_count?: number }>>([])
   const [moodLog, setMoodLog] = useState<ResidentMoodLogEntry[]>([])
+  const [pets, setPets] = useState<Pet[]>([])
   const [achievements, setAchievements] = useState<ResidentAchievement[]>([])
+  const [jobInfo, setJobInfo] = useState<ResidentJobPayload | null>(null)
   const [memoirBusy, setMemoirBusy] = useState(false)
   const [tradeBusy, setTradeBusy] = useState(false)
   const [showChat, setShowChat] = useState(false)
@@ -173,6 +178,7 @@ export function ResidentStoryPanel({
       { key: 'relations' as const, label: t('resident_panel.tab_relations') },
       { key: 'skills' as const, label: t('resident_panel.tab_skills') },
       { key: 'education' as const, label: t('resident_panel.tab_education', '学业') },
+      { key: 'pets' as const, label: t('resident_panel.tab_pets', '宠物') },
       { key: 'mood_log' as const, label: t('resident_panel.tab_mood_log', 'Mood Log') },
       { key: 'backpack' as const, label: t('resident_panel.tab_backpack', 'Backpack') },
       { key: 'schedule' as const, label: t('resident_panel.tab_schedule') },
@@ -217,6 +223,14 @@ export function ResidentStoryPanel({
         if (!cancelled) setMoodLog([])
       })
 
+    void getResidentPets(residentId)
+      .then((data) => {
+        if (!cancelled) setPets(data)
+      })
+      .catch(() => {
+        if (!cancelled) setPets(resident?.pets ?? [])
+      })
+
     void getResidentDiary(residentId, { limit: 12 })
       .then((data) => {
         if (!cancelled) setDiaryEntries(data)
@@ -231,6 +245,14 @@ export function ResidentStoryPanel({
       })
       .catch(() => {
         if (!cancelled) setAchievements([])
+      })
+
+    void getResidentJob(residentId)
+      .then((data) => {
+        if (!cancelled) setJobInfo(data)
+      })
+      .catch(() => {
+        if (!cancelled) setJobInfo(null)
       })
 
     void getResidentEducation(residentId)
@@ -266,11 +288,9 @@ export function ResidentStoryPanel({
 
   const moodEmoji = MOOD_EMOJI[resident.mood ?? ''] ?? ''
   const energyPct = Math.round((resident.energy ?? 1.0) * 100)
-
-  const recentEvents = [...memories]
-    .filter((m) => !isHeartbeat(m.content))
-    .reverse()
-    .slice(0, 8)
+  const reputationValue = Math.max(-1, Math.min(1, resident.reputation ?? 0))
+  const reputationPct = Math.round(((reputationValue + 1) / 2) * 100)
+  const isTownCelebrity = reputationValue > 0.8
 
   const topRelationships = [...relationships]
     .sort((a, b) => b.intensity - a.intensity)
@@ -304,7 +324,7 @@ export function ResidentStoryPanel({
             <div className="mt-1 flex flex-wrap items-center gap-2">
               {resident.occupation && (
                 <span className="rounded-full border border-sky-400/20 bg-sky-400/10 px-2.5 py-0.5 text-[11px] font-medium text-sky-200">
-                  {resident.occupation}
+                  {jobInfo?.job?.title ?? resident.occupation}
                 </span>
               )}
               {resident.mood && (
@@ -343,6 +363,39 @@ export function ResidentStoryPanel({
         <div className="flex items-center gap-1.5 text-amber-200">
           <span className="text-[11px]">{t('resident_panel.coins')}</span>
           <span className="text-sm tabular-nums font-medium">{resident.coins ?? 0}</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-emerald-200">
+          <span className="text-[11px]">Wallet</span>
+          <span className="text-sm tabular-nums font-medium">{Math.round(jobInfo?.wallet ?? 0)}</span>
+        </div>
+      </div>
+
+      {jobInfo?.job ? (
+        <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2">
+          <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Job</p>
+          <p className="mt-0.5 text-sm text-white">
+            {jobInfo.job.title} · ${jobInfo.job.salary}/day · satisfaction {Math.round(jobInfo.job.satisfaction * 100)}%
+          </p>
+        </div>
+      ) : null}
+
+      <div className="mt-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">声望</span>
+            {isTownCelebrity ? (
+              <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-0.5 text-[10px] text-amber-100">
+                镇上名人
+              </span>
+            ) : null}
+          </div>
+          <span className="text-sm font-medium tabular-nums text-white">{reputationValue.toFixed(2)}</span>
+        </div>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-900/60">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-rose-500 via-amber-300 to-emerald-300 transition-all duration-500"
+            style={{ width: `${Math.max(6, reputationPct)}%` }}
+          />
         </div>
       </div>
 
@@ -383,26 +436,34 @@ export function ResidentStoryPanel({
 
       {/* ---- Tab content (all rendered, inactive hidden) ---- */}
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
-        {/* Memories — timeline style */}
+        {/* Memoir timeline */}
         <div className={activeTab === 'memories' ? '' : 'hidden'}>
           <div className="relative pl-5">
             <div className="absolute left-[7px] top-1 bottom-1 w-px bg-white/10" />
-            {recentEvents.length > 0 ? (
+            {memories.length > 0 ? (
               <div className="space-y-3">
-                {recentEvents.map((mem) => (
+                {memories.map((mem) => (
                   <div key={mem.id} className="relative">
                     <div className="absolute -left-5 top-2.5 h-2 w-2 rounded-full border-2 border-slate-500 bg-slate-800" />
                     <div className="rounded-xl border border-white/6 bg-slate-900/50 px-3 py-2">
-                      <span className="text-[10px] text-slate-500">{mem.timestamp}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-slate-500">{mem.timestamp}</span>
+                        <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2 py-0.5 text-[10px] text-cyan-100">
+                          {mem.type ?? 'memoir'}
+                        </span>
+                      </div>
                       <p className="mt-0.5 text-[13px] leading-relaxed text-slate-300">
                         {mem.content}
+                      </p>
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        {t('resident_panel.memory_weight', '情绪权重')} {Math.round((mem.emotional_weight ?? 0) * 100)}%
                       </p>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-slate-500">{t('resident_panel.no_recent')}</p>
+              <p className="text-sm text-slate-500">{t('resident_panel.no_memories', '暂无回忆')}</p>
             )}
           </div>
         </div>
@@ -596,6 +657,41 @@ export function ResidentStoryPanel({
             <p className="text-sm text-slate-500">
               {t('resident_panel.no_education', 'No education data yet')}
             </p>
+          )}
+        </div>
+
+        <div className={activeTab === 'pets' ? '' : 'hidden'}>
+          {pets.length > 0 ? (
+            <div className="space-y-2">
+              {pets.map((pet) => (
+                <div
+                  key={pet.id}
+                  className="rounded-xl border border-white/6 bg-slate-900/50 px-3 py-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-white">{pet.name}</p>
+                      <p className="text-xs capitalize text-slate-400">{pet.species}</p>
+                    </div>
+                    <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-0.5 text-[10px] text-amber-100">
+                      {pet.mood ?? 'calm'}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-300">
+                    <span>Hunger</span>
+                    <span>{Math.round((pet.hunger ?? 0) * 100)}%</span>
+                  </div>
+                  <div className="mt-1 h-1.5 rounded-full bg-white/10">
+                    <div
+                      className="h-1.5 rounded-full bg-gradient-to-r from-amber-300 via-orange-300 to-rose-300 transition-all duration-500"
+                      style={{ width: `${Math.round((pet.hunger ?? 0) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">{t('resident_panel.no_pets', 'No pets yet')}</p>
           )}
         </div>
 

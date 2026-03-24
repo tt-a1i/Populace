@@ -18,12 +18,15 @@ from backend.api.schemas import (
     BuildingResponse,
     BuildingVisitRecord,
     CrimeEventResponse,
+    FestivalListResponse,
+    PetResponse,
     PresetEventResponse,
     ReputationRankingEntryResponse,
     SafetyHotspotResponse,
     SafetyStatsResponse,
     ScenarioDataResponse,
     WeatherResponse,
+    WorldEconomyResponse,
     WorldEducationCourseResponse,
     WorldEventResponse,
     ZoneResponse,
@@ -214,6 +217,16 @@ async def get_vote_history(request: Request) -> list[VoteResponse]:
 
 
 @router.get(
+    "/economy",
+    response_model=WorldEconomyResponse,
+    responses=error_responses(503),
+)
+async def get_world_economy(request: Request) -> WorldEconomyResponse:
+    state = get_simulation_state(request)
+    return WorldEconomyResponse(**state.world.get_economy_overview())
+
+
+@router.get(
     "/crimes",
     response_model=list[CrimeEventResponse],
     responses=error_responses(503),
@@ -253,6 +266,16 @@ async def get_achievement_leaderboard(request: Request) -> list[AchievementLeade
 
     state = get_simulation_state(request)
     return [AchievementLeaderboardEntryResponse(**row) for row in build_leaderboard(state)]
+
+
+@router.get(
+    "/pets",
+    response_model=list[PetResponse],
+    responses=error_responses(503),
+)
+async def get_world_pets(request: Request) -> list[PetResponse]:
+    state = get_simulation_state(request)
+    return [PetResponse(**asdict(pet)) for pet in state.world.list_pets()]
 
 
 class GenerateScenarioRequest(BaseModel):
@@ -388,6 +411,16 @@ async def list_zones(request: Request) -> list[ZoneResponse]:
 async def list_families(request: Request) -> list[WorldFamilyResponse]:
     state = get_simulation_state(request)
     return [WorldFamilyResponse(**family) for family in state.world.list_families()]
+
+
+@router.get(
+    "/festivals",
+    response_model=FestivalListResponse,
+    responses=error_responses(503),
+)
+async def list_festivals(request: Request) -> FestivalListResponse:
+    state = get_simulation_state(request)
+    return FestivalListResponse(**state.get_festivals())
 
 
 @router.get(

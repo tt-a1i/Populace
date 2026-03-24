@@ -22,6 +22,8 @@ from engine.types import (
     Event,
     EventUpdate,
     Item,
+    Job,
+    Memory,
     MoodEntry,
     MovementUpdate,
     Pet,
@@ -55,14 +57,14 @@ _MOOD_LADDER = ["sad", "fearful", "angry", "tired", "neutral", "calm", "content"
 _BUILDING_WORK_MAP = {
     "cafe": {
         "occupation": "barista",
-        "base_income": 3,
+        "base_income": 16,
         "skill": "cooking",
         "item_name": "coffee",
         "item_value": 12,
     },
     "school": {
         "occupation": "teacher",
-        "base_income": 4,
+        "base_income": 20,
         "skill": "teaching",
         "item_name": "book",
         "item_value": 7,
@@ -74,7 +76,11 @@ _BUILDING_WORK_MAP = {
         "item_name": "goods",
         "item_value": 6,
     },
-    "dock": {"occupation": "fisher", "base_income": 4, "skill": "fishing"},
+    "dock": {"occupation": "farmer", "base_income": 14, "skill": "fishing"},
+    "plaza": {"occupation": "guard", "base_income": 17, "skill": "social"},
+    "park": {"occupation": "artist", "base_income": 15, "skill": "art"},
+    "clinic": {"occupation": "doctor", "base_income": 24, "skill": "social"},
+    "hospital": {"occupation": "doctor", "base_income": 24, "skill": "social"},
 }
 _EDUCATION_SUBJECTS = {
     "cooking": "烹饪课",
@@ -106,6 +112,7 @@ class World:
 
     def __init__(self, config: Optional[WorldConfig] = None) -> None:
         self.config: WorldConfig = config or WorldConfig()
+        self.rng = random.Random(self.config.seed) if self.config.seed is not None else random
         self.agents: List[Agent] = []
         self.buildings: List[Building] = []
         self.zones: List[Zone] = self._default_zones()
@@ -129,6 +136,8 @@ class World:
         self.flagged_residents: set[str] = set()
         self.pets: List[Pet] = []
         self.stray_pets: List[Pet] = []
+        self.gdp_history: List[dict] = []
+        self.economic_output: float = 0.0
         self.path_cache: PathCache = PathCache()
         self.grid_chunk_size: int = max(1, self.config.interaction_distance)
         self.grid_index: Dict[Tuple[int, int], List[Agent]] = {}
@@ -197,8 +206,9 @@ class World:
         self._ensure_resident_safety(agent.resident)
         self._ensure_resident_reputation(agent.resident)
         self._ensure_resident_memories(agent.resident)
-        self._rebuild_pet_registry()
+        self._ensure_resident_job(agent.resident)
         self.agents.append(agent)
+        self._rebuild_pet_registry()
         self.mark_grid_index_dirty()
 
     def _rebuild_pet_registry(self) -> None:
@@ -212,9 +222,10 @@ class World:
             resident = agent.resident
             if resident.pets:
                 continue
-            if sum(ord(char) for char in resident.id) % 10 >= 3:
+            checksum = sum(ord(char) for char in f"{resident.id}:{resident.name}")
+            if checksum % 10 >= 3:
                 continue
-            species = _PET_SPECIES[sum(ord(char) for char in resident.name) % len(_PET_SPECIES)]
+            species = _PET_SPECIES[checksum % len(_PET_SPECIES)]
             resident.pets.append(
                 Pet(
                     id=f"pet_{resident.id}",
@@ -287,13 +298,13 @@ class World:
 
                 self._sync_pet_to_owner(pet, owner)
                 if pet.location == owner.resident.location or abs(pet.x - owner.resident.x) + abs(pet.y - owner.resident.y) <= 1:
-                    if random.random() < 0.05:
+                    if self.rng.random() < 0.05:
                         self.shift_resident_mood(owner, 1, "pet")
-                    if pet.hunger < 0.4 and random.random() < 0.35:
+                    if pet.hunger < 0.4 and self.rng.random() < 0.35:
                         pet.hunger = round(min(1.0, pet.hunger + 0.5), 3)
                         pet.mood = "content"
                         events.append(EventUpdate(description=f"{owner.resident.name}喂食了宠物{pet.name}。"))
-                    elif random.random() < 0.18:
+                    elif self.rng.random() < 0.18:
                         pet.mood = "happy"
                         self.shift_resident_mood(owner, 1, "pet")
                         events.append(EventUpdate(description=f"{owner.resident.name}和宠物{pet.name}玩耍了一会儿。"))
@@ -302,19 +313,13 @@ class World:
                     events.append(EventUpdate(description=f"{pet.name}{sound}叫唤，似乎饿了。"))
                 continue
 
-            step_x = random.choice([-1, 0, 1])
-            step_y = random.choice([-1, 0, 1])
-            pet.x = max(0, min(self.config.map_width_tiles - 1, pet.x + step_x))
-            pet.y = max(0, min(self.config.map_height_tiles - 1, pet.y + step_y))
-            pet.location = None
-
             for agent in self.agents:
                 resident = agent.resident
                 if self._friendly_resident_score(resident) < 0.65:
                     continue
                 if abs(resident.x - pet.x) + abs(resident.y - pet.y) > 1:
                     continue
-                if random.random() >= 0.18:
+                if self.rng.random() >= 0.18:
                     continue
                 pet.owner_id = resident.id
                 resident.pets.append(pet)
@@ -322,6 +327,14 @@ class World:
                 self._sync_pet_to_owner(pet, agent)
                 events.append(EventUpdate(description=f"{resident.name}收养了流浪{pet.name}。"))
                 break
+            if pet.owner_id:
+                continue
+
+            step_x = self.rng.choice([-1, 0, 1])
+            step_y = self.rng.choice([-1, 0, 1])
+            pet.x = max(0, min(self.config.map_width_tiles - 1, pet.x + step_x))
+            pet.y = max(0, min(self.config.map_height_tiles - 1, pet.y + step_y))
+            pet.location = None
 
         self._rebuild_pet_registry()
         return events
@@ -419,6 +432,24 @@ class World:
         resident.reputation = max(-1.0, min(1.0, float(getattr(resident, "reputation", 0.0))))
         resident.reputation_history = list(getattr(resident, "reputation_history", []))
 
+    def _ensure_resident_job(self, resident: Resident) -> None:
+        job = getattr(resident, "job", None)
+        if not isinstance(job, Job):
+            if isinstance(job, dict):
+                resident.job = Job(**job)
+            else:
+                resident.job = Job()
+        resident.wallet = max(0.0, float(getattr(resident, "wallet", 0.0)))
+        resident.job.satisfaction = min(1.0, max(0.0, float(getattr(resident.job, "satisfaction", 0.5))))
+        current_occupation = getattr(resident, "occupation", "") or "unemployed"
+        if not resident.job.title or (
+            resident.job.title == "unemployed" and current_occupation != "unemployed"
+        ):
+            resident.job.title = current_occupation
+        if not resident.job.title:
+            resident.job.title = current_occupation
+        resident.occupation = resident.job.title or current_occupation
+
     def _ensure_resident_memories(self, resident: Resident) -> None:
         resident.memories = list(getattr(resident, "memories", []))
 
@@ -479,7 +510,10 @@ class World:
         if not positive_memories:
             return None
         memory = max(positive_memories, key=lambda item: (item.emotional_weight, item.tick))
-        self.shift_resident_mood(resident, 1, "memory")
+        if self.mood_score(resident.mood) < 0:
+            self.set_resident_mood(resident, "calm", "memory")
+        else:
+            self.shift_resident_mood(resident, 1, "memory")
         return memory
 
     def adjust_resident_reputation(self, resident_id: str, delta: float, source: str) -> float:
@@ -584,6 +618,100 @@ class World:
                 return
 
         resident.inventory.append(Item(name=item_name, quantity=quantity, value=value))
+
+    def _job_profile_for_building(self, building: Building) -> dict[str, object] | None:
+        return _BUILDING_WORK_MAP.get(building.type)
+
+    def _is_work_hour(self, hour: float) -> bool:
+        return 8.0 <= hour < 12.0 or 13.0 <= hour < 17.0
+
+    def _assign_job_for_building(self, resident: Resident, building: Building) -> None:
+        self._ensure_resident_job(resident)
+        profile = self._job_profile_for_building(building)
+        if profile is None:
+            return
+        resident.job.title = str(profile["occupation"])
+        resident.job.workplace_id = building.id
+        resident.job.salary = float(profile["base_income"])
+        resident.job.work_hours = [8, 12, 13, 17]
+        resident.occupation = resident.job.title
+
+    def _find_job_opening(self) -> Building | None:
+        for building in self.buildings:
+            if self._job_profile_for_building(building) is not None:
+                return building
+        return None
+
+    def _seek_job(self, agent: Agent) -> None:
+        resident = agent.resident
+        self._ensure_resident_job(resident)
+        if resident.job.title != "unemployed":
+            return
+        building = self._find_job_opening()
+        if building is None:
+            return
+        self._assign_job_for_building(resident, building)
+        self.enter_building(agent, building)
+
+    def _job_satisfaction(self, resident: Resident) -> float:
+        self._ensure_resident_job(resident)
+        counterpart_scores: list[float] = []
+        for (from_id, to_id), rel in self.relationships.items():
+            if resident.id not in {from_id, to_id}:
+                continue
+            counterpart_scores.append(rel.intensity)
+        relationship_factor = sum(counterpart_scores) / len(counterpart_scores) if counterpart_scores else 0.0
+        score = 0.5 + self.mood_score(resident.mood) * 0.2 + resident.reputation * 0.2 + relationship_factor * 0.1
+        return max(0.0, min(1.0, round(score, 3)))
+
+    def _register_gdp(self, amount: float) -> None:
+        self.economic_output = round(self.economic_output + max(0.0, amount), 2)
+
+    def _purchase_for_resident(self, resident: Resident) -> None:
+        self._ensure_resident_job(resident)
+        if resident.location is None:
+            return
+        building = self.get_building(resident.location)
+        if building is None or building.type not in {"shop", "cafe"}:
+            return
+        price = 6.0 if building.type == "shop" else 4.0
+        item_name = "meal" if building.type == "cafe" else "supplies"
+        if resident.wallet < price:
+            return
+        resident.wallet = round(resident.wallet - price, 2)
+        self.add_inventory_item(resident, item_name=item_name, quantity=1, value=int(price))
+        self._register_gdp(price)
+
+    def get_economy_overview(self) -> dict:
+        employed = [agent for agent in self.agents if getattr(agent.resident.job, "title", "unemployed") != "unemployed"]
+        unemployed = [agent for agent in self.agents if getattr(agent.resident.job, "title", "unemployed") == "unemployed"]
+        incomes = sorted(float(getattr(agent.resident.job, "salary", 0.0)) for agent in self.agents)
+        buckets = [
+            {"bucket": "0-9", "count": 0},
+            {"bucket": "10-19", "count": 0},
+            {"bucket": "20+", "count": 0},
+        ]
+        for income in incomes:
+            if income < 10:
+                buckets[0]["count"] += 1
+            elif income < 20:
+                buckets[1]["count"] += 1
+            else:
+                buckets[2]["count"] += 1
+        occ_count: Dict[str, int] = {}
+        for agent in employed:
+            title = getattr(agent.resident.job, "title", "unemployed")
+            occ_count[title] = occ_count.get(title, 0) + 1
+        return {
+            "employment_rate": round(len(employed) / len(self.agents), 3) if self.agents else 0.0,
+            "average_income": round(sum(incomes) / len(incomes), 2) if incomes else 0.0,
+            "gdp": round(self.economic_output, 2),
+            "unemployed_count": len(unemployed),
+            "employed_count": len(employed),
+            "employment_distribution": [{"occupation": key, "count": value} for key, value in sorted(occ_count.items())],
+            "income_distribution": buckets,
+            "gdp_history": list(self.gdp_history)[-20:],
+        }
 
     def mark_grid_index_dirty(self) -> None:
         """Mark the nearby-agent spatial index for rebuild before next query."""
@@ -1019,11 +1147,13 @@ class World:
         crafting_knowledge = float(agent.resident.education.knowledge_level.get("crafting", 0.0))
         tick_per_day = self.config.tick_per_day
         hour = (self.current_tick % tick_per_day) * 24.0 / tick_per_day
-        is_work_hour = 8.0 <= hour < 12.0 or 13.0 <= hour < 17.0
+        is_work_hour = self._is_work_hour(hour)
+        self._ensure_resident_job(agent.resident)
 
         if building.type == "home":
             self.set_resident_mood(agent, "neutral", "rest")
-            agent.resident.occupation = "unemployed"
+            if agent.resident.job.title == "unemployed":
+                agent.resident.occupation = "unemployed"
             # Recover energy at home
             recovery = (0.025 if is_elderly(agent.resident) else 0.05) + cooking_knowledge * 0.04
             agent.resident.energy = min(1.0, agent.resident.energy + recovery)
@@ -1032,11 +1162,13 @@ class World:
                 work_profile = _BUILDING_WORK_MAP[building.type]
                 skill_name = work_profile["skill"]
                 current_skill = float(agent.resident.skills.get(skill_name, 0.0))
-                agent.resident.occupation = work_profile["occupation"]
+                self._assign_job_for_building(agent.resident, building)
                 already_paid: bool = getattr(agent, "_paid_this_stay", False)
                 if not already_paid:
                     bonus_income = round(current_skill * work_profile["base_income"])
                     agent.resident.coins += work_profile["base_income"] + bonus_income
+                    agent.resident.wallet = round(agent.resident.wallet + float(work_profile["base_income"]) + bonus_income, 2)
+                    self._register_gdp(float(work_profile["base_income"]) + bonus_income)
                     item_name = work_profile.get("item_name")
                     if item_name:
                         item_value = int(work_profile.get("item_value", 0) * (1.0 + crafting_knowledge * 0.5))
@@ -1050,19 +1182,22 @@ class World:
                 growth = 0.015 if current_skill < 0.6 else 0.008 if current_skill < 0.85 else 0.003
                 agent.resident.skills[skill_name] = round(min(1.0, current_skill + growth), 4)
                 agent.resident.energy = max(0.0, agent.resident.energy - 0.03)
+                agent.resident.job.satisfaction = self._job_satisfaction(agent.resident)
             elif agent.resident.education.courses:
                 self.teach_course(agent)
         elif building.type in _BUILDING_WORK_MAP:
             work_profile = _BUILDING_WORK_MAP[building.type]
             skill_name = work_profile["skill"]
             current_skill = float(agent.resident.skills.get(skill_name, 0.0))
-            agent.resident.occupation = work_profile["occupation"]
+            self._assign_job_for_building(agent.resident, building)
             # Pay once per stay, not every tick
             already_paid: bool = getattr(agent, "_paid_this_stay", False)
             if not already_paid:
                 if is_work_hour:
                     bonus_income = round(current_skill * work_profile["base_income"])
                     agent.resident.coins += work_profile["base_income"] + bonus_income
+                    agent.resident.wallet = round(agent.resident.wallet + float(work_profile["base_income"]) + bonus_income, 2)
+                    self._register_gdp(float(work_profile["base_income"]) + bonus_income)
                     item_name = work_profile.get("item_name")
                     if item_name:
                         item_value = int(work_profile.get("item_value", 0) * (1.0 + crafting_knowledge * 0.5))
@@ -1077,10 +1212,16 @@ class World:
             agent.resident.skills[skill_name] = round(min(1.0, current_skill + growth), 4)
             # Work drains energy every tick
             agent.resident.energy = max(0.0, agent.resident.energy - 0.03)
+            agent.resident.job.satisfaction = self._job_satisfaction(agent.resident)
+            if agent.resident.job.satisfaction < 0.2:
+                agent.resident.job = Job()
+                agent.resident.occupation = "unemployed"
+                self.shift_resident_mood(agent, -1, "job")
+            self._purchase_for_resident(agent.resident)
 
     def building_stay_duration(self) -> int:
         """Return the random number of ticks an agent stays indoors."""
-        return random.randint(3, 8)
+        return self.rng.randint(3, 8)
 
     def _extroversion(self, personality: str) -> float:
         text = personality.lower()
@@ -1148,7 +1289,7 @@ class World:
             location_name = self._resident_location_name(resident)
             if location_name in patrol_zones:
                 pressure *= 0.5
-            if random.random() >= pressure:
+            if self.rng.random() >= pressure:
                 continue
             nearby = [other for other in self.get_social_candidates(agent) if other is not agent]
             victim = None
@@ -1159,7 +1300,7 @@ class World:
                     break
             crime_type = "vandalism"
             if victim is not None:
-                crime_type = "conflict" if random.random() < 0.5 else "theft"
+                crime_type = "conflict" if self.rng.random() < 0.5 else "theft"
             event = CrimeEvent(
                 type=crime_type,
                 perpetrator=agent.resident.id,
@@ -1249,6 +1390,7 @@ class World:
             A :class:`~engine.types.TickState` describing everything that
             changed this tick (pushed to the frontend via WebSocket).
         """
+        movement_candidates = {agent.resident.id for agent in self.agents if agent.resident.location is None}
         self.rebuild_grid_index()
         self.current_tick += 1
         sim_time = self.simulation_time()
@@ -1278,11 +1420,16 @@ class World:
                 weather_events.append("暴风雨持续，居民继续回家避风。")
 
         for agent in self.agents:
-            if active_weather is WeatherType.sunny and random.random() < 0.1:
+            self._ensure_resident_job(agent.resident)
+            if active_weather is WeatherType.sunny and self.rng.random() < 0.1:
                 self.shift_resident_mood(agent, 1, "weather")
             if agent.resident.energy < 0.2:
                 self.set_resident_mood(agent, "tired", "energy")
             self.update_mental_state(agent.resident)
+            if agent.resident.job.title == "unemployed":
+                if self.rng.random() < 0.5:
+                    self.shift_resident_mood(agent, -1, "unemployment")
+                self._seek_job(agent)
             if self.mood_score(agent.resident.mood) < 0:
                 self.recall_comforting_memory(agent)
 
@@ -1302,6 +1449,13 @@ class World:
             from engine.diary import generate_diary_entry
             for agent in self.agents:
                 generate_diary_entry(agent, self)
+            self.gdp_history.append(
+                {
+                    "tick": self.current_tick,
+                    "gdp": round(self.economic_output, 2),
+                }
+            )
+            self.gdp_history = self.gdp_history[-30:]
 
         # Collect current position of every agent as movement updates.
         # The backend simulation loop (backend/core/simulation.py) calls
@@ -1315,7 +1469,7 @@ class World:
                 action="walking" if a.current_path else "standing",
             )
             for a in self.agents
-            if a.resident.location is None
+            if a.resident.id in movement_candidates
         ]
 
         energy_updates = [

@@ -43,6 +43,17 @@ def test_economy_stats_occupation_dist_entries(client: TestClient) -> None:
         assert entry["count"] > 0
 
 
+def test_world_economy_endpoint_returns_gdp_and_employment(client: TestClient) -> None:
+    resp = client.get("/api/world/economy")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "employment_rate" in data
+    assert "average_income" in data
+    assert "gdp" in data
+    assert "income_distribution" in data
+    assert "gdp_history" in data
+
+
 # ---------------------------------------------------------------------------
 # Resident response includes occupation field
 # ---------------------------------------------------------------------------
@@ -54,6 +65,19 @@ def test_resident_response_has_occupation(client: TestClient) -> None:
     for r in residents:
         assert "occupation" in r
         assert isinstance(r["occupation"], str)
+
+
+def test_resident_job_endpoint_returns_job_payload(client: TestClient) -> None:
+    residents = client.get("/api/residents").json()
+    rid = residents[0]["id"]
+    resp = client.get(f"/api/residents/{rid}/job")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["resident_id"] == rid
+    assert "wallet" in data
+    assert "job" in data
+    assert "title" in data["job"]
+    assert "salary" in data["job"]
 
 
 # ---------------------------------------------------------------------------
@@ -106,7 +130,7 @@ def test_occupation_set_in_school():
 
 
 def test_occupation_reset_at_home():
-    """Resident returning home has occupation reset to 'unemployed'."""
+    """Resident resting at home keeps their assigned job identity."""
     from engine.types import Building, Resident, WorldConfig
     from engine.world import World
     from engine.generative_agent import GenerativeAgent
@@ -124,7 +148,7 @@ def test_occupation_reset_at_home():
     world.enter_building(agent, home)
 
     world.apply_building_effects(agent)
-    assert resident.occupation == "unemployed"
+    assert resident.occupation == "barista"
 
 
 def test_occupation_income_during_work_phase():
@@ -173,6 +197,53 @@ def test_no_income_outside_work_hours():
     assert resident.occupation == "barista"
     # 100 - 5 (cafe entry cost) = 95; no work income outside work hours
     assert resident.coins == 95
+
+
+def test_job_income_updates_wallet_and_job_title():
+    from engine.types import Building, Resident, WorldConfig
+    from engine.world import World
+    from engine.generative_agent import GenerativeAgent
+
+    cfg = WorldConfig(tick_per_day=48)
+    world = World(cfg)
+    world.current_tick = 16
+
+    shop = Building(id="shop-job", type="shop", name="Shop", capacity=10, position=(7, 7))
+    world.add_building(shop)
+
+    resident = Resident(id="job-1", name="Dora", personality="hardworking")
+    agent = GenerativeAgent(resident)
+    world.add_agent(agent)
+    world.enter_building(agent, shop)
+
+    before = resident.wallet
+    world.apply_building_effects(agent)
+
+    assert resident.job.title == "shopkeeper"
+    assert resident.wallet > before
+
+
+def test_unemployed_resident_mood_declines_and_seeks_job():
+    from engine.types import Building, Resident, WorldConfig
+    from engine.world import World
+    from engine.generative_agent import GenerativeAgent
+
+    cfg = WorldConfig(tick_per_day=48)
+    world = World(cfg)
+    world.current_tick = 16
+
+    shop = Building(id="job-seek-shop", type="shop", name="Shop", capacity=10, position=(7, 7))
+    world.add_building(shop)
+
+    resident = Resident(id="job-2", name="Nina", personality="anxious", mood="neutral")
+    agent = GenerativeAgent(resident)
+    world.add_agent(agent)
+    resident.location = None
+    resident.job.title = "unemployed"
+
+    world.tick()
+
+    assert resident.job.title != "unemployed"
 
 
 # ---------------------------------------------------------------------------

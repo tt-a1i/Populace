@@ -1,7 +1,7 @@
 import { Application, Container, Graphics, Rectangle, Text } from 'pixi.js'
 
 import { useSimulationStore, type ResidentPosition, type SimulationSpeed } from '../../stores/simulation'
-import type { Building, Zone } from '../../types'
+import type { Building, Festival, Zone } from '../../types'
 import { ResidentSprite, type ResidentHoverInfo } from './ResidentSprite'
 import { ResidentSpritePool } from './ResidentSpritePool'
 import { MilestoneEffect } from './effects/MilestoneEffect'
@@ -64,9 +64,11 @@ export class TownRenderer {
   private readonly zoneLayer = new Container()
   private readonly buildingLayer = new Container()
   private readonly residentLayer = new Container()
+  private readonly petLayer = new Container()
   private readonly effectLayer = new Container()
   private readonly uiLayer = new Container()
   private readonly residents = new Map<string, ResidentSprite>()
+  private readonly petSprites = new Map<string, Text>()
   private readonly residentSpritePool = new ResidentSpritePool<ResidentSprite>(
     () =>
       new ResidentSprite(POOLED_RESIDENT_PLACEHOLDER, {
@@ -94,6 +96,13 @@ export class TownRenderer {
   private readonly sunnyGlow = new Graphics()
   private readonly dayNightOverlay = new Graphics()
   private readonly weatherContainer = new Container()
+  private readonly festivalMarker = new Container()
+  private readonly festivalPulse = new Graphics()
+  private readonly festivalCore = new Graphics()
+  private readonly festivalLabel = new Text({
+    text: '',
+    style: { fill: 0xfffbeb, fontFamily: 'Avenir Next, Helvetica Neue, sans-serif', fontSize: 10, fontWeight: '700' },
+  })
   private currentWeatherEffect: WeatherEffect | null = null
   private currentWeather = 'sunny'
   private readonly onViewportChange?: TownRendererOptions['onViewportChange']
@@ -130,6 +139,8 @@ export class TownRenderer {
   private heatmapFilterResidentId: string | null = null
   private readonly heatmapHistory: Array<{ id: string; x: number; y: number }[]> = []
   private readonly MAX_HEATMAP_TICKS = 100
+  private activeFestival: Festival | null = null
+  private festivalPulseTime = 0
 
   private dragging = false
   private dragPointerId: number | null = null
@@ -169,13 +180,14 @@ export class TownRenderer {
     this.app.stage.addChild(this.world, this.uiLayer)
     this.world.sortableChildren = true
     this.world.hitArea = new Rectangle(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
-    this.world.addChild(this.tileLayer, this.zoneLayer, this.buildingLayer, this.residentLayer, this.effectLayer)
+    this.world.addChild(this.tileLayer, this.zoneLayer, this.buildingLayer, this.residentLayer, this.petLayer, this.effectLayer)
 
     this.tileLayer.zIndex = 0
     this.zoneLayer.zIndex = 1
     this.buildingLayer.zIndex = 2
     this.residentLayer.zIndex = 3
-    this.effectLayer.zIndex = 4
+    this.petLayer.zIndex = 4
+    this.effectLayer.zIndex = 5
     this.uiLayer.zIndex = 4
     this.residentLayer.sortableChildren = true
 
@@ -191,8 +203,11 @@ export class TownRenderer {
     this.tileLayer.addChild(this.waterOverlay)
     this.effectLayer.addChild(
       this.ambientAccent, this.sunnyGlow, this.dayNightOverlay,
-      this.eventRadiusGraphics, this.heatmapGraphics, this.weatherContainer, this.vignetteGraphics,
+      this.eventRadiusGraphics, this.heatmapGraphics, this.weatherContainer, this.festivalMarker, this.vignetteGraphics,
     )
+    this.festivalMarker.addChild(this.festivalPulse, this.festivalCore, this.festivalLabel)
+    this.festivalMarker.visible = false
+    this.festivalLabel.anchor = { x: 0.5, y: 1.8 }
 
     // Path + relationship lines below residents
     this.residentLayer.addChild(this.pathGraphics, this.pathTargetGraphics, this.relationLineGraphics)
@@ -334,6 +349,7 @@ export class TownRenderer {
 
     if (!buildings.length) {
       this.drawBuildings()
+      this.drawFestivalMarker()
       return
     }
 
@@ -451,6 +467,7 @@ export class TownRenderer {
 
     this.updateBuildingLabelsForZoom()
     this.drawPlaceholderBuildings()
+    this.drawFestivalMarker()
   }
 
   syncZones(zones: Zone[]): void {
@@ -555,6 +572,7 @@ export class TownRenderer {
   syncResidents(residents: ResidentPosition[]): void {
     this.currentResidentPositions = residents
     const activeIds = new Set(residents.map((resident) => resident.id))
+    const activePetIds = new Set<string>()
 
     for (const resident of residents) {
       const sprite = this.residents.get(resident.id)
@@ -564,22 +582,40 @@ export class TownRenderer {
         sprite.setExternalHighlight(this.highlightedResidentIds.has(resident.id))
         sprite.applyResident(resident)
         sprite.alpha = resident.currentBuildingId ? 0.18 : 1
-        continue
+      } else {
+        const newSprite = this.residentSpritePool.acquire()
+        newSprite.reuse(resident, {
+          onFocusRequest: this.followResident,
+          onSelectRequest: this.selectResident,
+          onHoverStart: this.showTooltip,
+          onHoverEnd: this.hideTooltip,
+        })
+        newSprite.setSimulationSpeed(this.simulationMeta.speed)
+        newSprite.setExternalHighlight(this.highlightedResidentIds.has(resident.id))
+        newSprite.alpha = resident.currentBuildingId ? 0.18 : 1
+
+        this.residentLayer.addChild(newSprite)
+        this.residents.set(resident.id, newSprite)
       }
 
-      const newSprite = this.residentSpritePool.acquire()
-      newSprite.reuse(resident, {
-        onFocusRequest: this.followResident,
-        onSelectRequest: this.selectResident,
-        onHoverStart: this.showTooltip,
-        onHoverEnd: this.hideTooltip,
-      })
-      newSprite.setSimulationSpeed(this.simulationMeta.speed)
-      newSprite.setExternalHighlight(this.highlightedResidentIds.has(resident.id))
-      newSprite.alpha = resident.currentBuildingId ? 0.18 : 1
-
-      this.residentLayer.addChild(newSprite)
-      this.residents.set(resident.id, newSprite)
+      for (const pet of resident.pets ?? []) {
+        const petId = pet.id
+        const icon = pet.species === 'dog' ? '🐕' : pet.species === 'cat' ? '🐈' : pet.species === 'bird' ? '🐦' : '🐇'
+        let petSprite = this.petSprites.get(petId)
+        if (!petSprite) {
+          petSprite = new Text({
+            text: icon,
+            style: { fontFamily: 'Apple Color Emoji, Segoe UI Emoji, sans-serif', fontSize: 14 },
+            anchor: { x: 0.5, y: 1 },
+          })
+          this.petLayer.addChild(petSprite)
+          this.petSprites.set(petId, petSprite)
+        }
+        petSprite.text = icon
+        petSprite.position.set((resident.targetX + 0.75) * TILE_SIZE, (resident.targetY + 0.95) * TILE_SIZE)
+        petSprite.alpha = resident.currentBuildingId ? 0.18 : 1
+        activePetIds.add(petId)
+      }
     }
 
     for (const [residentId, sprite] of this.residents.entries()) {
@@ -591,6 +627,15 @@ export class TownRenderer {
       sprite.prepareForPool()
       this.residentSpritePool.release(sprite)
       this.residents.delete(residentId)
+    }
+
+    for (const [petId, petSprite] of this.petSprites.entries()) {
+      if (activePetIds.has(petId)) {
+        continue
+      }
+      this.petLayer.removeChild(petSprite)
+      petSprite.destroy()
+      this.petSprites.delete(petId)
     }
 
     if (this.followedResidentId && !activeIds.has(this.followedResidentId)) {
@@ -607,6 +652,12 @@ export class TownRenderer {
     this.drawTiles()
     this.updateDayNightOverlay()
     this.renderHud()
+    this.drawFestivalMarker()
+  }
+
+  setActiveFestival(festival: Festival | null): void {
+    this.activeFestival = festival
+    this.drawFestivalMarker()
   }
 
   updateWeather(weather: string): void {
@@ -800,8 +851,12 @@ export class TownRenderer {
     for (const sprite of this.residents.values()) {
       sprite.destroy({ children: true })
     }
+    for (const sprite of this.petSprites.values()) {
+      sprite.destroy()
+    }
 
     this.residents.clear()
+    this.petSprites.clear()
     this.residentSpritePool.drain((sprite) => {
       sprite.destroy({ children: true })
     })
@@ -816,6 +871,7 @@ export class TownRenderer {
 
     // Animate weather particles
     this.tickWeatherEffect(deltaMs)
+    this.tickFestivalMarker(deltaMs)
 
     // Animate water ripple overlay
     this.waterTime += deltaMs * 0.001
@@ -848,6 +904,46 @@ export class TownRenderer {
     if (this.followedResidentId) {
       this.centerOnResident(this.followedResidentId)
     }
+  }
+
+  private tickFestivalMarker(deltaMs: number): void {
+    if (!this.activeFestival || !this.festivalMarker.visible) {
+      return
+    }
+
+    this.festivalPulseTime += deltaMs * 0.004
+    const scale = 1 + Math.sin(this.festivalPulseTime) * 0.08
+    this.festivalPulse.scale.set(scale, scale)
+    this.festivalPulse.alpha = 0.24 + (Math.sin(this.festivalPulseTime) + 1) * 0.14
+  }
+
+  private drawFestivalMarker(): void {
+    this.festivalPulse.clear()
+    this.festivalCore.clear()
+
+    if (!this.activeFestival) {
+      this.festivalMarker.visible = false
+      this.festivalLabel.text = ''
+      return
+    }
+
+    const hostBuilding = this.currentBuildings.find((building) => building.id === this.activeFestival?.location)
+    if (!hostBuilding) {
+      this.festivalMarker.visible = false
+      return
+    }
+
+    const x = hostBuilding.position[0] * TILE_SIZE + TILE_SIZE
+    const y = hostBuilding.position[1] * TILE_SIZE - 4
+    this.festivalMarker.position.set(x, y)
+    this.festivalMarker.visible = true
+    this.festivalLabel.text = this.activeFestival.name
+    this.festivalPulse.circle(0, 0, 20)
+    this.festivalPulse.fill({ color: 0xf59e0b, alpha: 0.3 })
+    this.festivalCore.circle(0, 0, 10)
+    this.festivalCore.fill({ color: 0xf97316, alpha: 0.95 })
+    this.festivalCore.circle(0, 0, 4)
+    this.festivalCore.fill({ color: 0xfffbeb, alpha: 0.95 })
   }
 
   private bindCameraControls(): void {

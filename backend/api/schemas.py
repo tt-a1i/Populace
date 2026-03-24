@@ -136,6 +136,18 @@ class BuildingDetailResponse(BaseModel):
     recent_visits: list[BuildingVisitRecord] = Field(default_factory=list)
 
 
+class PetResponse(BaseModel):
+    id: str
+    name: str
+    species: str
+    owner_id: str | None = None
+    mood: str = "calm"
+    hunger: float = 1.0
+    location: str | None = None
+    x: int = 0
+    y: int = 0
+
+
 class ResidentResponse(BaseModel):
     class FamilyInfoResponse(BaseModel):
         parent_ids: list[str] = Field(default_factory=list)
@@ -160,6 +172,8 @@ class ResidentResponse(BaseModel):
     current_goal: str | None = None
     coins: int = 100
     occupation: str = "unemployed"
+    wallet: float = 0.0
+    job: dict[str, Any] = Field(default_factory=dict)
     skills: dict[str, float] = Field(default_factory=dict)
     inventory: list[dict[str, Any]] = Field(default_factory=list)
     energy: float = 1.0
@@ -167,6 +181,7 @@ class ResidentResponse(BaseModel):
     reputation: float = 0.0
     family: FamilyInfoResponse = Field(default_factory=FamilyInfoResponse)
     education: "EducationResponse" = Field(default_factory=lambda: EducationResponse())
+    pets: list[PetResponse] = Field(default_factory=list)
 
 
 class PopulationResidentResponse(BaseModel):
@@ -190,6 +205,7 @@ class PopulationResidentResponse(BaseModel):
     age_days: int = 0
     goals: list[str] = Field(default_factory=list)
     education: "EducationResponse" = Field(default_factory=lambda: EducationResponse())
+    pets: list[PetResponse] = Field(default_factory=list)
 
 
 class MarketStatsResponse(BaseModel):
@@ -236,6 +252,10 @@ class ResidentMemoryResponse(BaseModel):
     timestamp: str
     importance: float
     emotion: str
+    tick: int = 0
+    type: str = "memoir"
+    emotional_weight: float = 0.0
+    related_resident_ids: list[str] = Field(default_factory=list)
     source: str = "system"
 
 
@@ -547,6 +567,24 @@ class EconomyStatsResponse(BaseModel):
     richest: str | None = None
     poorest: str | None = None
     occupation_distribution: list[OccupationDistEntry] = Field(default_factory=list)
+
+
+class ResidentJobResponse(BaseModel):
+    resident_id: str
+    resident_name: str
+    wallet: float = 0.0
+    job: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorldEconomyResponse(BaseModel):
+    employment_rate: float = 0.0
+    average_income: float = 0.0
+    gdp: float = 0.0
+    unemployed_count: int = 0
+    employed_count: int = 0
+    employment_distribution: list[OccupationDistEntry] = Field(default_factory=list)
+    income_distribution: list[dict[str, float | int | str]] = Field(default_factory=list)
+    gdp_history: list[dict[str, float | int]] = Field(default_factory=list)
 
 
 class MemoirResponse(BaseModel):

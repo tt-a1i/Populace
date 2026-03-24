@@ -9,6 +9,8 @@ const {
   mockGetResidentMoodLog,
   mockGetResidentDiary,
   mockGetResidentEducation,
+  mockGetResidentJob,
+  mockGetResidentPets,
   mockGetResidentSkills,
   mockGenerateMemoir,
   mockInjectResidentMemory,
@@ -65,6 +67,15 @@ const {
       course_history: [{ tick: 18, subject: 'social', course_name: 'Social Studio' }],
     },
   }),
+  mockGetResidentJob: vi.fn().mockResolvedValue({
+    resident_id: 'a',
+    resident_name: 'Ada',
+    wallet: 240,
+    job: { title: 'artist', workplace_id: 'atelier', salary: 18, work_hours: [8, 12, 13, 17], satisfaction: 0.74 },
+  }),
+  mockGetResidentPets: vi.fn().mockResolvedValue([
+    { id: 'pet-1', name: '旺财', species: 'dog', owner_id: 'a', mood: 'happy', hunger: 0.8, location: null, x: 1, y: 1 },
+  ]),
   mockGetResidentSkills: vi.fn().mockResolvedValue({
     resident_id: 'a',
     skills: { cooking: 0.82, teaching: 0.45, trading: 0.16 },
@@ -102,6 +113,8 @@ vi.mock('../services/api', () => ({
   getResidentMoodLog: mockGetResidentMoodLog,
   getResidentDiary: mockGetResidentDiary,
   getResidentEducation: mockGetResidentEducation,
+  getResidentJob: mockGetResidentJob,
+  getResidentPets: mockGetResidentPets,
   getResidentSkills: mockGetResidentSkills,
   generateMemoir: mockGenerateMemoir,
   injectResidentMemory: mockInjectResidentMemory,
@@ -138,9 +151,12 @@ describe('resident avatar placements', () => {
           goals: [],
           coins: 120,
           occupation: 'artist',
+          wallet: 240,
+          job: { title: 'artist', workplace_id: 'atelier', salary: 18, work_hours: [8, 12, 13, 17], satisfaction: 0.74 },
           energy: 0.8,
           skills: { cooking: 0.82, teaching: 0.45, trading: 0.16 },
           inventory: [{ name: 'coffee', quantity: 2, value: 5 }, { name: 'book', quantity: 1, value: 7 }],
+          pets: [{ id: 'pet-1', name: '旺财', species: 'dog', owner_id: 'a', mood: 'happy', hunger: 0.8, location: null, x: 1, y: 1 }],
         },
         {
           id: 'b',
@@ -160,6 +176,8 @@ describe('resident avatar placements', () => {
           goals: [],
           coins: 95,
           occupation: 'chef',
+          wallet: 110,
+          job: { title: 'chef', workplace_id: 'cafe', salary: 16, work_hours: [8, 12, 13, 17], satisfaction: 0.61 },
           energy: 0.7,
           skills: { cooking: 0.3, teaching: 0.15 },
           inventory: [],
@@ -180,6 +198,7 @@ describe('resident avatar placements', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('img', { name: /ada avatar/i })).toBeInTheDocument()
+      expect(screen.getByText(/artist/i)).toBeInTheDocument()
     })
   })
 
@@ -357,6 +376,27 @@ describe('resident avatar placements', () => {
       expect(screen.getAllByText(/social studio/i).length).toBeGreaterThan(0)
       expect(screen.getByText(/crafting/i)).toBeInTheDocument()
       expect(screen.getByLabelText(/education-radar/i)).toBeInTheDocument()
+    })
+  })
+
+  it('renders a pets tab with pet status in the resident sidebar', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <ResidentStoryPanel
+        residentId="a"
+        residents={useSimulationStore.getState().residents}
+        buildings={[]}
+        onClose={() => undefined}
+      />,
+    )
+
+    await user.click(screen.getByRole('tab', { name: /宠物|pets/i }))
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/旺财/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/dog/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/80%/i).length).toBeGreaterThan(0)
     })
   })
 })

@@ -124,6 +124,17 @@ def test_world_education_lists_courses_and_registration_counts(client):
     assert all("registration_count" in item for item in data)
 
 
+def test_world_pets_lists_owned_and_stray_pets(client):
+    response = client.get("/api/world/pets")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert data
+    assert all("species" in item for item in data)
+    assert any(item.get("owner_id") for item in data)
+
+
 def test_get_weather_returns_current_weather_season_and_forecast(client):
     state = client.app.state.simulation_state
     state.world.weather = __import__("engine.types", fromlist=["WeatherType"]).WeatherType.cloudy

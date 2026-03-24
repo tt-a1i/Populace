@@ -127,6 +127,20 @@ def test_get_resident_education(client):
     assert isinstance(payload["education"]["courses"], list)
 
 
+def test_get_resident_pets(client):
+    residents = client.get("/api/residents").json()
+    pet_owner = next((resident for resident in residents if resident.get("pets")), None)
+    assert pet_owner is not None
+
+    response = client.get(f"/api/residents/{pet_owner['id']}/pets")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert isinstance(payload, list)
+    assert payload
+    assert payload[0]["owner_id"] == pet_owner["id"]
+
+
 def test_get_resident_family_profile(client):
     residents = client.get("/api/residents").json()
     rid = residents[0]["id"]

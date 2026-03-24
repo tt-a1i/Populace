@@ -14,7 +14,7 @@ import { useSound } from '../../audio'
 import { getActiveEvents, getZones, injectEvent, type ActiveEvent } from '../../services/api'
 import { useToast } from '../ui/ToastProvider'
 import { useRelationshipsStore } from '../../stores/relationships'
-import type { Zone } from '../../types'
+import type { Festival, Zone } from '../../types'
 import {
   useSimulationStore,
   type ResidentPosition,
@@ -84,6 +84,7 @@ export function TownCanvas() {
   const hoveredPairIds = useSimulationStore((state) => state.hoveredPairIds)
   const weather = useSimulationStore((state) => state.weather)
   const season = useSimulationStore((state) => state.season)
+  const currentFestival = useSimulationStore((state) => state.currentFestival)
   const messageFeed = useSimulationStore((state) => state.messageFeed)
   const replayFrozenFrame = useSimulationStore((state) => state.replayFrozenFrame)
   const getFrameByTick = useSimulationStore((state) => state.getFrameByTick)
@@ -392,6 +393,7 @@ export function TownCanvas() {
         tickPerDay: state.tickPerDay,
         time: state.time,
       })
+      renderer.setActiveFestival((state as typeof state & { currentFestival?: Festival | null }).currentFestival ?? null)
       renderer.setFollowTarget(state.selectedResidentId)
       renderer.setHighlightedResidents(state.hoveredPairIds)
       renderer.resize(initialWidth, initialHeight)
@@ -444,6 +446,10 @@ export function TownCanvas() {
     simulationMeta.tickPerDay,
     simulationMeta.time,
   ])
+
+  useEffect(() => {
+    rendererRef.current?.setActiveFestival(currentFestival)
+  }, [currentFestival])
 
   useEffect(() => {
     rendererRef.current?.setFollowTarget(selectedResidentId)

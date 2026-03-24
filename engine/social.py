@@ -516,6 +516,37 @@ async def initiate_dialogue(
             world.shift_resident_mood(agent_a, -1, "social")
             world.shift_resident_mood(agent_b, -1, "social")
 
+    if comfort_target_id:
+        memory_type = "loss"
+        memory_weight = 0.7
+    elif getattr(world, "active_festival", None):
+        memory_type = "festival"
+        memory_weight = 0.8
+    elif delta < 0:
+        memory_type = "argument"
+        memory_weight = -0.8
+    elif not had_shared_memory:
+        memory_type = "first_meeting"
+        memory_weight = 0.75
+    else:
+        memory_type = "achievement"
+        memory_weight = 0.45
+
+    world.remember_resident_memory(
+        agent_a.resident,
+        memory_type=memory_type,
+        content=f"和{agent_b.resident.name}{'一起度过了节日' if memory_type == 'festival' else '有过一次交谈'}",
+        emotional_weight=memory_weight,
+        related_resident_ids=[agent_b.resident.id],
+    )
+    world.remember_resident_memory(
+        agent_b.resident,
+        memory_type=memory_type,
+        content=f"和{agent_a.resident.name}{'一起度过了节日' if memory_type == 'festival' else '有过一次交谈'}",
+        emotional_weight=memory_weight,
+        related_resident_ids=[agent_a.resident.id],
+    )
+
     # Memorise important dialogues (spec §11)
     if is_important:
         summary = f"与 {agent_b.resident.name} 的对话：{context_history[:100]}"
@@ -537,35 +568,6 @@ async def initiate_dialogue(
             source="dialogue",
         )
         agent_b.memory_stream.add(mem_b)
-        if comfort_target_id:
-            memory_type = "loss"
-            memory_weight = 0.7
-        elif getattr(world, "active_festival", None):
-            memory_type = "festival"
-            memory_weight = 0.8
-        elif delta < 0:
-            memory_type = "argument"
-            memory_weight = -0.8
-        elif not had_shared_memory:
-            memory_type = "first_meeting"
-            memory_weight = 0.75
-        else:
-            memory_type = "achievement"
-            memory_weight = 0.45
-        world.remember_resident_memory(
-            agent_a.resident,
-            memory_type=memory_type,
-            content=f"和{agent_b.resident.name}{'一起度过了节日' if memory_type == 'festival' else '有过一次重要交谈'}",
-            emotional_weight=memory_weight,
-            related_resident_ids=[agent_b.resident.id],
-        )
-        world.remember_resident_memory(
-            agent_b.resident,
-            memory_type=memory_type,
-            content=f"和{agent_a.resident.name}{'一起度过了节日' if memory_type == 'festival' else '有过一次重要交谈'}",
-            emotional_weight=memory_weight,
-            related_resident_ids=[agent_a.resident.id],
-        )
 
     # Social interaction costs energy for both participants
     agent_a.resident.energy = max(0.0, agent_a.resident.energy - 0.02)

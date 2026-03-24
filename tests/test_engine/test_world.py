@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from engine.types import Building, Memory, MovementUpdate, RelationType, Relationship, TickState, WorldConfig
+from engine.types import Building, Memory, MovementUpdate, Pet, RelationType, Relationship, TickState, WorldConfig
 from engine.world import World
 
 from tests.conftest import make_agent
@@ -22,6 +22,9 @@ def test_world_tick_returns_movements_for_map_agents(mock_world):
     """Agents on the map (location=None) appear in movements."""
     for a in mock_world.agents:
         a.resident.location = None
+        mock_world._ensure_resident_job(a.resident)
+        a.resident.job.title = "tester"
+        a.resident.occupation = "tester"
     state = mock_world.tick()
     assert len(state.movements) == 3
     ids = {m.id for m in state.movements}
@@ -217,6 +220,42 @@ def test_school_class_increases_knowledge_and_history(mock_world):
     subject = agent.resident.education.courses[0].subject
     assert agent.resident.education.knowledge_level[subject] >= 0.05
     assert agent.resident.education.course_history[-1].subject == subject
+
+
+def test_assign_initial_pets_creates_owned_and_stray_pets(mock_world):
+    mock_world.assign_initial_pets()
+
+    owned_count = sum(len(agent.resident.pets) for agent in mock_world.agents)
+    assert owned_count >= 1
+    assert mock_world.stray_pets
+    assert len(mock_world.list_pets()) == owned_count + len(mock_world.stray_pets)
+
+
+def test_update_pets_can_adopt_stray_and_sync_owned_pet(mock_world, monkeypatch):
+    adopter = mock_world.agents[0]
+    adopter.resident.personality = "友善热心"
+    adopter.resident.x = 5
+    adopter.resident.y = 5
+    mock_world.stray_pets = [
+        Pet(
+            id="stray-1",
+            name="流浪团团",
+            species="rabbit",
+            owner_id=None,
+            x=5,
+            y=5,
+            hunger=0.6,
+        )
+    ]
+    monkeypatch.setattr("engine.world.random.random", lambda: 0.0)
+    monkeypatch.setattr("engine.world.random.choice", lambda values: 0)
+
+    events = mock_world.update_pets()
+
+    assert adopter.resident.pets
+    assert adopter.resident.pets[0].owner_id == adopter.resident.id
+    assert mock_world.stray_pets == []
+    assert any("收养" in event.description for event in events)
 
 
 def test_social_knowledge_boosts_social_probability(mock_world):

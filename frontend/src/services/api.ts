@@ -6,6 +6,18 @@ export interface Item {
   value: number
 }
 
+export interface Pet {
+  id: string
+  name: string
+  species: string
+  owner_id?: string | null
+  mood?: string
+  hunger?: number
+  location?: string | null
+  x?: number
+  y?: number
+}
+
 export interface ApiResident {
   id: string
   name: string
@@ -21,9 +33,21 @@ export interface ApiResident {
   outfit_color?: string | null
   coins?: number
   occupation?: string
+  wallet?: number
+  job?: ResidentJob
   skills?: Record<string, number>
   inventory?: Item[]
   energy?: number
+  reputation?: number
+  pets?: Pet[]
+}
+
+export interface ResidentJob {
+  title: string
+  workplace_id?: string | null
+  salary: number
+  work_hours: number[]
+  satisfaction: number
 }
 
 export interface ReplayRelationship {
@@ -82,6 +106,23 @@ export interface VoteRecord {
   result_announced: boolean
   total_votes: number
   effects?: string[]
+}
+
+export interface FestivalRecord {
+  name: string
+  type: string
+  start_tick: number
+  duration: number
+  location: string
+  participants: string[]
+  status: 'active' | 'completed' | string
+  end_tick?: number | null
+  memorial?: string | null
+}
+
+export interface FestivalListResponse {
+  current: FestivalRecord[]
+  history: FestivalRecord[]
 }
 
 interface VotePayload {
@@ -222,6 +263,10 @@ export function getVoteHistory() {
   return request<VoteRecord[]>('/api/world/votes/history')
 }
 
+export function getFestivals() {
+  return request<FestivalListResponse>('/api/world/festivals')
+}
+
 export function getResidents() {
   return request<ApiResident[]>('/api/residents')
 }
@@ -239,6 +284,10 @@ export interface ResidentMemory {
   timestamp: string
   importance: number
   emotion: string
+  tick?: number
+  type?: string
+  emotional_weight?: number
+  related_resident_ids?: string[]
 }
 
 export interface ResidentRelationship {
@@ -284,6 +333,30 @@ export interface ResidentMoodLogEntry {
   cause: string
 }
 
+export interface ReputationHistoryEntry {
+  tick: number
+  source: string
+  delta: number
+  before: number
+  after: number
+}
+
+export interface ResidentReputation {
+  resident_id: string
+  resident_name: string
+  reputation: number
+  title: string
+  history: ReputationHistoryEntry[]
+}
+
+export interface ReputationRankingEntry {
+  resident_id: string
+  resident_name: string
+  reputation: number
+  title: string
+  recent_events: string[]
+}
+
 export interface EducationCourse {
   subject: string
   name: string
@@ -307,6 +380,8 @@ export interface ResidentEducationPayload {
     course_history: EducationHistoryEntry[]
   }
 }
+
+export interface WorldPetPayload extends Pet {}
 
 export interface TradeResidentItemPayload {
   buyer_id: string
@@ -357,8 +432,16 @@ export interface SimulationStats {
   total_memories: number
 }
 
-export function getResidentMemories(id: string) {
-  return request<ResidentMemory[]>(`/api/residents/${id}/memories`)
+export function getResidentMemories(
+  id: string,
+  options?: { page?: number; page_size?: number; memory_type?: string },
+) {
+  const params = new URLSearchParams()
+  if (options?.page !== undefined) params.set('page', String(options.page))
+  if (options?.page_size !== undefined) params.set('page_size', String(options.page_size))
+  if (options?.memory_type) params.set('memory_type', options.memory_type)
+  const query = params.toString()
+  return request<ResidentMemory[]>(`/api/residents/${id}/memories${query ? `?${query}` : ''}`)
 }
 
 export function patchResidentAttributes(
@@ -413,8 +496,16 @@ export function getResidentMoodLog(id: string) {
   return request<ResidentMoodLogEntry[]>(`/api/residents/${id}/mood-log`)
 }
 
+export function getResidentReputation(id: string) {
+  return request<ResidentReputation>(`/api/residents/${id}/reputation`)
+}
+
 export function getResidentEducation(id: string) {
   return request<ResidentEducationPayload>(`/api/residents/${id}/education`)
+}
+
+export function getResidentPets(id: string) {
+  return request<Pet[]>(`/api/residents/${id}/pets`)
 }
 
 export function tradeResidentItem(id: string, payload: TradeResidentItemPayload) {
@@ -613,6 +704,10 @@ export function getWorldEducation() {
   return request<WorldEducationCourse[]>('/api/world/education')
 }
 
+export function getWorldPets() {
+  return request<WorldPetPayload[]>('/api/world/pets')
+}
+
 export function getZones() {
   return request<ZoneData[]>('/api/world/zones')
 }
@@ -809,8 +904,38 @@ export function getResidentAchievements(id: string) {
   return request<ResidentAchievement[]>(`/api/residents/${id}/achievements`)
 }
 
+export interface ResidentJobPayload {
+  resident_id: string
+  resident_name: string
+  wallet: number
+  job: ResidentJob
+}
+
+export interface WorldEconomyPayload {
+  employment_rate: number
+  average_income: number
+  gdp: number
+  unemployed_count: number
+  employed_count: number
+  employment_distribution: Array<{ occupation: string; count: number }>
+  income_distribution: Array<{ bucket: string; count: number }>
+  gdp_history: Array<{ tick: number; gdp: number }>
+}
+
 export function getAchievementLeaderboard() {
   return request<AchievementLeaderboardEntry[]>('/api/world/achievements/leaderboard')
+}
+
+export function getResidentJob(id: string) {
+  return request<ResidentJobPayload>(`/api/residents/${id}/job`)
+}
+
+export function getWorldEconomy() {
+  return request<WorldEconomyPayload>('/api/world/economy')
+}
+
+export function getReputationRankings() {
+  return request<ReputationRankingEntry[]>('/api/world/reputation/rankings')
 }
 
 export function transferCoins(fromId: string, toId: string, amount: number) {

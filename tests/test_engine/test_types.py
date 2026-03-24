@@ -11,6 +11,7 @@ from engine.types import (
     Item,
     Memory,
     MoodEntry,
+    Pet,
     Season,
     Reflection,
     RelationType,
@@ -81,6 +82,14 @@ def test_item_creation():
     item = Item(name="coffee", quantity=2, value=6)
     assert item.name == "coffee"
     assert item.quantity == 2
+
+
+def test_pet_creation():
+    pet = Pet(id="pet-1", name="旺财", species="dog", owner_id="r1", hunger=0.7, x=3, y=4)
+    assert pet.species == "dog"
+    assert pet.owner_id == "r1"
+    assert pet.hunger == 0.7
+    assert pet.x == 3 and pet.y == 4
 
 
 def test_memory_creation():

@@ -9,8 +9,10 @@ from pydantic import BaseModel, Field, field_validator
 from backend.api.schemas import (
     DiaryEntryResponse,
     EducationResponse,
+    PetResponse,
     ResidentMemoryResponse,
     ResidentEducationResponse,
+    ResidentJobResponse,
     ResidentMoodLogEntryResponse,
     ResidentReputationResponse,
     ResidentReflectionResponse,
@@ -42,6 +44,25 @@ class ResidentUpdateRequest(BaseModel):
     location: Optional[str] = None
     x: Optional[int] = None
     y: Optional[int] = None
+
+
+@router.get(
+    "/{resident_id}/job",
+    response_model=ResidentJobResponse,
+    responses=error_responses(404, 503),
+)
+async def get_resident_job(resident_id: str, request: Request) -> ResidentJobResponse:
+    state = get_simulation_state(request)
+    agent = _find_agent(state, resident_id)
+    if agent is None:
+        raise _NOT_FOUND
+    resident = agent.resident
+    return ResidentJobResponse(
+        resident_id=resident.id,
+        resident_name=resident.name,
+        wallet=float(getattr(resident, "wallet", 0.0)),
+        job=asdict(getattr(resident, "job", None)) if getattr(resident, "job", None) is not None else {},
+    )
 
 
 @router.get("", response_model=list[ResidentResponse], responses=error_responses(503))
@@ -100,13 +121,31 @@ async def update_resident(
     response_model=list[ResidentMemoryResponse],
     responses=error_responses(404, 503),
 )
-async def get_resident_memories(resident_id: str, request: Request) -> list[ResidentMemoryResponse]:
-    """Return the most recent short-term memories for a resident (max 20)."""
+async def get_resident_memories(
+    resident_id: str,
+    request: Request,
+    page: int = 1,
+    page_size: int = 20,
+    memory_type: str | None = None,
+) -> list[ResidentMemoryResponse]:
+    """Return resident memoir entries with optional pagination and type filtering."""
     state = get_simulation_state(request)
     agent = _find_agent(state, resident_id)
     if agent is None:
         raise _NOT_FOUND
-    return [ResidentMemoryResponse(**asdict(mem)) for mem in agent.memory_stream.all]
+    resident = agent.resident
+    state.world._ensure_resident_memories(resident)
+    resident_memory_ids = {memory.id for memory in resident.memories}
+    combined = [*resident.memories]
+    combined.extend(memory for memory in agent.memory_stream.all if memory.id not in resident_memory_ids)
+    memories = list(reversed(combined))
+    if memory_type:
+        memories = [memory for memory in memories if memory.type == memory_type]
+    safe_page = max(1, page)
+    safe_page_size = max(1, min(100, page_size))
+    start = (safe_page - 1) * safe_page_size
+    end = start + safe_page_size
+    return [ResidentMemoryResponse(**asdict(mem)) for mem in memories[start:end]]
 
 
 @router.get(
@@ -152,6 +191,19 @@ async def get_resident_education(resident_id: str, request: Request) -> Resident
         resident_name=agent.resident.name,
         education=EducationResponse(**asdict(agent.resident.education)),
     )
+
+
+@router.get(
+    "/{resident_id}/pets",
+    response_model=list[PetResponse],
+    responses=error_responses(404, 503),
+)
+async def get_resident_pets(resident_id: str, request: Request) -> list[PetResponse]:
+    state = get_simulation_state(request)
+    agent = _find_agent(state, resident_id)
+    if agent is None:
+        raise _NOT_FOUND
+    return [PetResponse(**asdict(pet)) for pet in state.world.list_resident_pets(resident_id)]
 
 
 @router.get(
@@ -528,15 +580,37 @@ async def inject_resident_memory(
     agent = _find_agent(state, resident_id)
     if agent is None:
         raise _NOT_FOUND
+    if "第一次" in payload.content or "初次" in payload.content:
+        memory_type = "first_meeting"
+    elif "礼物" in payload.content or "收到" in payload.content:
+        memory_type = "gift"
+    elif "节" in payload.content or "祭" in payload.content:
+        memory_type = "festival"
+    elif "争吵" in payload.content or "吵" in payload.content:
+        memory_type = "argument"
+    elif "失去" in payload.content or "离开" in payload.content:
+        memory_type = "loss"
+    else:
+        memory_type = "achievement"
     mem = Memory(
         id=str(uuid.uuid4()),
         content=payload.content,
         timestamp=state.world.simulation_time(),
         importance=max(0.0, min(1.0, payload.importance)),
         emotion=payload.emotion,
+        tick=state.world.current_tick,
+        type=memory_type,
+        emotional_weight=max(0.1, min(1.0, payload.importance)),
         source="injected",
     )
     agent.memory_stream.add(mem)
+    state.world.remember_resident_memory(
+        agent.resident,
+        memory_type=mem.type,
+        content=payload.content,
+        emotional_weight=mem.emotional_weight,
+        related_resident_ids=[],
+    )
     return ResidentMemoryResponse(**asdict(mem))
 
 

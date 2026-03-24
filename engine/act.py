@@ -108,8 +108,9 @@ def _step_astar(agent: "Agent", target: tuple, world: "World") -> None:
 
     # Advance up to 2 steps along the path; elderly residents move at half speed.
     max_steps = 1 if is_elderly(res) or getattr(res, "mental_state", "stable") == "depressed" else 2
+    world_rng = getattr(world, "rng", random)
     if getattr(world, "weather", WeatherType.sunny) == WeatherType.snowy and max_steps > 1:
-        max_steps = 1 if random.random() < 0.3 else max_steps
+        max_steps = 1 if world_rng.random() < 0.3 else max_steps
     steps = min(max_steps, len(agent.current_path))
     for _ in range(steps):
         if not agent.current_path:
@@ -140,11 +141,12 @@ def _step_random(agent: "Agent", world: "World") -> None:
     ]
     walkable = [p for p in candidates if _is_walkable(p[0], p[1], world)]
     if walkable:
-        if getattr(world, "weather", WeatherType.sunny) == WeatherType.snowy and random.random() < 0.3:
+        world_rng = getattr(world, "rng", random)
+        if getattr(world, "weather", WeatherType.sunny) == WeatherType.snowy and world_rng.random() < 0.3:
             return
-        if getattr(res, "mental_state", "stable") == "depressed" and random.random() < 0.5:
+        if getattr(res, "mental_state", "stable") == "depressed" and world_rng.random() < 0.5:
             return
-        res.x, res.y = random.choice(walkable)
+        res.x, res.y = world_rng.choice(walkable)
         world.mark_grid_index_dirty()
         res.energy = max(0.0, res.energy - 0.01)
         _maybe_enter_building(agent, world)
@@ -214,9 +216,10 @@ def apply_mood_contagion(world: "World") -> None:
                 direction = 1.0 if other_rank > my_rank else -1.0
                 net_push += direction * intensity * 0.05
 
-            if net_push > 0 and random.random() < min(1.0, net_push):
+            world_rng = getattr(world, "rng", random)
+            if net_push > 0 and world_rng.random() < min(1.0, net_push):
                 new_rank = min(my_rank + 1, len(_MOOD_LADDER) - 1)
                 world.set_resident_mood(agent, _MOOD_LADDER[new_rank], "contagion")
-            elif net_push < 0 and random.random() < min(1.0, -net_push):
+            elif net_push < 0 and world_rng.random() < min(1.0, -net_push):
                 new_rank = max(my_rank - 1, 0)
                 world.set_resident_mood(agent, _MOOD_LADDER[new_rank], "contagion")

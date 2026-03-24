@@ -111,6 +111,7 @@ def build_forecast(season: Season | str, steps: int = FORECAST_STEPS) -> list[st
 
 def sync_weather_cycle(world: "World") -> list[str]:
     events: list[str] = []
+    world_rng = getattr(world, "rng", random)
 
     next_season = season_for_tick(world.current_tick)
     if next_season != normalize_season(world.season):
@@ -130,7 +131,7 @@ def sync_weather_cycle(world: "World") -> list[str]:
         events.append(str(festival["description"]))
 
     if world.current_tick % WEATHER_CHANGE_INTERVAL == 0:
-        next_weather = choose_weather(normalize_season(world.season))
+        next_weather = choose_weather(normalize_season(world.season), rng=world_rng)
         if next_weather != normalize_weather(world.weather):
             world.weather = next_weather
             events.append(f"天气变化：{next_weather.value}")
@@ -142,5 +143,8 @@ def sync_weather_cycle(world: "World") -> list[str]:
             world.active_festival = None
             world.active_festival_dialogue_hint = None
 
-    world.weather_forecast = build_forecast(normalize_season(world.season))
+    world.weather_forecast = [
+        choose_weather(normalize_season(world.season), rng=world_rng).value
+        for _ in range(max(0, FORECAST_STEPS))
+    ]
     return events

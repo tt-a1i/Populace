@@ -38,6 +38,18 @@ export interface Item {
   value: number
 }
 
+export interface Pet {
+  id: string
+  name: string
+  species: 'cat' | 'dog' | 'bird' | 'rabbit' | string
+  owner_id?: string | null
+  mood?: string
+  hunger?: number
+  location?: string | null
+  x?: number
+  y?: number
+}
+
 export interface EnergyUpdate {
   id: string
   energy: number
@@ -63,6 +75,8 @@ export interface PopulationResidentSnapshot {
   energy?: number
   age_days?: number
   goals?: string[]
+  reputation?: number
+  pets?: Pet[]
 }
 
 export interface PopulationEvent {
@@ -89,6 +103,24 @@ export interface VoteRecord {
   effects?: string[]
 }
 
+export interface Festival {
+  name: string
+  type: string
+  start_tick: number
+  duration: number
+  location: string
+  participants: string[]
+  status?: string
+  end_tick?: number | null
+  memorial?: string | null
+}
+
+export interface FestivalUpdate {
+  festival: Festival
+  status: 'started' | 'ended' | string
+  memorial?: string | null
+}
+
 export interface TickState {
   tick: number
   time: string
@@ -103,6 +135,7 @@ export interface TickState {
   population_events?: PopulationEvent[]
   vote_updates?: VoteRecord[]
   vote_announcements?: VoteRecord[]
+  festival_updates?: FestivalUpdate[]
 }
 
 export interface Resident {
@@ -126,6 +159,8 @@ export interface Resident {
   age_days?: number
   safety_feeling?: number
   flagged_for_crime?: boolean
+  reputation?: number
+  pets?: Pet[]
 }
 
 export interface Building {

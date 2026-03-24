@@ -6,7 +6,10 @@ import type {
   Building,
   DialogueUpdate,
   EnergyUpdate,
+  Festival,
+  FestivalUpdate,
   MovementUpdate,
+  Pet,
   PopulationEvent,
   Resident,
   TickState,
@@ -52,11 +55,21 @@ export interface ResidentPosition {
   dialogueKind?: 'dialogue' | 'gossip' | 'monologue'
   currentGoal?: string | null   // active short-term goal for thought bubble
   coins?: number
+  wallet?: number
+  job?: {
+    title?: string
+    workplace_id?: string | null
+    salary?: number
+    work_hours?: number[]
+    satisfaction?: number
+  }
   occupation?: string
   energy?: number
   ageDays?: number
+  reputation?: number
   skills?: Record<string, number>
   inventory?: Resident['inventory']
+  pets?: Pet[]
 }
 
 export interface TickMovement extends Omit<MovementUpdate, 'action'> {
@@ -116,10 +129,14 @@ export interface SimulationSnapshot {
     inventory?: Resident['inventory']
     energy?: number
     age_days?: number
+    reputation?: number
+    pets?: Pet[]
   }>
   last_tick?: SimulationTickState | null
   active_votes?: VoteRecord[]
   vote_history?: VoteRecord[]
+  active_festivals?: Festival[]
+  festival_history?: Festival[]
 }
 
 interface SimulationState {
@@ -139,6 +156,8 @@ interface SimulationState {
   messageFeed: FeedMessage[]
   activeVotes: VoteRecord[]
   voteHistory: VoteRecord[]
+  currentFestival: Festival | null
+  festivalHistory: Festival[]
   selectedResidentId: string | null
   hoveredPairIds: [string, string] | null
   setRunning: (running: boolean) => void
@@ -149,6 +168,7 @@ interface SimulationState {
   setActiveVotes: (votes: VoteRecord[]) => void
   setVoteHistory: (votes: VoteRecord[]) => void
   applyVoteTick: (votes: VoteRecord[], announcements: VoteRecord[]) => void
+  applyFestivalTick: (updates: FestivalUpdate[]) => void
   applyResidentOperation: (
     resident: Partial<ResidentPosition> & { id: string; name?: string },
     operation: 'resident_updated' | 'resident_teleported',
@@ -272,6 +292,8 @@ function residentPositionFromPopulationSnapshot(
     inventory: resident.inventory ?? previous?.inventory ?? [],
     energy: resident.energy ?? previous?.energy ?? 1.0,
     ageDays: resident.age_days ?? previous?.ageDays ?? 0,
+    reputation: resident.reputation ?? previous?.reputation ?? 0,
+    pets: resident.pets ?? previous?.pets ?? [],
   }
 }
 
@@ -295,6 +317,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   ],
   activeVotes: [],
   voteHistory: [],
+  currentFestival: null,
+  festivalHistory: [],
   selectedResidentId: null,
   hoveredPairIds: null,
   setRunning: (running) => set({ running }),
@@ -309,6 +333,27 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       activeVotes: votes,
       voteHistory: [...announcements, ...state.voteHistory.filter((item) => !announcements.some((entry) => entry.id === item.id))].slice(0, 20),
     })),
+  applyFestivalTick: (updates) =>
+    set((state) => {
+      if (updates.length === 0) {
+        return state
+      }
+      let currentFestival = state.currentFestival
+      let festivalHistory = [...state.festivalHistory]
+      for (const update of updates) {
+        if (update.status === 'started') {
+          currentFestival = { ...update.festival, status: 'active' }
+        } else if (update.status === 'ended') {
+          if (currentFestival?.name === update.festival.name) {
+            currentFestival = null
+          }
+          festivalHistory = [{ ...update.festival, status: 'completed', memorial: update.memorial ?? update.festival.memorial ?? null }, ...festivalHistory]
+            .filter((festival, index, items) => index === items.findIndex((item) => item.name === festival.name && item.start_tick === festival.start_tick))
+            .slice(0, 20)
+        }
+      }
+      return { currentFestival, festivalHistory }
+    }),
   applyResidentOperation: (resident, operation) =>
     set((state) => {
       const nextResidents = state.residents.map((currentResident) => {
@@ -333,6 +378,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           inventory: resident.inventory ?? currentResident.inventory,
           energy: resident.energy ?? currentResident.energy,
           ageDays: resident.ageDays ?? currentResident.ageDays,
+          reputation: resident.reputation ?? currentResident.reputation,
+          pets: resident.pets ?? currentResident.pets,
           currentBuildingId:
             resident.currentBuildingId ??
             ((resident as { location?: string | null }).location !== undefined
@@ -439,6 +486,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           inventory: existingResident?.inventory ?? [],
           energy: existingResident?.energy ?? 1.0,
           ageDays: existingResident?.ageDays ?? 0,
+          reputation: existingResident?.reputation ?? 0,
+          pets: existingResident?.pets ?? [],
         })
       }
 
@@ -509,6 +558,21 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           tickState.vote_announcements && tickState.vote_announcements.length > 0
             ? [...tickState.vote_announcements, ...state.voteHistory.filter((item) => !tickState.vote_announcements?.some((entry) => entry.id === item.id))].slice(0, 20)
             : state.voteHistory,
+        currentFestival:
+          tickState.festival_updates?.find((entry) => entry.status === 'started')?.festival
+            ? { ...tickState.festival_updates.find((entry) => entry.status === 'started')!.festival, status: 'active' }
+            : tickState.festival_updates?.some((entry) => entry.status === 'ended')
+              ? null
+              : state.currentFestival,
+        festivalHistory:
+          tickState.festival_updates && tickState.festival_updates.some((entry) => entry.status === 'ended')
+            ? [
+                ...tickState.festival_updates
+                  .filter((entry) => entry.status === 'ended')
+                  .map((entry) => ({ ...entry.festival, status: 'completed', memorial: entry.memorial ?? entry.festival.memorial ?? null })),
+                ...state.festivalHistory,
+              ].slice(0, 20)
+            : state.festivalHistory,
         buildings: recomputeBuildingOccupancy(state.buildings, nextResidents),
         messageFeed: appendRecentMessages(state.messageFeed, freshMessages),
         residents: nextResidents,
@@ -546,6 +610,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           inventory: (r as { inventory?: Resident['inventory'] }).inventory ?? prev?.inventory ?? [],
           energy: (r as { energy?: number }).energy ?? prev?.energy ?? 1.0,
           ageDays: (r as { age_days?: number }).age_days ?? prev?.ageDays ?? 0,
+          reputation: (r as { reputation?: number }).reputation ?? prev?.reputation ?? 0,
+          pets: (r as { pets?: Pet[] }).pets ?? prev?.pets ?? [],
         }
       })
 
@@ -578,6 +644,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         buildings,
         activeVotes: snapshot.active_votes ?? state.activeVotes,
         voteHistory: snapshot.vote_history ?? state.voteHistory,
+        currentFestival: snapshot.active_festivals?.[0] ?? state.currentFestival,
+        festivalHistory: snapshot.festival_history ?? state.festivalHistory,
         replayFrozenFrame: state.replayFrozenFrame,
         messageFeed:
           residents.length > 0

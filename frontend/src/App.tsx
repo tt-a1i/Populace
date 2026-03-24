@@ -66,6 +66,7 @@ function SimulationView() {
   const weather = useSimulationStore((s) => s.weather)
   const season = useSimulationStore((s) => s.season)
   const speed = useSimulationStore((s) => s.speed)
+  const currentFestival = useSimulationStore((s) => s.currentFestival)
 
   const [showOnboarding, setShowOnboarding] = useState(
     () => !localStorage.getItem('populace:onboarding_done'),
@@ -111,6 +112,16 @@ function SimulationView() {
   const weatherEmoji = WEATHER_EMOJI[weather] ?? WEATHER_EMOJI.sunny
   const seasonEmoji = SEASON_EMOJI[season] ?? SEASON_EMOJI.spring
   const seasonLabel = t(`app.season_${season}`, season)
+  const festivalSummary = currentFestival
+    ? ({
+        spring: '全镇集会与舞蹈正在展开',
+        summer: '户外聚餐让社交节奏明显提速',
+        autumn: '分享物品与感恩问候正在传递',
+        winter: '围炉夜话让家人重新聚在一起',
+        birthday: '小范围生日庆祝正在进行',
+        achievement: '成就庆典吸引亲友围拢祝贺',
+      }[currentFestival.type] ?? '镇上的庆典正在进行')
+    : null
 
   if (!hasInitialSnapshot) {
     return <LoadingTransition onRetry={retry} timedOut={startupTimedOut} />
@@ -154,6 +165,19 @@ function SimulationView() {
           </div>
         </div>
       </div>
+
+      {currentFestival && festivalSummary ? (
+        <div className="pointer-events-none absolute inset-x-0 top-14 z-20 flex justify-center px-3">
+          <div className="pointer-events-auto flex max-w-2xl items-center gap-3 rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-3 text-amber-50 shadow-lg backdrop-blur-md">
+            <span className="text-xl">🎉</span>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">Festival Live</p>
+              <p className="text-sm font-semibold">{currentFestival.name}</p>
+              <p className="text-xs text-amber-100/80">{festivalSummary}</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* BOTTOM-LEFT: Message Feed (hidden on small screens) */}
       <div className="pointer-events-none absolute bottom-16 left-3 z-20 hidden w-72 sm:bottom-14 sm:block">
