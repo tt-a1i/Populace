@@ -8,6 +8,7 @@ import type {
   EnergyUpdate,
   Festival,
   FestivalUpdate,
+  HealthState,
   MovementUpdate,
   Pet,
   PopulationEvent,
@@ -70,6 +71,7 @@ export interface ResidentPosition {
   skills?: Record<string, number>
   inventory?: Resident['inventory']
   pets?: Pet[]
+  health?: HealthState
 }
 
 export interface TickMovement extends Omit<MovementUpdate, 'action'> {
@@ -131,6 +133,7 @@ export interface SimulationSnapshot {
     age_days?: number
     reputation?: number
     pets?: Pet[]
+    health?: HealthState
   }>
   last_tick?: SimulationTickState | null
   active_votes?: VoteRecord[]
@@ -294,6 +297,7 @@ function residentPositionFromPopulationSnapshot(
     ageDays: resident.age_days ?? previous?.ageDays ?? 0,
     reputation: resident.reputation ?? previous?.reputation ?? 0,
     pets: resident.pets ?? previous?.pets ?? [],
+    health: resident.health ?? previous?.health,
   }
 }
 
@@ -612,6 +616,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           ageDays: (r as { age_days?: number }).age_days ?? prev?.ageDays ?? 0,
           reputation: (r as { reputation?: number }).reputation ?? prev?.reputation ?? 0,
           pets: (r as { pets?: Pet[] }).pets ?? prev?.pets ?? [],
+          health: (r as { health?: HealthState }).health ?? prev?.health,
         }
       })
 

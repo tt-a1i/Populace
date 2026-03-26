@@ -9,6 +9,7 @@ const {
   mockGetResidentMoodLog,
   mockGetResidentDiary,
   mockGetResidentEducation,
+  mockGetResidentHealth,
   mockGetResidentJob,
   mockGetResidentPets,
   mockGetResidentSkills,
@@ -67,6 +68,15 @@ const {
       course_history: [{ tick: 18, subject: 'social', course_name: 'Social Studio' }],
     },
   }),
+  mockGetResidentHealth: vi.fn().mockResolvedValue({
+    resident_id: 'a',
+    resident_name: 'Ada',
+    health: {
+      hp: 0.88,
+      illness: null,
+      recovery_tick: 0,
+    },
+  }),
   mockGetResidentJob: vi.fn().mockResolvedValue({
     resident_id: 'a',
     resident_name: 'Ada',
@@ -113,6 +123,7 @@ vi.mock('../services/api', () => ({
   getResidentMoodLog: mockGetResidentMoodLog,
   getResidentDiary: mockGetResidentDiary,
   getResidentEducation: mockGetResidentEducation,
+  getResidentHealth: mockGetResidentHealth,
   getResidentJob: mockGetResidentJob,
   getResidentPets: mockGetResidentPets,
   getResidentSkills: mockGetResidentSkills,

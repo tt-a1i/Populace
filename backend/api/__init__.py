@@ -7,7 +7,7 @@ from backend.api.residents import router as residents_router
 from backend.api.saves import router as saves_router
 from backend.api.settings import router as settings_router
 from backend.api.simulation import SimulationState, router as simulation_router
-from backend.api.world import router as world_router
+from backend.api.world import buildings_router, router as world_router
 from backend.api.ws import router as ws_router
 
 __all__ = [
@@ -22,5 +22,6 @@ __all__ = [
     "residents_router",
     "simulation_router",
     "world_router",
+    "buildings_router",
     "ws_router",
 ]

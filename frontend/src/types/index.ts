@@ -50,6 +50,18 @@ export interface Pet {
   y?: number
 }
 
+export interface Illness {
+  type: string
+  contagious?: boolean
+  severity?: number
+}
+
+export interface HealthState {
+  hp: number
+  illness?: Illness | null
+  recovery_tick: number
+}
+
 export interface EnergyUpdate {
   id: string
   energy: number
@@ -77,6 +89,7 @@ export interface PopulationResidentSnapshot {
   goals?: string[]
   reputation?: number
   pets?: Pet[]
+  health?: HealthState
 }
 
 export interface PopulationEvent {
@@ -161,6 +174,7 @@ export interface Resident {
   flagged_for_crime?: boolean
   reputation?: number
   pets?: Pet[]
+  health?: HealthState
 }
 
 export interface Building {
@@ -169,6 +183,9 @@ export interface Building {
   name: string
   capacity: number
   position: [number, number]
+  level?: number
+  upgrades?: string[]
+  decoration_score?: number
   occupants?: number
 }
 

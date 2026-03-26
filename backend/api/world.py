@@ -16,6 +16,7 @@ from backend.api.schemas import (
     BuildingDetailResponse,
     BuildingOccupantInfo,
     BuildingResponse,
+    BuildingUpgradeResponse,
     BuildingVisitRecord,
     CrimeEventResponse,
     FestivalListResponse,
@@ -26,9 +27,13 @@ from backend.api.schemas import (
     SafetyStatsResponse,
     ScenarioDataResponse,
     WeatherResponse,
+    WorldBulletinResponse,
+    WorldCultureResponse,
+    WorldHealthResponse,
     WorldEconomyResponse,
     WorldEducationCourseResponse,
     WorldEventResponse,
+    WorldTransportResponse,
     ZoneResponse,
     api_error,
     error_responses,
@@ -40,6 +45,104 @@ from engine.weather import build_forecast, normalize_season
 
 
 router = APIRouter(prefix="/api/world", tags=["world"])
+buildings_router = APIRouter(prefix="/api/buildings", tags=["buildings"])
+
+
+def _vote_passed_for_building(state: Any, building: Building) -> bool:
+    votes = [*getattr(state, "_active_votes", []), *getattr(state, "_vote_history", [])]
+    building_markers = {building.id.lower(), building.name.lower()}
+    support_markers = ("同意", "通过", "批准", "支持", "升级", "扩建", "豪华", "approve", "upgrade", "expand", "luxury")
+    for vote in votes:
+        issue = str(vote.get("issue", "")).lower()
+        if not any(marker in issue for marker in building_markers):
+            continue
+        if vote.get("status") != "completed":
+            continue
+        winning_option = str(vote.get("winning_option") or "").lower()
+        if any(marker in winning_option for marker in support_markers):
+            return True
+    return False
+
+
+def _average_visit_willingness(state: Any, building: Building) -> float:
+    candidates = [agent.resident for agent in state.world.agents if agent.resident.home_building_id != building.id]
+    if not candidates:
+        return 0.0
+    total = sum(state.world.get_building_visit_willingness(resident, building) for resident in candidates)
+    return round(total / len(candidates), 3)
+
+
+def _serialize_building_upgrade(state: Any, building: Building) -> BuildingUpgradeResponse:
+    required_reserve = round(state.world.get_building_upgrade_cost(building), 2)
+    reserve_ready = float(state.world.economic_output) >= required_reserve
+    vote_passed = _vote_passed_for_building(state, building)
+    next_level = building.level + 1 if building.level < 3 else None
+    return BuildingUpgradeResponse(
+        id=building.id,
+        type=building.type,
+        name=building.name,
+        level=building.level,
+        capacity=building.capacity,
+        upgrades=list(building.upgrades),
+        decoration_score=round(float(building.decoration_score), 3),
+        next_level=next_level,
+        required_reserve=required_reserve,
+        reserve_ready=reserve_ready,
+        vote_passed=vote_passed,
+        can_upgrade=state.world.can_upgrade_building(building, state.world.economic_output, vote_passed),
+        special_feature=state.world.get_building_special_feature(building),
+    )
+
+
+def _build_building_detail(building_id: str, state: Any) -> BuildingDetailResponse:
+    building = state.world.get_building(building_id)
+    if building is None:
+        raise api_error(404, f"Building '{building_id}' not found", "building_not_found")
+
+    occupant_agents = state.world.get_occupants(building_id)
+    current_residents = [
+        BuildingOccupantInfo(
+            id=agent.resident.id,
+            name=agent.resident.name,
+            occupation=getattr(agent.resident, "occupation", "unemployed"),
+            mood=agent.resident.mood,
+            status="chatting" if getattr(agent, "in_dialogue", False) else "idle",
+        )
+        for agent in occupant_agents
+    ]
+
+    visit_log: list[dict[str, Any]] = getattr(state, "building_visit_log", [])
+    recent_visits = [
+        BuildingVisitRecord(
+            resident_id=entry["resident_id"],
+            resident_name=entry["resident_name"],
+            action=entry["action"],
+            tick=entry["tick"],
+        )
+        for entry in visit_log
+        if entry.get("building_id") == building_id
+    ][-10:]
+
+    upgrade = _serialize_building_upgrade(state, building)
+    return BuildingDetailResponse(
+        id=building.id,
+        type=building.type,
+        name=building.name,
+        capacity=building.capacity,
+        position=building.position,
+        level=building.level,
+        upgrades=list(building.upgrades),
+        decoration_score=round(float(building.decoration_score), 3),
+        occupants=len(occupant_agents),
+        next_level=upgrade.next_level,
+        required_reserve=upgrade.required_reserve,
+        reserve_ready=upgrade.reserve_ready,
+        vote_passed=upgrade.vote_passed,
+        special_feature=upgrade.special_feature,
+        visit_willingness=_average_visit_willingness(state, building),
+        current_residents=current_residents,
+        recent_visits=recent_visits,
+    )
 
 class VoteRequest(BaseModel):
     issue: str = Field(min_length=2, max_length=120)
@@ -227,6 +330,16 @@ async def get_world_economy(request: Request) -> WorldEconomyResponse:
 
 
 @router.get(
+    "/health",
+    response_model=WorldHealthResponse,
+    responses=error_responses(503),
+)
+async def get_world_health(request: Request) -> WorldHealthResponse:
+    state = get_simulation_state(request)
+    return WorldHealthResponse(**state.world.get_health_stats())
+
+
+@router.get(
     "/crimes",
     response_model=list[CrimeEventResponse],
     responses=error_responses(503),
@@ -394,6 +507,16 @@ async def get_world_education(request: Request) -> list[WorldEducationCourseResp
 
 
 @router.get(
+    "/culture",
+    response_model=WorldCultureResponse,
+    responses=error_responses(503),
+)
+async def get_world_culture(request: Request) -> WorldCultureResponse:
+    state = get_simulation_state(request)
+    return WorldCultureResponse(**state.world.get_culture_overview())
+
+
+@router.get(
     "/zones",
     response_model=list[ZoneResponse],
     responses=error_responses(503),
@@ -424,6 +547,16 @@ async def list_festivals(request: Request) -> FestivalListResponse:
 
 
 @router.get(
+    "/bulletin",
+    response_model=WorldBulletinResponse,
+    responses=error_responses(503),
+)
+async def get_world_bulletin(request: Request) -> WorldBulletinResponse:
+    state = get_simulation_state(request)
+    return WorldBulletinResponse(**state.get_bulletin_board())
+
+
+@router.get(
     "/crimes",
     response_model=list[CrimeEventResponse],
     responses=error_responses(503),
@@ -444,6 +577,16 @@ async def get_safety_stats(request: Request) -> SafetyStatsResponse:
 
 
 @router.get(
+    "/transport",
+    response_model=WorldTransportResponse,
+    responses=error_responses(503),
+)
+async def get_transport(request: Request) -> WorldTransportResponse:
+    state = get_simulation_state(request)
+    return WorldTransportResponse(**state.world.get_transport_overview())
+
+
+@router.get(
     "/buildings",
     response_model=list[BuildingResponse],
     responses=error_responses(503),
@@ -455,6 +598,16 @@ async def list_buildings(request: Request) -> list[BuildingResponse]:
 
 
 @router.get(
+    "/buildings/upgrades",
+    response_model=list[BuildingUpgradeResponse],
+    responses=error_responses(503),
+)
+async def list_building_upgrades(request: Request) -> list[BuildingUpgradeResponse]:
+    state = get_simulation_state(request)
+    return [_serialize_building_upgrade(state, building) for building in state.world.buildings]
+
+
+@router.get(
     "/buildings/{building_id}/details",
     response_model=BuildingDetailResponse,
     responses=error_responses(404, 503),
@@ -462,45 +615,17 @@ async def list_buildings(request: Request) -> list[BuildingResponse]:
 async def get_building_details(building_id: str, request: Request) -> BuildingDetailResponse:
     """Return detailed info about a building including current occupants and visit history."""
     state = get_simulation_state(request)
-    building = state.world.get_building(building_id)
-    if building is None:
-        raise api_error(404, f"Building '{building_id}' not found", "building_not_found")
+    return _build_building_detail(building_id, state)
 
-    occupant_agents = state.world.get_occupants(building_id)
-    current_residents = [
-        BuildingOccupantInfo(
-            id=agent.resident.id,
-            name=agent.resident.name,
-            occupation=getattr(agent.resident, "occupation", "unemployed"),
-            mood=agent.resident.mood,
-            status="chatting" if getattr(agent, "in_dialogue", False) else "idle",
-        )
-        for agent in occupant_agents
-    ]
 
-    # Collect recent visit records from the building visit log (if tracked)
-    visit_log: list[dict[str, Any]] = getattr(state, "building_visit_log", [])
-    recent_visits = [
-        BuildingVisitRecord(
-            resident_id=entry["resident_id"],
-            resident_name=entry["resident_name"],
-            action=entry["action"],
-            tick=entry["tick"],
-        )
-        for entry in visit_log
-        if entry.get("building_id") == building_id
-    ][-10:]
-
-    return BuildingDetailResponse(
-        id=building.id,
-        type=building.type,
-        name=building.name,
-        capacity=building.capacity,
-        position=building.position,
-        occupants=len(occupant_agents),
-        current_residents=current_residents,
-        recent_visits=recent_visits,
-    )
+@buildings_router.get(
+    "/{building_id}/details",
+    response_model=BuildingDetailResponse,
+    responses=error_responses(404, 503),
+)
+async def get_building_details_alias(building_id: str, request: Request) -> BuildingDetailResponse:
+    state = get_simulation_state(request)
+    return _build_building_detail(building_id, state)
 
 
 _VALID_BUILDING_TYPES = {"home", "cafe", "park", "shop", "school", "gym", "library", "hospital"}

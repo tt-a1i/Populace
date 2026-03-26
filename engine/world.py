@@ -17,21 +17,26 @@ from engine.types import (
     CrimeEvent,
     Course,
     CourseHistoryEntry,
+    CulturalEvent,
     Education,
     EnergyUpdate,
     Event,
     EventUpdate,
+    Health,
+    Illness,
     Item,
     Job,
     Memory,
     MoodEntry,
     MovementUpdate,
     Pet,
+    Road,
     ReputationEntry,
     Relationship,
     Resident,
     Season,
     TickState,
+    TransportMode,
     WeatherType,
     WorldConfig,
     Zone,
@@ -89,6 +94,12 @@ _EDUCATION_SUBJECTS = {
     "social": "社交课",
     "art": "艺术课",
 }
+_CULTURAL_EVENT_NAMES = {
+    "concert": "暮色音乐会",
+    "exhibition": "小镇画展",
+    "theater": "街角戏剧夜",
+    "workshop": "手作工坊体验",
+}
 _PET_EMOJI_NAME = {
     "cat": "小咪",
     "dog": "旺财",
@@ -97,6 +108,21 @@ _PET_EMOJI_NAME = {
 }
 _PET_SPECIES = ("cat", "dog", "bird", "rabbit")
 _PET_FRIENDLY_KW = ("友善", "善良", "热心", "温柔", "开朗", "friendly", "kind")
+_BUILDING_SPECIAL_FEATURES = {
+    "cafe": "banquet",
+    "school": "advanced_courses",
+    "hospital": "surgery",
+}
+_BUILDING_UPGRADE_COSTS = {
+    1: 120.0,
+    2: 260.0,
+}
+_ILLNESS_PROFILES = {
+    "cold": {"contagious": True, "severity": 0.28, "recovery": 12},
+    "flu": {"contagious": True, "severity": 0.55, "recovery": 18},
+    "injury": {"contagious": False, "severity": 0.45, "recovery": 14},
+    "exhaustion": {"contagious": False, "severity": 0.35, "recovery": 10},
+}
 
 
 class World:
@@ -136,9 +162,19 @@ class World:
         self.flagged_residents: set[str] = set()
         self.pets: List[Pet] = []
         self.stray_pets: List[Pet] = []
+        self.cultural_events: List[CulturalEvent] = []
+        self.culture_prosperity_history: List[dict] = []
         self.gdp_history: List[dict] = []
         self.economic_output: float = 0.0
         self.path_cache: PathCache = PathCache()
+        self.roads: List[Road] = []
+        self.road_usage: Dict[tuple[str, str], int] = {}
+        self.transport_mode_usage: Dict[str, int] = {mode.value: 0 for mode in TransportMode}
+        self.last_transport_stats: dict = {
+            "mode_share": {mode.value: 0 for mode in TransportMode},
+            "average_travel_ticks": 0.0,
+            "congestion_hotspots": [],
+        }
         self.grid_chunk_size: int = max(1, self.config.interaction_distance)
         self.grid_index: Dict[Tuple[int, int], List[Agent]] = {}
         self._grid_index_dirty = True
@@ -203,10 +239,13 @@ class World:
                 MoodEntry(tick=self.current_tick, mood=agent.resident.mood, cause="initial")
             )
         self.ensure_resident_education(agent.resident)
+        self._ensure_resident_artistic_talent(agent.resident)
         self._ensure_resident_safety(agent.resident)
         self._ensure_resident_reputation(agent.resident)
+        self._ensure_resident_transport(agent.resident)
         self._ensure_resident_memories(agent.resident)
         self._ensure_resident_job(agent.resident)
+        self._ensure_resident_health(agent.resident)
         self.agents.append(agent)
         self._rebuild_pet_registry()
         self.mark_grid_index_dirty()
@@ -431,6 +470,162 @@ class World:
     def _ensure_resident_reputation(self, resident: Resident) -> None:
         resident.reputation = max(-1.0, min(1.0, float(getattr(resident, "reputation", 0.0))))
         resident.reputation_history = list(getattr(resident, "reputation_history", []))
+
+    def _ensure_resident_transport(self, resident: Resident) -> None:
+        mode = getattr(resident, "transport_mode", TransportMode.walk)
+        if isinstance(mode, TransportMode):
+            resident.transport_mode = mode
+            return
+        try:
+            resident.transport_mode = TransportMode(str(mode))
+        except ValueError:
+            resident.transport_mode = TransportMode.walk
+
+    def _ensure_resident_health(self, resident: Resident) -> None:
+        health = getattr(resident, "health", None)
+        if not isinstance(health, Health):
+            if isinstance(health, dict):
+                illness_data = health.get("illness")
+                illness = Illness(**illness_data) if isinstance(illness_data, dict) else None
+                resident.health = Health(
+                    hp=float(health.get("hp", 1.0)),
+                    illness=illness,
+                    recovery_tick=int(health.get("recovery_tick", 0)),
+                    work_streak=int(health.get("work_streak", 0)),
+                )
+            else:
+                resident.health = Health()
+        resident.health.hp = max(0.0, min(1.0, float(getattr(resident.health, "hp", 1.0))))
+        resident.health.recovery_tick = int(getattr(resident.health, "recovery_tick", 0))
+        resident.health.work_streak = max(0, int(getattr(resident.health, "work_streak", 0)))
+        illness = getattr(resident.health, "illness", None)
+        if illness is not None and not isinstance(illness, Illness):
+            if isinstance(illness, dict):
+                resident.health.illness = Illness(**illness)
+            else:
+                resident.health.illness = None
+
+    def has_illness(self, resident: Resident, *illness_types: str) -> bool:
+        self._ensure_resident_health(resident)
+        illness = resident.health.illness
+        if illness is None:
+            return False
+        return illness.type in illness_types if illness_types else True
+
+    def health_movement_penalty(self, resident: Resident) -> float:
+        return 0.4 if self.has_illness(resident) else 0.0
+
+    def health_work_efficiency(self, resident: Resident) -> float:
+        return 0.4 if self.has_illness(resident) else 1.0
+
+    def infect_resident(self, resident: Resident, illness_type: str, *, severity: float | None = None, recovery_ticks: int | None = None) -> bool:
+        self._ensure_resident_health(resident)
+        profile = _ILLNESS_PROFILES.get(illness_type, {"contagious": False, "severity": 0.3, "recovery": 10})
+        current = resident.health.illness
+        next_severity = float(severity if severity is not None else profile["severity"])
+        next_recovery = int(recovery_ticks if recovery_ticks is not None else profile["recovery"])
+        if current is not None and current.type == illness_type and resident.health.recovery_tick >= next_recovery:
+            return False
+        resident.health.illness = Illness(
+            type=illness_type,
+            contagious=bool(profile["contagious"]),
+            severity=max(next_severity, float(getattr(current, "severity", 0.0))) if current else next_severity,
+        )
+        resident.health.recovery_tick = max(resident.health.recovery_tick, next_recovery)
+        resident.health.hp = max(0.1, round(resident.health.hp - resident.health.illness.severity * 0.1, 3))
+        self.shift_resident_mood(resident, -1, illness_type)
+        return True
+
+    def recover_resident_health(self, resident: Resident, amount: float, *, treatment: bool = False) -> None:
+        self._ensure_resident_health(resident)
+        resident.health.hp = round(min(1.0, resident.health.hp + amount), 3)
+        if resident.health.illness is None:
+            resident.health.recovery_tick = 0
+            return
+        resident.health.recovery_tick -= 2 if treatment else 1
+        if resident.health.recovery_tick <= 0 or resident.health.hp >= 0.98:
+            resident.health.illness = None
+            resident.health.recovery_tick = 0
+            resident.health.hp = max(0.6, resident.health.hp)
+
+    def maybe_transmit_illness(self, source: Resident, target: Resident) -> bool:
+        self._ensure_resident_health(source)
+        self._ensure_resident_health(target)
+        illness = source.health.illness
+        if illness is None or not illness.contagious or target.health.illness is not None:
+            return False
+        if self.rng.random() >= 0.3:
+            return False
+        return self.infect_resident(target, illness.type, severity=illness.severity, recovery_ticks=max(6, source.health.recovery_tick))
+
+    def nearest_hospital(self) -> Building | None:
+        return next((building for building in self.buildings if building.type == "hospital"), None)
+
+    def get_health_stats(self) -> dict:
+        illness_counts: Dict[str, int] = {}
+        hotspots: Dict[str, dict[str, float]] = {}
+        active_cases = 0
+        contagious_cases = 0
+        hospitalized_count = 0
+        total_hp = 0.0
+        hospital_ids = {building.id for building in self.buildings if building.type == "hospital"}
+
+        for agent in self.agents:
+            resident = agent.resident
+            self._ensure_resident_health(resident)
+            total_hp += resident.health.hp
+            illness = resident.health.illness
+            if illness is None:
+                continue
+            active_cases += 1
+            illness_counts[illness.type] = illness_counts.get(illness.type, 0) + 1
+            if illness.contagious:
+                contagious_cases += 1
+            if resident.location in hospital_ids:
+                hospitalized_count += 1
+            location = self._resident_location_name(resident)
+            bucket = hotspots.setdefault(location, {"cases": 0, "intensity": 0.0})
+            bucket["cases"] += 1
+            bucket["intensity"] += illness.severity
+
+        max_cases = max((row["cases"] for row in hotspots.values()), default=1)
+        outbreak_hotspots = [
+            {
+                "location": location,
+                "cases": int(row["cases"]),
+                "intensity": round(max(0.2, row["cases"] / max_cases), 3),
+            }
+            for location, row in sorted(hotspots.items(), key=lambda item: (-item[1]["cases"], item[0]))
+        ]
+        return {
+            "active_cases": active_cases,
+            "contagious_cases": contagious_cases,
+            "hospitalized_count": hospitalized_count,
+            "treatment_rate": round(hospitalized_count / active_cases, 3) if active_cases else 0.0,
+            "average_hp": round(total_hp / len(self.agents), 3) if self.agents else 1.0,
+            "illness_counts": illness_counts,
+            "outbreak_hotspots": outbreak_hotspots,
+        }
+
+    def get_resident_health_profile(self, resident_id: str) -> dict | None:
+        agent = self.get_agent(resident_id)
+        if agent is None:
+            return None
+        self._ensure_resident_health(agent.resident)
+        illness = agent.resident.health.illness
+        return {
+            "resident_id": agent.resident.id,
+            "resident_name": agent.resident.name,
+            "health": {
+                "hp": round(agent.resident.health.hp, 3),
+                "illness": None if illness is None else {
+                    "type": illness.type,
+                    "contagious": illness.contagious,
+                    "severity": round(illness.severity, 3),
+                },
+                "recovery_tick": agent.resident.health.recovery_tick,
+            },
+        }
 
     def _ensure_resident_job(self, resident: Resident) -> None:
         job = getattr(resident, "job", None)
@@ -713,6 +908,67 @@ class World:
             "gdp_history": list(self.gdp_history)[-20:],
         }
 
+    def get_building_upgrade_cost(self, building: Building) -> float:
+        return float(_BUILDING_UPGRADE_COSTS.get(building.level, 0.0))
+
+    def get_building_special_feature(self, building: Building) -> str | None:
+        if building.level < 3:
+            return None
+        return _BUILDING_SPECIAL_FEATURES.get(building.type)
+
+    def can_upgrade_building(self, building: Building, town_funds: float, vote_passed: bool) -> bool:
+        if building.level >= 3:
+            return False
+        if not vote_passed:
+            return False
+        return float(town_funds) >= self.get_building_upgrade_cost(building)
+
+    def upgrade_building(self, building_id: str, *, town_funds: float, vote_passed: bool) -> bool:
+        building = self.get_building(building_id)
+        if building is None or not self.can_upgrade_building(building, town_funds, vote_passed):
+            return False
+
+        if building.level == 1:
+            building.level = 2
+            building.capacity = max(building.capacity + 1, math.ceil(building.capacity * 1.5))
+            if "expanded" not in building.upgrades:
+                building.upgrades.append("expanded")
+            return True
+
+        if building.level == 2:
+            building.level = 3
+            if "luxury" not in building.upgrades:
+                building.upgrades.append("luxury")
+            return True
+
+        return False
+
+    def decorate_home(self, resident: Resident, effort: float = 0.12) -> bool:
+        home_id = resident.home_building_id or resident.location
+        if not home_id:
+            return False
+        building = self.get_building(home_id)
+        if building is None or building.type not in {"home", "house", "residence"}:
+            return False
+
+        next_score = min(1.0, round(float(building.decoration_score) + max(0.02, effort), 3))
+        if next_score <= building.decoration_score:
+            return False
+        building.decoration_score = next_score
+        return True
+
+    def get_building_visit_willingness(self, resident: Resident, building: Building) -> float:
+        base = 0.2
+        if building.type in {"home", "house", "residence"}:
+            if resident.home_building_id == building.id:
+                base = 0.58
+            else:
+                base = 0.18
+            base += float(building.decoration_score) * 0.45
+        elif building.type in {"cafe", "park", "shop"}:
+            base += 0.08
+        return max(0.0, min(1.0, round(base, 3)))
+
     def mark_grid_index_dirty(self) -> None:
         """Mark the nearby-agent spatial index for rebuild before next query."""
         self._grid_index_dirty = True
@@ -777,6 +1033,193 @@ class World:
 
         return [other for other in self.get_nearby_agents(agent.resident.x, agent.resident.y) if other is not agent]
 
+    def _road_key(self, from_building: str, to_building: str) -> tuple[str, str]:
+        return tuple(sorted((from_building, to_building)))
+
+    def _distance_between_buildings(self, left: Building, right: Building) -> float:
+        return round(math.dist(left.position, right.position), 2)
+
+    def _road_type_for_distance(self, distance: float) -> str:
+        if distance >= 14:
+            return "carriage_route"
+        if distance >= 8:
+            return "avenue"
+        return "street"
+
+    def generate_road_network(self) -> None:
+        if len(self.buildings) < 2:
+            self.roads = []
+            return
+
+        next_roads: dict[tuple[str, str], Road] = {}
+        for building in self.buildings:
+            others = sorted(
+                (other for other in self.buildings if other.id != building.id),
+                key=lambda other: (self._distance_between_buildings(building, other), other.id),
+            )
+            for other in others[:2]:
+                key = self._road_key(building.id, other.id)
+                if key in next_roads:
+                    continue
+                distance = self._distance_between_buildings(building, other)
+                next_roads[key] = Road(
+                    from_building=key[0],
+                    to_building=key[1],
+                    distance=distance,
+                    road_type=self._road_type_for_distance(distance),
+                    traffic=int(self.road_usage.get(key, 0)),
+                )
+
+        anchor = self.buildings[0]
+        for building in self.buildings[1:]:
+            key = self._road_key(anchor.id, building.id)
+            if key not in next_roads:
+                distance = self._distance_between_buildings(anchor, building)
+                next_roads[key] = Road(
+                    from_building=key[0],
+                    to_building=key[1],
+                    distance=distance,
+                    road_type=self._road_type_for_distance(distance),
+                    traffic=int(self.road_usage.get(key, 0)),
+                )
+
+        self.roads = sorted(next_roads.values(), key=lambda road: (road.from_building, road.to_building))
+
+    def get_road_network(self) -> List[Road]:
+        if not self.roads and len(self.buildings) >= 2:
+            self.generate_road_network()
+        return list(self.roads)
+
+    def find_road_between(self, from_building: str, to_building: str) -> Optional[Road]:
+        key = self._road_key(from_building, to_building)
+        for road in self.get_road_network():
+            if self._road_key(road.from_building, road.to_building) == key:
+                road.traffic = int(self.road_usage.get(key, 0))
+                return road
+        return None
+
+    def _resolve_building(self, building_or_id: Building | str | None) -> Optional[Building]:
+        if isinstance(building_or_id, Building):
+            return building_or_id
+        if isinstance(building_or_id, str):
+            return self.get_building(building_or_id)
+        return None
+
+    def choose_transport_mode(self, resident: Resident, from_building: Building | str | None, to_building: Building | str | None) -> TransportMode:
+        start = self._resolve_building(from_building)
+        end = self._resolve_building(to_building)
+        if start is None or end is None:
+            return TransportMode.walk
+        distance = self._distance_between_buildings(start, end)
+        has_bicycle = any(item.name == "bicycle" and item.quantity > 0 for item in resident.inventory)
+        if distance >= 14:
+            return TransportMode.cart
+        if has_bicycle and distance >= 5:
+            return TransportMode.bicycle
+        return TransportMode.walk
+
+    def compute_travel_steps(self, resident: Resident, road: Road | None) -> int:
+        mode = getattr(resident, "transport_mode", TransportMode.walk)
+        if isinstance(mode, str):
+            mode = TransportMode(mode)
+        base_steps = 2
+        if mode is TransportMode.bicycle:
+            base_steps *= 2
+        elif mode is TransportMode.cart:
+            base_steps *= 3
+        key = self._road_key(road.from_building, road.to_building) if road is not None else None
+        traffic = int(self.road_usage.get(key, 0)) if key is not None else 0
+        slowdown = 1.0
+        if traffic >= 3:
+            slowdown = max(0.45, 1.0 - min(0.6, (traffic - 2) * 0.15))
+        return max(1, int(math.floor(base_steps * slowdown)))
+
+    def estimate_travel_ticks(
+        self,
+        resident: Resident,
+        from_location: tuple[int, int] | Building | str | None,
+        to_location: tuple[int, int] | Building | str | None,
+    ) -> int:
+        from_building = self._resolve_building(from_location if not isinstance(from_location, tuple) else self.get_building_at_position(*from_location))
+        to_building = self._resolve_building(to_location if not isinstance(to_location, tuple) else self.get_building_at_position(*to_location))
+        if from_building is None and isinstance(from_location, tuple) and to_building is None and isinstance(to_location, tuple):
+            distance = math.dist(from_location, to_location)
+            return max(1, math.ceil(distance / 2))
+        if from_building is None or to_building is None:
+            return 1
+        road = self.find_road_between(from_building.id, to_building.id)
+        if road is None:
+            distance = self._distance_between_buildings(from_building, to_building)
+            road = Road(from_building=from_building.id, to_building=to_building.id, distance=distance, road_type=self._road_type_for_distance(distance))
+        resident.transport_mode = self.choose_transport_mode(resident, from_building, to_building)
+        steps = self.compute_travel_steps(resident, road)
+        return max(1, math.ceil(max(road.distance, 1.0) / max(1, steps)))
+
+    def record_road_usage(self, road: Road | None, resident_id: str) -> None:
+        if road is None:
+            return
+        key = self._road_key(road.from_building, road.to_building)
+        self.road_usage[key] = int(self.road_usage.get(key, 0)) + 1
+        road.traffic = self.road_usage[key]
+
+    def get_transport_overview(
+        self,
+        resident: Resident | None = None,
+        from_building_id: str | None = None,
+        to_building_id: str | None = None,
+    ) -> dict:
+        roads = [
+            {
+                "from_building": road.from_building,
+                "to_building": road.to_building,
+                "distance": road.distance,
+                "road_type": road.road_type,
+                "traffic": int(self.road_usage.get(self._road_key(road.from_building, road.to_building), 0)),
+            }
+            for road in self.get_road_network()
+        ]
+        stats = dict(self.last_transport_stats)
+        stats["mode_share"] = dict(stats.get("mode_share", {}))
+        stats["congestion_hotspots"] = list(stats.get("congestion_hotspots", []))
+        if resident is not None and from_building_id and to_building_id:
+            mode = self.choose_transport_mode(resident, from_building_id, to_building_id)
+            stats["mode_share"][mode.value] = stats["mode_share"].get(mode.value, 0) + 1
+        return {"roads": roads, "stats": stats}
+
+    def _refresh_transport_stats(self) -> None:
+        hotspots = []
+        for road in self.get_road_network():
+            key = self._road_key(road.from_building, road.to_building)
+            traffic = int(self.road_usage.get(key, 0))
+            road.traffic = traffic
+            if traffic >= 2:
+                hotspots.append(
+                    {
+                        "road_key": f"{key[0]}:{key[1]}",
+                        "traffic": traffic,
+                        "slowdown": round(min(0.6, max(0.0, (traffic - 1) * 0.15)), 3),
+                    }
+                )
+        trip_samples = []
+        for agent in self.agents:
+            resident = agent.resident
+            origin = self.get_building(resident.location) if resident.location is not None else self.get_building(resident.home_building_id) or self.get_building_at_position(resident.x, resident.y)
+            if origin is None:
+                continue
+            nearest = min(
+                (building for building in self.buildings if building.id != origin.id),
+                default=None,
+                key=lambda building: self._distance_between_buildings(origin, building),
+            )
+            if nearest is None:
+                continue
+            trip_samples.append(self.estimate_travel_ticks(resident, origin, nearest))
+        self.last_transport_stats = {
+            "mode_share": dict(self.transport_mode_usage),
+            "average_travel_ticks": round(sum(trip_samples) / len(trip_samples), 2) if trip_samples else 0.0,
+            "congestion_hotspots": hotspots,
+        }
+
     # ------------------------------------------------------------------
     # Building management
     # ------------------------------------------------------------------
@@ -787,6 +1230,7 @@ class World:
         if building.type == "school":
             for agent in self.agents:
                 self.ensure_resident_education(agent.resident)
+        self.generate_road_network()
 
     def get_school_buildings(self) -> List[Building]:
         return [building for building in self.buildings if building.type == "school"]
@@ -801,6 +1245,17 @@ class World:
             Course(subject=subject, name=name, building_id=school_id)
             for subject, name in _EDUCATION_SUBJECTS.items()
         ]
+
+    def _ensure_resident_artistic_talent(self, resident: Resident) -> None:
+        try:
+            current_value = float(getattr(resident, "artistic_talent", 0.0))
+        except (TypeError, ValueError):
+            current_value = 0.0
+        if current_value > 0.0:
+            resident.artistic_talent = round(min(1.0, current_value), 4)
+            return
+        checksum = sum(ord(char) for char in f"{resident.id}:{resident.name}")
+        resident.artistic_talent = round(0.2 + (checksum % 76) / 100, 4)
 
     def ensure_resident_education(self, resident: Resident) -> None:
         if not self.has_school_building():
@@ -886,6 +1341,175 @@ class World:
             }
             for subject, name in _EDUCATION_SUBJECTS.items()
         ]
+
+    def public_culture_venues(self) -> List[Building]:
+        return [building for building in self.buildings if building.type != "home"]
+
+    def eligible_culture_organizers(self) -> List[Agent]:
+        eligible: List[Agent] = []
+        for agent in self.agents:
+            self._ensure_resident_artistic_talent(agent.resident)
+            art_skill = float(agent.resident.skills.get("art", 0.0))
+            art_knowledge = float(agent.resident.education.knowledge_level.get("art", 0.0))
+            if art_skill >= 0.45 or art_knowledge >= 0.65:
+                eligible.append(agent)
+        return eligible
+
+    def _culture_event_type_for_agent(self, agent: Agent) -> str:
+        event_types = tuple(_CULTURAL_EVENT_NAMES)
+        checksum = sum(ord(char) for char in f"{agent.resident.id}:{self.current_tick}")
+        return event_types[checksum % len(event_types)]
+
+    def _culture_event_quality(self, agent: Agent) -> float:
+        self._ensure_resident_artistic_talent(agent.resident)
+        return min(
+            1.0,
+            float(agent.resident.artistic_talent) * 0.5
+            + float(agent.resident.skills.get("art", 0.0)) * 0.3
+            + float(agent.resident.education.knowledge_level.get("art", 0.0)) * 0.2,
+        )
+
+    def _culture_interest_score(self, organizer: Agent, candidate: Agent, quality: float) -> float:
+        if organizer.resident.id == candidate.resident.id:
+            return 2.0 + quality
+        relationship = self.get_relationship(organizer.resident.id, candidate.resident.id)
+        inverse = self.get_relationship(candidate.resident.id, organizer.resident.id)
+        friendship = max(
+            relationship.intensity if relationship is not None else 0.0,
+            inverse.intensity if inverse is not None else 0.0,
+        )
+        return (
+            quality * 1.2
+            + float(candidate.resident.skills.get("art", 0.0)) * 0.3
+            + float(candidate.resident.education.knowledge_level.get("art", 0.0)) * 0.2
+            + friendship * 0.5
+            + self._extroversion(candidate.resident.personality) * 0.2
+        )
+
+    def maybe_create_cultural_event(self) -> Optional[CulturalEvent]:
+        venues = self.public_culture_venues()
+        organizers = self.eligible_culture_organizers()
+        if not venues or not organizers:
+            return None
+        if any(self.current_tick < event.tick_start + event.duration for event in self.cultural_events):
+            return None
+
+        organizer = max(organizers, key=self._culture_event_quality)
+        venue = max(venues, key=lambda building: (building.capacity, -sum(building.position)))
+        quality = self._culture_event_quality(organizer)
+        participant_count = max(2, min(len(self.agents), 2 + int(round(quality * max(1, len(self.agents) - 1)))))
+        participants = [
+            agent.resident.id
+            for agent in sorted(
+                self.agents,
+                key=lambda candidate: self._culture_interest_score(organizer, candidate, quality),
+                reverse=True,
+            )[:participant_count]
+        ]
+        if organizer.resident.id not in participants:
+            participants.insert(0, organizer.resident.id)
+
+        event_type = self._culture_event_type_for_agent(organizer)
+        event = CulturalEvent(
+            type=event_type,
+            name=_CULTURAL_EVENT_NAMES[event_type],
+            venue_id=venue.id,
+            organizer_id=organizer.resident.id,
+            participants=participants,
+            tick_start=self.current_tick,
+            duration=max(4, self.config.tick_per_day // 6),
+        )
+        self.cultural_events.append(event)
+        self.cultural_events = self.cultural_events[-30:]
+
+        for participant_id in participants:
+            participant = next((agent for agent in self.agents if agent.resident.id == participant_id), None)
+            if participant is None:
+                continue
+            participant.resident.education.knowledge_level["art"] = round(
+                min(1.0, float(participant.resident.education.knowledge_level.get("art", 0.0)) + 0.05),
+                4,
+            )
+            self.shift_resident_mood(participant, 1, "culture")
+
+        self.culture_prosperity_history.append(
+            {
+                "tick": self.current_tick,
+                "prosperity_index": self.culture_prosperity_index(),
+            }
+        )
+        self.culture_prosperity_history = self.culture_prosperity_history[-60:]
+        return event
+
+    def update_cultural_events(self) -> List[EventUpdate]:
+        updates: List[EventUpdate] = []
+        if self.current_tick % max(12, self.config.tick_per_day // 2) == 0:
+            event = self.maybe_create_cultural_event()
+            if event is not None:
+                updates.append(EventUpdate(description=f"{event.name} 在 {event.venue_id} 开始了。"))
+
+        active_cutoff = self.current_tick - self.config.tick_per_day * 7
+        self.cultural_events = [
+            event
+            for event in self.cultural_events
+            if event.tick_start + event.duration >= active_cutoff
+        ]
+        return updates
+
+    def culture_prosperity_index(self) -> float:
+        if not self.cultural_events or not self.agents:
+            return 0.0
+        recent_cutoff = self.current_tick - self.config.tick_per_day * 7
+        recent_events = [event for event in self.cultural_events if event.tick_start >= recent_cutoff]
+        if not recent_events:
+            recent_events = list(self.cultural_events[-5:])
+        event_frequency = min(1.0, len(recent_events) / 8)
+        participation_rate = sum(len(event.participants) for event in recent_events) / (len(recent_events) * max(1, len(self.agents)))
+        organizer_quality = 0.0
+        for event in recent_events:
+            organizer = next((agent for agent in self.agents if agent.resident.id == event.organizer_id), None)
+            if organizer is not None:
+                organizer_quality += self._culture_event_quality(organizer)
+        organizer_quality = organizer_quality / max(1, len(recent_events))
+        return round(min(1.0, event_frequency * 0.45 + participation_rate * 0.4 + organizer_quality * 0.15), 4)
+
+    def culture_talent_rankings(self) -> List[dict]:
+        rankings = []
+        for agent in self.agents:
+            self._ensure_resident_artistic_talent(agent.resident)
+            rankings.append(
+                {
+                    "resident_id": agent.resident.id,
+                    "resident_name": agent.resident.name,
+                    "artistic_talent": round(float(agent.resident.artistic_talent), 4),
+                    "art_skill": round(float(agent.resident.skills.get("art", 0.0)), 4),
+                    "art_knowledge": round(float(agent.resident.education.knowledge_level.get("art", 0.0)), 4),
+                }
+            )
+        rankings.sort(
+            key=lambda row: row["artistic_talent"] * 0.55 + row["art_skill"] * 0.3 + row["art_knowledge"] * 0.15,
+            reverse=True,
+        )
+        return rankings[:10]
+
+    def get_culture_overview(self) -> dict:
+        return {
+            "events": [
+                {
+                    "type": event.type,
+                    "name": event.name,
+                    "venue_id": event.venue_id,
+                    "organizer_id": event.organizer_id,
+                    "participants": list(event.participants),
+                    "tick_start": event.tick_start,
+                    "duration": event.duration,
+                }
+                for event in sorted(self.cultural_events, key=lambda item: item.tick_start, reverse=True)[:20]
+            ],
+            "prosperity_index": self.culture_prosperity_index(),
+            "prosperity_history": list(self.culture_prosperity_history[-30:]),
+            "talent_rankings": self.culture_talent_rankings(),
+        }
 
     def set_zones(self, zones: List[Zone]) -> None:
         self.zones = zones or self._default_zones()
@@ -1048,7 +1672,12 @@ class World:
             return 0.0
 
         if building.type == "cafe":
-            return 0.2
+            bonus = 0.2
+            if building.level >= 3:
+                bonus += 0.12
+            return bonus
+        if building.type in {"home", "house", "residence"}:
+            return min(0.18, float(building.decoration_score) * 0.2)
         return 0.0
 
     def get_social_probability(self, agent_a: Agent, agent_b: Agent) -> float:
@@ -1088,6 +1717,10 @@ class World:
             probability *= 0.35
         if agent_b.resident.mental_state == "depressed":
             probability *= 0.8
+        if self.has_illness(agent_a.resident):
+            probability *= 0.5
+        if self.has_illness(agent_b.resident):
+            probability *= 0.7
         return max(0.05, min(0.95, probability))
 
     def remove_building(self, building_id: str) -> Optional["Building"]:
@@ -1122,6 +1755,7 @@ class World:
 
         # Flush path cache so agents re-route around the now-open tiles
         self.path_cache = PathCache()
+        self.generate_road_network()
         self.mark_grid_index_dirty()
         return building
 
@@ -1149,26 +1783,60 @@ class World:
         hour = (self.current_tick % tick_per_day) * 24.0 / tick_per_day
         is_work_hour = self._is_work_hour(hour)
         self._ensure_resident_job(agent.resident)
+        self._ensure_resident_health(agent.resident)
+        illness = agent.resident.health.illness
 
         if building.type == "home":
             self.set_resident_mood(agent, "neutral", "rest")
             if agent.resident.job.title == "unemployed":
                 agent.resident.occupation = "unemployed"
+            agent.resident.health.work_streak = 0
             # Recover energy at home
-            recovery = (0.025 if is_elderly(agent.resident) else 0.05) + cooking_knowledge * 0.04
+            decoration_bonus = float(getattr(building, "decoration_score", 0.0))
+            recovery = (0.025 if is_elderly(agent.resident) else 0.05) + cooking_knowledge * 0.04 + decoration_bonus * 0.03
             agent.resident.energy = min(1.0, agent.resident.energy + recovery)
+            self.recover_resident_health(agent.resident, 0.03)
+            if decoration_bonus >= 0.25:
+                self.shift_resident_mood(agent, 1, "decoration")
+            if (
+                agent.resident.home_building_id == building.id
+                and decoration_bonus < 0.95
+                and agent.resident.coins >= 15
+                and self.rng.random() < 0.05
+            ):
+                if self.decorate_home(agent.resident, effort=0.05):
+                    agent.resident.coins = max(0, agent.resident.coins - 5)
+        elif building.type == "hospital":
+            if agent.resident.job.title == "doctor" or agent.resident.occupation == "doctor":
+                self._assign_job_for_building(agent.resident, building)
+            doctor_present = any(
+                occupant.resident.job.title == "doctor"
+                for occupant in self.get_occupants(building.id)
+                if occupant is not agent
+            ) or agent.resident.job.title == "doctor"
+            if illness is not None:
+                self.recover_resident_health(agent.resident, 0.06 if doctor_present else 0.035, treatment=True)
+                agent.resident.energy = min(1.0, agent.resident.energy + 0.04)
+            else:
+                self.recover_resident_health(agent.resident, 0.015, treatment=doctor_present)
+            if building.level >= 3 and (illness is not None or agent.resident.mood in {"sad", "fearful", "tired"}):
+                self.shift_resident_mood(agent, 2, "surgery")
+                agent.resident.mental_state = "stable"
         elif building.type == "school":
             if is_work_hour:
                 work_profile = _BUILDING_WORK_MAP[building.type]
                 skill_name = work_profile["skill"]
                 current_skill = float(agent.resident.skills.get(skill_name, 0.0))
                 self._assign_job_for_building(agent.resident, building)
+                agent.resident.health.work_streak += 1
                 already_paid: bool = getattr(agent, "_paid_this_stay", False)
                 if not already_paid:
                     bonus_income = round(current_skill * work_profile["base_income"])
-                    agent.resident.coins += work_profile["base_income"] + bonus_income
-                    agent.resident.wallet = round(agent.resident.wallet + float(work_profile["base_income"]) + bonus_income, 2)
-                    self._register_gdp(float(work_profile["base_income"]) + bonus_income)
+                    gross_income = work_profile["base_income"] + bonus_income
+                    earned_income = max(1, round(gross_income * self.health_work_efficiency(agent.resident)))
+                    agent.resident.coins += earned_income
+                    agent.resident.wallet = round(agent.resident.wallet + float(earned_income), 2)
+                    self._register_gdp(float(earned_income))
                     item_name = work_profile.get("item_name")
                     if item_name:
                         item_value = int(work_profile.get("item_value", 0) * (1.0 + crafting_knowledge * 0.5))
@@ -1180,24 +1848,36 @@ class World:
                         )
                     agent._paid_this_stay = True  # type: ignore[attr-defined]
                 growth = 0.015 if current_skill < 0.6 else 0.008 if current_skill < 0.85 else 0.003
+                if building.level >= 3:
+                    growth += 0.01
+                    knowledge = float(agent.resident.education.knowledge_level.get(skill_name, 0.0))
+                    agent.resident.education.knowledge_level[skill_name] = round(min(1.0, knowledge + 0.025), 4)
                 agent.resident.skills[skill_name] = round(min(1.0, current_skill + growth), 4)
                 agent.resident.energy = max(0.0, agent.resident.energy - 0.03)
                 agent.resident.job.satisfaction = self._job_satisfaction(agent.resident)
             elif agent.resident.education.courses:
                 self.teach_course(agent)
+            else:
+                agent.resident.health.work_streak = 0
         elif building.type in _BUILDING_WORK_MAP:
             work_profile = _BUILDING_WORK_MAP[building.type]
             skill_name = work_profile["skill"]
             current_skill = float(agent.resident.skills.get(skill_name, 0.0))
             self._assign_job_for_building(agent.resident, building)
+            if is_work_hour:
+                agent.resident.health.work_streak += 1
+            else:
+                agent.resident.health.work_streak = 0
             # Pay once per stay, not every tick
             already_paid: bool = getattr(agent, "_paid_this_stay", False)
             if not already_paid:
                 if is_work_hour:
                     bonus_income = round(current_skill * work_profile["base_income"])
-                    agent.resident.coins += work_profile["base_income"] + bonus_income
-                    agent.resident.wallet = round(agent.resident.wallet + float(work_profile["base_income"]) + bonus_income, 2)
-                    self._register_gdp(float(work_profile["base_income"]) + bonus_income)
+                    gross_income = work_profile["base_income"] + bonus_income
+                    earned_income = max(1, round(gross_income * self.health_work_efficiency(agent.resident)))
+                    agent.resident.coins += earned_income
+                    agent.resident.wallet = round(agent.resident.wallet + float(earned_income), 2)
+                    self._register_gdp(float(earned_income))
                     item_name = work_profile.get("item_name")
                     if item_name:
                         item_value = int(work_profile.get("item_value", 0) * (1.0 + crafting_knowledge * 0.5))
@@ -1209,6 +1889,9 @@ class World:
                         )
                     agent._paid_this_stay = True  # type: ignore[attr-defined]
             growth = 0.015 if current_skill < 0.6 else 0.008 if current_skill < 0.85 else 0.003
+            if building.type == "cafe" and building.level >= 3 and len(self.get_occupants(building.id)) >= 3:
+                growth += 0.005
+                self.shift_resident_mood(agent, 1, "banquet")
             agent.resident.skills[skill_name] = round(min(1.0, current_skill + growth), 4)
             # Work drains energy every tick
             agent.resident.energy = max(0.0, agent.resident.energy - 0.03)
@@ -1218,6 +1901,11 @@ class World:
                 agent.resident.occupation = "unemployed"
                 self.shift_resident_mood(agent, -1, "job")
             self._purchase_for_resident(agent.resident)
+        else:
+            agent.resident.health.work_streak = 0
+
+        if agent.resident.health.work_streak >= 50:
+            self.infect_resident(agent.resident, "exhaustion")
 
     def building_stay_duration(self) -> int:
         """Return the random number of ticks an agent stays indoors."""
@@ -1314,6 +2002,7 @@ class World:
             self.flagged_residents.add(agent.resident.id)
             if victim is not None:
                 self.shift_resident_mood(victim, -3, f"crime:{crime_type}")
+                self.infect_resident(victim.resident, "injury")
             for resident_agent in self.agents:
                 resident_agent.resident.safety_feeling = max(
                     0.0,
@@ -1392,6 +2081,8 @@ class World:
         """
         movement_candidates = {agent.resident.id for agent in self.agents if agent.resident.location is None}
         self.rebuild_grid_index()
+        self.road_usage = {}
+        self.transport_mode_usage = {mode.value: 0 for mode in TransportMode}
         self.current_tick += 1
         sim_time = self.simulation_time()
         from engine.weather import normalize_season, normalize_weather, sync_weather_cycle
@@ -1421,8 +2112,11 @@ class World:
 
         for agent in self.agents:
             self._ensure_resident_job(agent.resident)
+            self._ensure_resident_health(agent.resident)
             if active_weather is WeatherType.sunny and self.rng.random() < 0.1:
                 self.shift_resident_mood(agent, 1, "weather")
+            if active_weather is WeatherType.stormy and agent.resident.location is None:
+                self.infect_resident(agent.resident, "cold") if self.rng.random() < 0.18 else None
             if agent.resident.energy < 0.2:
                 self.set_resident_mood(agent, "tired", "energy")
             self.update_mental_state(agent.resident)
@@ -1430,6 +2124,19 @@ class World:
                 if self.rng.random() < 0.5:
                     self.shift_resident_mood(agent, -1, "unemployment")
                 self._seek_job(agent)
+            if agent.resident.health.illness is not None:
+                if self.current_tick % 6 == 0:
+                    self.shift_resident_mood(agent, -1, agent.resident.health.illness.type)
+                agent.resident.health.hp = round(max(0.1, agent.resident.health.hp - agent.resident.health.illness.severity * 0.01), 3)
+                hospital = self.nearest_hospital()
+                if hospital is not None and agent.resident.location != hospital.id:
+                    if agent.resident.location is not None:
+                        self.leave_building(agent)
+                    agent.resident.x, agent.resident.y = hospital.position
+                    self.enter_building(agent, hospital)
+                    agent.current_path = []
+                elif hospital is None:
+                    self.recover_resident_health(agent.resident, 0.01)
             if self.mood_score(agent.resident.mood) < 0:
                 self.recall_comforting_memory(agent)
 
@@ -1438,6 +2145,7 @@ class World:
 
         crime_events = self.process_crime_tick()
         pet_events = self.update_pets()
+        culture_events = self.update_cultural_events()
 
         # ── Mood contagion: co-occupants influence each other's mood ──────
         from engine.act import apply_mood_contagion
@@ -1478,6 +2186,7 @@ class World:
         ]
 
         # Clear path cache after tick so the next tick's agent cycle starts fresh
+        self._refresh_transport_stats()
         self.path_cache.clear()
 
         return TickState(
@@ -1487,6 +2196,7 @@ class World:
             events=[
                 *[EventUpdate(description=description) for description in weather_events],
                 *pet_events,
+                *culture_events,
                 *[
                     EventUpdate(description=f"{event.location}发生{event.type}事件")
                     for event in crime_events

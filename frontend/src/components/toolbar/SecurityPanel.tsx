@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { getCrimeLog, getSafetyStats, type CrimeLogEntry, type SafetyStats } from '../../services/api'
 import { PanelShell } from '../ui/PanelShell'
+import { PanelEmptyState, PanelSkeletonGrid, PanelSpinner } from '../ui/PanelStates'
 
 const EMPTY_STATS: SafetyStats = {
   safety_index: 1,
@@ -60,7 +61,12 @@ export function SecurityPanel() {
       </div>
 
       {error ? <p className="text-sm text-rose-300">{error}</p> : null}
-      {loading ? <p className="text-sm text-slate-400">治安数据加载中…</p> : null}
+      {loading ? (
+        <>
+          <PanelSpinner title="治安数据加载中…" message="正在汇总巡逻、热区和案件记录。" />
+          <PanelSkeletonGrid columns={4} />
+        </>
+      ) : null}
 
       <section className="grid gap-3 md:grid-cols-4">
         <MetricCard label="平均安全感" value={formatScore(stats.average_safety_feeling)} />
@@ -77,7 +83,7 @@ export function SecurityPanel() {
           </div>
           <div className="mt-3 grid gap-3">
             {stats.hotspots.length === 0 ? (
-              <p className="text-sm text-slate-500">当前没有犯罪热区。</p>
+              <PanelEmptyState title="当前没有犯罪热区" message="小镇目前较为平静，尚未观察到需要重点巡查的区域。" />
             ) : (
               stats.hotspots.map((spot) => (
                 <div key={spot.location} className="grid gap-1">
@@ -101,7 +107,7 @@ export function SecurityPanel() {
           <h4 className="text-sm font-semibold text-white">类型统计</h4>
           <div className="mt-3 grid gap-2">
             {Object.keys(stats.crimes_by_type).length === 0 ? (
-              <p className="text-sm text-slate-500">暂无案件记录。</p>
+              <PanelEmptyState title="暂无案件记录" message="目前没有可统计的案件类型，继续观察镇上的动向。" />
             ) : (
               Object.entries(stats.crimes_by_type).map(([type, count]) => (
                 <div key={type} className="flex items-center justify-between rounded-lg bg-slate-900/40 px-3 py-2 text-sm text-slate-200">
@@ -125,7 +131,7 @@ export function SecurityPanel() {
         </div>
         <div className="mt-3 grid gap-2">
           {events.length === 0 ? (
-            <p className="text-sm text-slate-500">当前没有犯罪记录。</p>
+            <PanelEmptyState title="当前没有犯罪记录" message="治安日志暂时为空，巡逻与居民秩序保持稳定。" />
           ) : (
             events.map((event, index) => (
               <article key={`${event.tick}-${event.perpetrator}-${index}`} className="rounded-lg bg-slate-900/40 px-3 py-3 text-sm text-slate-200">

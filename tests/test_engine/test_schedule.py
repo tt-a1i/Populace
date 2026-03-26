@@ -161,6 +161,20 @@ def test_rule_plan_inserts_walk_pet_for_dog_owner(world_with_buildings):
     assert plan.get("target") == [12, 12]
 
 
+def test_rule_plan_prefers_nearer_building_when_travel_time_is_limited(world_with_buildings):
+    sched = DailySchedule("普通居民")
+    world_with_buildings.add_building(Building(id="cafe2", type="cafe", name="街角咖啡", capacity=4, position=(6, 5)))
+    agent = make_agent("a4", "阿近", x=5, y=5)
+    agent.resident.home_building_id = "home1"
+    world_with_buildings.add_agent(agent)
+    world_with_buildings.current_tick = 25  # 12:30 lunch
+
+    plan = sched.rule_plan(agent, world_with_buildings)
+
+    assert plan["action"] == "move"
+    assert plan.get("target") == [6, 5]
+
+
 def test_rule_plan_idle_when_already_at_destination(world_with_buildings):
     """Agent already inside the schedule-target building returns idle."""
     sched = DailySchedule("内向")

@@ -1,5 +1,6 @@
 import { Application, Container, Graphics, Rectangle, Text } from 'pixi.js'
 
+import type { WorldTransportPayload } from '../../services/api'
 import { useSimulationStore, type ResidentPosition, type SimulationSpeed } from '../../stores/simulation'
 import type { Building, Festival, Zone } from '../../types'
 import { ResidentSprite, type ResidentHoverInfo } from './ResidentSprite'
@@ -10,6 +11,7 @@ import { RainEffect } from './effects/RainEffect'
 import { SnowEffect } from './effects/SnowEffect'
 import { StormEffect } from './effects/StormEffect'
 import { createWeatherFilter } from './effects/WeatherFilter'
+import { getBuildingVisualProfile } from './buildingVisuals'
 import { BUILDING_SHAPE, getDayLightingFromTime, getGrassDecoration, getSeasonTilePalette } from './visuals'
 import {
   MAP_HEIGHT,
@@ -80,6 +82,7 @@ export class TownRenderer {
   )
   private readonly tileGraphics = new Graphics()
   private readonly zoneGraphics = new Graphics()
+  private readonly transportGraphics = new Graphics()
   private readonly buildingGraphics = new Graphics()
   private readonly buildingLabelLayer = new Container()
   private readonly buildingCapacityLayer = new Container()
@@ -140,7 +143,15 @@ export class TownRenderer {
   private readonly heatmapHistory: Array<{ id: string; x: number; y: number }[]> = []
   private readonly MAX_HEATMAP_TICKS = 100
   private activeFestival: Festival | null = null
+  private currentTransport: WorldTransportPayload = {
+    roads: [],
+    stats: { mode_share: {}, average_travel_ticks: 0, congestion_hotspots: [] },
+  }
   private festivalPulseTime = 0
+  private buildingSignature = ''
+  private transportSignature = ''
+  private zoneSignature = ''
+  private tileVisualSignature = ''
 
   private dragging = false
   private dragPointerId: number | null = null
@@ -194,6 +205,7 @@ export class TownRenderer {
     this.tileLayer.addChild(this.tileGraphics)
     this.zoneLayer.addChild(this.zoneGraphics)
     this.buildingLayer.addChild(
+      this.transportGraphics,
       this.buildingGraphics,
       this.placeholderGraphics,
       this.buildingCapacityLayer,
@@ -287,6 +299,7 @@ export class TownRenderer {
     this.drawTiles()
     this.drawZones()
     this.drawBuildings()
+    this.drawTransport()
     this.drawAmbientAccent()
     this.drawVignette()
     this.updateDayNightOverlay()
@@ -332,7 +345,27 @@ export class TownRenderer {
   }
 
   syncBuildings(buildings: Array<Building & { occupants?: number }>): void {
+    const nextSignature = JSON.stringify(
+      buildings.map((building) => ({
+        id: building.id,
+        name: building.name,
+        type: building.type,
+        position: building.position,
+        capacity: building.capacity,
+        occupants: building.occupants ?? 0,
+        level: building.level ?? 1,
+        decoration_score: building.decoration_score ?? 0,
+        upgrades: building.upgrades ?? [],
+      })),
+    )
     this.currentBuildings = buildings
+
+    if (this.buildingSignature === nextSignature) {
+      this.drawTransport()
+      this.drawFestivalMarker()
+      return
+    }
+    this.buildingSignature = nextSignature
 
     while (this.buildingLabelLayer.children.length > 0) {
       const child = this.buildingLabelLayer.children[0]
@@ -349,22 +382,28 @@ export class TownRenderer {
 
     if (!buildings.length) {
       this.drawBuildings()
+      this.drawTransport()
       this.drawFestivalMarker()
       return
     }
 
     for (const b of buildings) {
       const [bx, by] = b.position
-      const x = bx * TILE_SIZE
-      const y = by * TILE_SIZE
+      const profile = getBuildingVisualProfile(b)
+      const baseWidth = TILE_SIZE * 2
+      const baseHeight = TILE_SIZE * 3
+      const width = baseWidth * profile.widthScale
+      const height = baseHeight * profile.heightScale
+      const x = bx * TILE_SIZE - (width - baseWidth) / 2
+      const y = by * TILE_SIZE - (height - baseHeight)
       const color = TownRenderer.BUILDING_TYPE_COLOR[b.type] ?? TownRenderer.BUILDING_TYPE_COLOR.default
-      const width = TILE_SIZE * 2
-      const height = TILE_SIZE * 3
       const shape = BUILDING_SHAPE[b.type] ?? 'rect'
 
       // Building shadow
       this.buildingGraphics.roundRect(x + 2, y + 2, width, height, 6)
       this.buildingGraphics.fill({ color: 0x000000, alpha: 0.25 })
+      this.buildingGraphics.roundRect(x - 4, y - 4, width + 8, height + 8, 10)
+      this.buildingGraphics.fill({ color, alpha: profile.glowAlpha })
 
       // Building body
       if (shape === 'peaked') {
@@ -412,7 +451,7 @@ export class TownRenderer {
       iconText.label = 'poi-icon'
 
       const nameText = new Text({
-        text: b.name,
+        text: `${b.name}${(b.level ?? 1) > 1 ? ` · Lv.${b.level}` : ''}`,
         style: {
           fill: 0xf8fafc, fontFamily: 'Avenir Next, Helvetica Neue, sans-serif',
           fontSize: 9, fontWeight: '700', wordWrap: true, wordWrapWidth: width + 20, align: 'center',
@@ -467,11 +506,65 @@ export class TownRenderer {
 
     this.updateBuildingLabelsForZoom()
     this.drawPlaceholderBuildings()
+    this.drawTransport()
     this.drawFestivalMarker()
   }
 
+  syncTransport(transport: WorldTransportPayload, buildings: Array<Building & { occupants?: number }> = this.currentBuildings): void {
+    const nextSignature = JSON.stringify({
+      roads: transport.roads,
+      hotspots: transport.stats.congestion_hotspots,
+    })
+    this.currentTransport = transport
+    this.currentBuildings = buildings
+    if (this.transportSignature === nextSignature) {
+      return
+    }
+    this.transportSignature = nextSignature
+    this.drawTransport()
+  }
+
+  private drawTransport(): void {
+    this.transportGraphics.clear()
+    if (!this.currentTransport.roads.length || !this.currentBuildings.length) {
+      return
+    }
+
+    const buildingById = new Map(this.currentBuildings.map((building) => [building.id, building]))
+    for (const road of this.currentTransport.roads) {
+      const from = buildingById.get(road.from_building)
+      const to = buildingById.get(road.to_building)
+      if (!from || !to) {
+        continue
+      }
+
+      const x1 = from.position[0] * TILE_SIZE + TILE_SIZE
+      const y1 = from.position[1] * TILE_SIZE + TILE_SIZE * 1.5
+      const x2 = to.position[0] * TILE_SIZE + TILE_SIZE
+      const y2 = to.position[1] * TILE_SIZE + TILE_SIZE * 1.5
+      const width = 1.5 + Math.min(4, road.traffic * 0.8)
+      const alpha = 0.2 + Math.min(0.45, road.traffic * 0.08)
+      const color = road.traffic >= 4 ? 0xf97316 : road.traffic >= 2 ? 0xfbbf24 : 0x38bdf8
+
+      this.transportGraphics.moveTo(x1, y1)
+      this.transportGraphics.lineTo(x2, y2)
+      this.transportGraphics.stroke({ color, width, alpha })
+    }
+  }
+
   syncZones(zones: Zone[]): void {
+    const nextSignature = JSON.stringify(
+      zones.map((zone) => ({
+        id: zone.id,
+        type: zone.type,
+        bounds: zone.bounds,
+      })),
+    )
     this.currentZones = zones
+    if (this.zoneSignature === nextSignature) {
+      return
+    }
+    this.zoneSignature = nextSignature
     this.drawZones()
   }
 
@@ -528,10 +621,13 @@ export class TownRenderer {
 
     for (const b of this.currentBuildings) {
       const [bx, by] = b.position
-      const x = bx * TILE_SIZE
-      const y = by * TILE_SIZE
-      const w = TILE_SIZE * 2
-      const h = TILE_SIZE * 3
+      const profile = getBuildingVisualProfile(b)
+      const baseWidth = TILE_SIZE * 2
+      const baseHeight = TILE_SIZE * 3
+      const w = baseWidth * profile.widthScale
+      const h = baseHeight * profile.heightScale
+      const x = bx * TILE_SIZE - (w - baseWidth) / 2
+      const y = by * TILE_SIZE - (h - baseHeight)
       if (worldX >= x && worldX <= x + w && worldY >= y && worldY <= y + h) {
         return b
       }
@@ -644,15 +740,16 @@ export class TownRenderer {
   }
 
   updateSimulationMeta(meta: SimulationMeta): void {
+    const previousMeta = this.simulationMeta
     this.simulationMeta = meta
     for (const sprite of this.residents.values()) {
       sprite.setSimulationSpeed(meta.speed)
     }
-    this.updateWeather('sunny')
-    this.drawTiles()
+    if (previousMeta.season !== meta.season) {
+      this.drawTiles()
+    }
     this.updateDayNightOverlay()
     this.renderHud()
-    this.drawFestivalMarker()
   }
 
   setActiveFestival(festival: Festival | null): void {
@@ -820,6 +917,7 @@ export class TownRenderer {
   }
 
   redrawTiles(): void {
+    this.tileVisualSignature = ''
     this.drawTiles()
     this.drawZones()
   }
@@ -1285,6 +1383,14 @@ export class TownRenderer {
   }
 
   private drawTiles(): void {
+    const nextSignature = JSON.stringify({
+      season: this.simulationMeta.season ?? 'spring',
+      weather: this.currentWeather,
+    })
+    if (this.tileVisualSignature === nextSignature) {
+      return
+    }
+    this.tileVisualSignature = nextSignature
     this.tileGraphics.clear()
 
     for (let y = 0; y < MAP_HEIGHT; y += 1) {
@@ -1334,6 +1440,11 @@ export class TownRenderer {
   }
 
   private drawZones(): void {
+    const nextSignature = `${this.zoneSignature}::${this.selectedZoneId ?? ''}`
+    if (nextSignature === this.zoneGraphics.label) {
+      return
+    }
+    this.zoneGraphics.label = nextSignature
     this.zoneGraphics.clear()
 
     for (const zone of this.currentZones) {

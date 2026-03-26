@@ -9,6 +9,7 @@ import {
   type Pet,
   type ResidentAchievement,
   type ResidentDiaryEntry,
+  type ResidentHealthPayload,
   type ResidentJobPayload,
   type ResidentMemory,
   type ResidentMoodLogEntry,
@@ -17,6 +18,7 @@ import {
   getResidentAchievements,
   getResidentDiary,
   getResidentEducation,
+  getResidentHealth,
   getResidentJob,
   getResidentMemories,
   getResidentMoodLog,
@@ -100,6 +102,15 @@ interface ResidentStoryPanelProps {
     skills?: Record<string, number>
     inventory?: Item[]
     pets?: Pet[]
+    health?: {
+      hp?: number
+      illness?: {
+        type: string
+        contagious?: boolean
+        severity?: number
+      } | null
+      recovery_tick?: number
+    }
     energy?: number
     reputation?: number
     currentGoal?: string | null
@@ -164,6 +175,7 @@ export function ResidentStoryPanel({
   const [moodLog, setMoodLog] = useState<ResidentMoodLogEntry[]>([])
   const [pets, setPets] = useState<Pet[]>([])
   const [achievements, setAchievements] = useState<ResidentAchievement[]>([])
+  const [healthInfo, setHealthInfo] = useState<ResidentHealthPayload | null>(null)
   const [jobInfo, setJobInfo] = useState<ResidentJobPayload | null>(null)
   const [memoirBusy, setMemoirBusy] = useState(false)
   const [tradeBusy, setTradeBusy] = useState(false)
@@ -255,6 +267,14 @@ export function ResidentStoryPanel({
         if (!cancelled) setJobInfo(null)
       })
 
+    void getResidentHealth(residentId)
+      .then((data) => {
+        if (!cancelled) setHealthInfo(data)
+      })
+      .catch(() => {
+        if (!cancelled) setHealthInfo(null)
+      })
+
     void getResidentEducation(residentId)
       .then((data) => {
         if (cancelled) return
@@ -272,7 +292,7 @@ export function ResidentStoryPanel({
     return () => {
       cancelled = true
     }
-  }, [residentId, resident?.skills])
+  }, [residentId, resident?.pets, resident?.skills])
 
   if (!resident) return null
 
@@ -291,6 +311,8 @@ export function ResidentStoryPanel({
   const reputationValue = Math.max(-1, Math.min(1, resident.reputation ?? 0))
   const reputationPct = Math.round(((reputationValue + 1) / 2) * 100)
   const isTownCelebrity = reputationValue > 0.8
+  const activeIllness = healthInfo?.health.illness ?? resident.health?.illness ?? null
+  const healthHp = Math.round((healthInfo?.health.hp ?? resident.health?.hp ?? 1) * 100)
 
   const topRelationships = [...relationships]
     .sort((a, b) => b.intensity - a.intensity)
@@ -329,6 +351,15 @@ export function ResidentStoryPanel({
               )}
               {resident.mood && (
                 <span className="text-[11px] text-slate-400">{resident.mood}</span>
+              )}
+              {activeIllness ? (
+                <span className="rounded-full border border-rose-400/20 bg-rose-400/10 px-2.5 py-0.5 text-[11px] text-rose-200">
+                  {activeIllness.type} · HP {healthHp}%
+                </span>
+              ) : (
+                <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-0.5 text-[11px] text-emerald-200">
+                  健康 · HP {healthHp}%
+                </span>
               )}
             </div>
           </div>

@@ -15,6 +15,7 @@ try:
     from backend.api import (
         SimulationState,
         achievements_router,
+        buildings_router,
         director_router,
         quests_router,
         report_router,
@@ -40,7 +41,7 @@ try:
     from backend.core.config import settings
     from backend.core.runtime import ensure_runtime_assets
 except ModuleNotFoundError:
-    from api import SimulationState, achievements_router, director_router, quests_router, report_router, residents_router, saves_router, schemas, settings_router, simulation_router, world_router, ws_router
+    from api import SimulationState, achievements_router, buildings_router, director_router, quests_router, report_router, residents_router, saves_router, schemas, settings_router, simulation_router, world_router, ws_router
     from db import close_driver, close_redis, get_driver, get_redis, initialize_constraints
     from observability import InMemoryRateLimiter, JsonRequestFormatter, RequestMetrics, build_request_log, configure_logging, get_client_ip, get_simulation_ticks_total
     from core.config import settings
@@ -271,6 +272,7 @@ app.include_router(achievements_router)
 app.include_router(director_router)
 app.include_router(quests_router)
 app.include_router(world_router)
+app.include_router(buildings_router)
 app.include_router(report_router)
 app.include_router(saves_router)
 app.include_router(settings_router)

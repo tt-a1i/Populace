@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { createVote, getActiveVotes, getVoteHistory } from '../../services/api'
 import { useSimulationStore } from '../../stores/simulation'
 import { PanelShell } from '../ui/PanelShell'
+import { PanelEmptyState, PanelSpinner } from '../ui/PanelStates'
 
 function normalizeOptions(raw: string): string[] {
   const deduped: string[] = []
@@ -24,11 +25,13 @@ export function VotePanel() {
   const [optionsText, setOptionsText] = useState('建新公园\n维持现状')
   const [durationTicks, setDurationTicks] = useState(8)
   const [busy, setBusy] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
+      setLoading(true)
       try {
         const [active, history] = await Promise.all([getActiveVotes(), getVoteHistory()])
         if (!cancelled) {
@@ -38,6 +41,10 @@ export function VotePanel() {
       } catch {
         if (!cancelled) {
           setError('投票数据加载失败')
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
         }
       }
     })()
@@ -123,6 +130,9 @@ export function VotePanel() {
           </button>
         </div>
       </div>
+      {loading ? (
+        <PanelSpinner title="投票数据加载中…" message="正在同步当前议题和历史决议。" />
+      ) : null}
 
       <section className="grid gap-2">
         <div className="flex items-center justify-between">
@@ -130,7 +140,7 @@ export function VotePanel() {
           <span className="text-xs text-slate-500">{activeVotes.length} 项</span>
         </div>
         {activeVotes.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-500">当前没有进行中的社区投票。</p>
+          <PanelEmptyState title="当前没有进行中的社区投票" message="创建一个新议题，让居民开始讨论和表决。" />
         ) : (
           activeVotes.map((vote) => (
             <article key={vote.id} className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
@@ -157,7 +167,7 @@ export function VotePanel() {
           <span className="text-xs text-slate-500">{voteHistory.length} 项</span>
         </div>
         {voteHistory.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-500">尚未产生社区决议。</p>
+          <PanelEmptyState title="尚未产生社区决议" message="完成一轮居民投票后，这里会沉淀社区的集体决定。" />
         ) : (
           voteHistory.map((vote) => (
             <article key={vote.id} className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">

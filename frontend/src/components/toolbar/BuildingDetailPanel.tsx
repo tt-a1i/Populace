@@ -14,6 +14,12 @@ const TYPE_ICON: Record<string, string> = {
   hospital: '\uD83C\uDFE5',
 }
 
+const SPECIAL_FEATURE_LABEL: Record<string, string> = {
+  banquet: '宴会功能',
+  advanced_courses: '高级课程',
+  surgery: '手术能力',
+}
+
 const STATUS_ICON: Record<string, string> = {
   chatting: '\uD83D\uDCAC',
   idle: '\uD83D\uDCA4',
@@ -80,6 +86,7 @@ export function BuildingDetailPanel({ buildingId, onClose }: BuildingDetailPanel
 
   const icon = TYPE_ICON[data.type] ?? '\uD83C\uDFE2'
   const capacityLabel = data.type === 'park' ? '\u221E' : String(data.capacity)
+  const specialFeature = data.special_feature ? (SPECIAL_FEATURE_LABEL[data.special_feature] ?? data.special_feature) : null
 
   return (
     <div className="grid gap-3">
@@ -89,7 +96,12 @@ export function BuildingDetailPanel({ buildingId, onClose }: BuildingDetailPanel
           <span className="text-xl">{icon}</span>
           <div>
             <h3 className="text-sm font-bold text-white">{data.name}</h3>
-            <p className="text-[10px] uppercase tracking-wider text-slate-500">{data.type}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] uppercase tracking-wider text-slate-500">{data.type}</p>
+              <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-0.5 text-[10px] font-semibold text-amber-100">
+                {`Lv.${data.level}`}
+              </span>
+            </div>
           </div>
         </div>
         <button
@@ -99,6 +111,41 @@ export function BuildingDetailPanel({ buildingId, onClose }: BuildingDetailPanel
         >
           {'\u2715'}
         </button>
+      </div>
+
+      <div className="grid gap-2 rounded-lg border border-white/6 bg-white/[0.03] px-3 py-3">
+        <div className="flex items-center justify-between text-xs text-slate-300">
+          <span>{t('building_detail.decoration_score', '装修分')}</span>
+          <span className="font-semibold text-white">{Math.round(data.decoration_score * 100)}</span>
+        </div>
+        <div className="flex items-center justify-between text-xs text-slate-300">
+          <span>{t('building_detail.visit_willingness', '来访意愿')}</span>
+          <span className="font-semibold text-white">{Math.round(data.visit_willingness * 100)}%</span>
+        </div>
+        <div className="flex items-center justify-between text-xs text-slate-300">
+          <span>{t('building_detail.reserve_need', '升级储备')}</span>
+          <span className={data.reserve_ready ? 'font-semibold text-emerald-300' : 'font-semibold text-amber-300'}>
+            {Math.round(data.required_reserve)}
+          </span>
+        </div>
+        {specialFeature ? (
+          <div className="flex items-center justify-between text-xs text-slate-300">
+            <span>{t('building_detail.special_feature', '特殊功能')}</span>
+            <span className="font-semibold text-fuchsia-200">{specialFeature}</span>
+          </div>
+        ) : null}
+        {data.upgrades.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {data.upgrades.map((upgrade) => (
+              <span
+                key={upgrade}
+                className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2 py-0.5 text-[10px] text-cyan-100"
+              >
+                {upgrade}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* Capacity bar */}

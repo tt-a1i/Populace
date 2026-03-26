@@ -87,6 +87,18 @@ def _step_astar(agent: "Agent", target: tuple, world: "World") -> None:
         _maybe_enter_building(agent, world)
         return
 
+    destination_building = world.get_building_at_position(*target)
+    origin_building = (
+        world.get_building(res.location)
+        if res.location is not None
+        else world.get_building_at_position(*pos) or world.get_building(getattr(res, "home_building_id", None))
+    )
+    road = None
+    if origin_building is not None and destination_building is not None:
+        res.transport_mode = world.choose_transport_mode(res, origin_building, destination_building)
+        world.transport_mode_usage[res.transport_mode.value] = world.transport_mode_usage.get(res.transport_mode.value, 0) + 1
+        road = world.find_road_between(origin_building.id, destination_building.id)
+
     path = agent.current_path
 
     # Recompute when: no path or destination changed
@@ -108,7 +120,13 @@ def _step_astar(agent: "Agent", target: tuple, world: "World") -> None:
 
     # Advance up to 2 steps along the path; elderly residents move at half speed.
     max_steps = 1 if is_elderly(res) or getattr(res, "mental_state", "stable") == "depressed" else 2
+    if road is not None:
+        max_steps = max(max_steps, world.compute_travel_steps(res, road))
     world_rng = getattr(world, "rng", random)
+    if getattr(getattr(res, "health", None), "illness", None) is not None:
+        if world_rng.random() < 0.4:
+            return
+        max_steps = min(max_steps, 1)
     if getattr(world, "weather", WeatherType.sunny) == WeatherType.snowy and max_steps > 1:
         max_steps = 1 if world_rng.random() < 0.3 else max_steps
     steps = min(max_steps, len(agent.current_path))
@@ -118,6 +136,8 @@ def _step_astar(agent: "Agent", target: tuple, world: "World") -> None:
         next_pos = agent.current_path[0]
         if _is_walkable(next_pos[0], next_pos[1], world):
             res.x, res.y = next_pos
+            if road is not None:
+                world.record_road_usage(road, res.id)
             world.mark_grid_index_dirty()
             agent.current_path = agent.current_path[1:]
             # Moving costs energy
@@ -142,6 +162,8 @@ def _step_random(agent: "Agent", world: "World") -> None:
     walkable = [p for p in candidates if _is_walkable(p[0], p[1], world)]
     if walkable:
         world_rng = getattr(world, "rng", random)
+        if getattr(getattr(res, "health", None), "illness", None) is not None and world_rng.random() < 0.4:
+            return
         if getattr(world, "weather", WeatherType.sunny) == WeatherType.snowy and world_rng.random() < 0.3:
             return
         if getattr(res, "mental_state", "stable") == "depressed" and world_rng.random() < 0.5:

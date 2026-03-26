@@ -59,6 +59,12 @@ else:
         winter = "winter"
 
 
+    class TransportMode(str, Enum):
+        walk = "walk"
+        bicycle = "bicycle"
+        cart = "cart"
+
+
     # ---------------------------------------------------------------------------
     # Neo4j node types (§4.5)
     # ---------------------------------------------------------------------------
@@ -125,6 +131,19 @@ else:
         y: int = 0
 
     @dataclass
+    class Illness:
+        type: str
+        contagious: bool = False
+        severity: float = 0.3
+
+    @dataclass
+    class Health:
+        hp: float = 1.0
+        illness: Optional["Illness"] = None
+        recovery_tick: int = 0
+        work_streak: int = 0
+
+    @dataclass
     class Course:
         subject: str
         name: str
@@ -154,6 +173,43 @@ else:
         duration: int
         location: str
         participants: List[str] = field(default_factory=list)
+
+    @dataclass
+    class CulturalEvent:
+        type: str
+        name: str
+        venue_id: str
+        organizer_id: str
+        participants: List[str] = field(default_factory=list)
+        tick_start: int = 0
+        duration: int = 0
+
+    @dataclass
+    class BulletinPost:
+        id: str
+        author_id: str
+        content: str
+        tick: int
+        likes: List[str] = field(default_factory=list)
+        category: str = "social"
+        topic: str = ""
+        subject_id: str = ""
+        tone: str = "positive"
+        author_name: str = ""
+
+        def __post_init__(self) -> None:
+            self.category = (self.category or "social").strip().lower() or "social"
+            self.topic = (self.topic or self.category).strip() or "social"
+            self.subject_id = (self.subject_id or self.author_id).strip() or self.author_id
+            normalized_tone = (self.tone or "positive").strip().lower()
+            if normalized_tone not in {"positive", "negative", "neutral"}:
+                normalized_tone = "positive"
+            self.tone = normalized_tone
+            deduped_likes: List[str] = []
+            for resident_id in self.likes:
+                if resident_id and resident_id not in deduped_likes:
+                    deduped_likes.append(resident_id)
+            self.likes = deduped_likes
 
     @dataclass
     class Education:
@@ -188,6 +244,14 @@ else:
         resolved: bool = False
 
     @dataclass
+    class Road:
+        from_building: str
+        to_building: str
+        distance: float
+        road_type: str = "street"
+        traffic: int = 0
+
+    @dataclass
     class Resident:
         """An AI resident of the town. Maps to a Neo4j ``Resident`` node."""
 
@@ -212,6 +276,7 @@ else:
         skills: Dict[str, float] = field(default_factory=dict)
         inventory: List["Item"] = field(default_factory=list)
         energy: float = 1.0
+        transport_mode: "TransportMode" = TransportMode.walk
         age_days: int = 0
         mood_history: List["MoodEntry"] = field(default_factory=list)
         mental_state: str = "stable"
@@ -221,6 +286,8 @@ else:
         reputation: float = 0.0
         reputation_history: List["ReputationEntry"] = field(default_factory=list)
         education: "Education" = field(default_factory=Education)
+        artistic_talent: float = 0.0
+        health: "Health" = field(default_factory=Health)
         family: "FamilyInfo" = field(default_factory=FamilyInfo)
         achievements: List["Achievement"] = field(default_factory=list)
         memories: List["Memory"] = field(default_factory=list)
@@ -237,6 +304,9 @@ else:
         name: str
         capacity: int
         position: Tuple[int, int]
+        level: int = 1
+        upgrades: List[str] = field(default_factory=list)
+        decoration_score: float = 0.0
 
 
     @dataclass

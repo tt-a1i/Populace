@@ -11,7 +11,14 @@ import { useTranslation } from 'react-i18next'
 import { Application } from 'pixi.js'
 
 import { useSound } from '../../audio'
-import { getActiveEvents, getZones, injectEvent, type ActiveEvent } from '../../services/api'
+import {
+  getActiveEvents,
+  getWorldTransport,
+  getZones,
+  injectEvent,
+  type ActiveEvent,
+  type WorldTransportPayload,
+} from '../../services/api'
 import { useToast } from '../ui/ToastProvider'
 import { useRelationshipsStore } from '../../stores/relationships'
 import type { Festival, Zone } from '../../types'
@@ -100,6 +107,10 @@ export function TownCanvas() {
   const [followedResidentId, setFollowedResidentId] = useState<string | null>(null)
   const [heatmapOn, setHeatmapOn] = useState(false)
   const [zones, setZones] = useState<Zone[]>([])
+  const [transport, setTransport] = useState<WorldTransportPayload>({
+    roads: [],
+    stats: { mode_share: {}, average_travel_ticks: 0, congestion_hotspots: [] },
+  })
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null)
   const lastRecordedTick = useRef(0)
 
@@ -384,7 +395,6 @@ export function TownCanvas() {
 
       const state = useSimulationStore.getState()
       renderer.syncBuildings(state.buildings)
-      renderer.syncZones(zones)
       renderer.syncResidents(state.residents)
       renderer.updateSimulationMeta({
         running: state.running,
@@ -426,6 +436,10 @@ export function TownCanvas() {
   useEffect(() => {
     rendererRef.current?.syncZones(zones)
   }, [zones])
+
+  useEffect(() => {
+    rendererRef.current?.syncTransport(transport, buildings)
+  }, [buildings, transport])
 
   useEffect(() => {
     rendererRef.current?.syncResidents(renderResidents)
@@ -534,6 +548,31 @@ export function TownCanvas() {
     }
 
     void loadZones()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadTransport = async () => {
+      try {
+        const nextTransport = await getWorldTransport()
+        if (!cancelled) {
+          setTransport(nextTransport)
+        }
+      } catch {
+        if (!cancelled) {
+          setTransport({
+            roads: [],
+            stats: { mode_share: {}, average_travel_ticks: 0, congestion_hotspots: [] },
+          })
+        }
+      }
+    }
+
+    void loadTransport()
     return () => {
       cancelled = true
     }

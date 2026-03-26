@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockScreenToTile, mockInjectEvent, mockPushToast, mockPlay, mockGetActiveEvents, mockGetZones } = vi.hoisted(() => ({
+const { mockScreenToTile, mockInjectEvent, mockPushToast, mockPlay, mockGetActiveEvents, mockGetZones, mockGetWorldTransport } = vi.hoisted(() => ({
   mockScreenToTile: vi.fn(),
   mockInjectEvent: vi.fn().mockResolvedValue({}),
   mockGetActiveEvents: vi.fn().mockResolvedValue([{ id: 'evt-1', radius: 6 }]),
@@ -18,6 +18,22 @@ const { mockScreenToTile, mockInjectEvent, mockPushToast, mockPlay, mockGetActiv
       dominant_building_types: ['cafe'],
     },
   ]),
+  mockGetWorldTransport: vi.fn().mockResolvedValue({
+    roads: [
+      {
+        from_building: 'cafe',
+        to_building: 'home1',
+        distance: 6,
+        road_type: 'street',
+        traffic: 3,
+      },
+    ],
+    stats: {
+      mode_share: { walk: 2, bicycle: 1, cart: 0 },
+      average_travel_ticks: 4,
+      congestion_hotspots: [{ road_key: 'cafe:home1', traffic: 3, slowdown: 0.25 }],
+    },
+  }),
   mockPushToast: vi.fn(),
   mockPlay: vi.fn(),
 }))
@@ -52,6 +68,7 @@ vi.mock('../components/town/TownRenderer', () => ({
     setSelectedZone = vi.fn()
     setActiveFestival = vi.fn()
     showEventRadii = vi.fn()
+    syncTransport = vi.fn()
     drawRelationshipLines = vi.fn()
     setHeatmapEnabled = vi.fn()
     recordHeatmapTick = vi.fn()
@@ -65,6 +82,7 @@ vi.mock('../components/town/TownRenderer', () => ({
 vi.mock('../services/api', () => ({
   getActiveEvents: mockGetActiveEvents,
   getZones: mockGetZones,
+  getWorldTransport: mockGetWorldTransport,
   injectEvent: mockInjectEvent,
 }))
 
@@ -207,6 +225,7 @@ describe('TownCanvas', () => {
     mockPlay.mockClear()
     mockGetActiveEvents.mockClear()
     mockGetZones.mockClear()
+    mockGetWorldTransport.mockClear()
     mockGetActiveEvents.mockResolvedValue([{ id: 'evt-1', radius: 6 }])
     vi.stubGlobal('ResizeObserver', MockResizeObserver)
   })
@@ -297,6 +316,23 @@ describe('TownCanvas', () => {
     await user.pointer([{ target: shell, keys: '[MouseLeft]', coords: { x: 40, y: 40 } }])
 
     expect(await screen.findByTestId('town-zone-panel')).toHaveTextContent('商业活力带')
+  })
+
+  it('loads transport network and forwards it to the renderer', async () => {
+    render(<TownCanvas />)
+
+    await waitFor(() => {
+      expect(mockGetWorldTransport).toHaveBeenCalledTimes(1)
+    })
+
+    const rendererInstances = (await import('../components/town/TownRenderer')).TownRenderer as unknown as {
+      instances: Array<{ syncTransport: ReturnType<typeof vi.fn> }>
+    }
+    const transportCalls = rendererInstances.instances[0]?.syncTransport.mock.calls ?? []
+    expect(transportCalls.some(([payload]) =>
+      payload?.roads?.some((road: { from_building: string; to_building: string }) => road.from_building === 'cafe' && road.to_building === 'home1')
+        && payload?.stats?.mode_share?.bicycle === 1,
+    )).toBe(true)
   })
 
   it('forwards the active festival marker to the renderer', async () => {

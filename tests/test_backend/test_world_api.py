@@ -35,6 +35,42 @@ def test_list_buildings(client):
     assert isinstance(response.json(), list)
 
 
+def test_building_upgrade_endpoints_expose_level_and_detail_metadata(client):
+    state = client.app.state.simulation_state
+    building = state.world.buildings[0]
+    original_level = getattr(building, "level", 1)
+    original_upgrades = list(getattr(building, "upgrades", []))
+    original_decoration = getattr(building, "decoration_score", 0.0)
+
+    try:
+        building.level = 2
+        building.upgrades = ["expanded"]
+        building.decoration_score = 0.72
+
+        upgrades_response = client.get("/api/world/buildings/upgrades")
+        assert upgrades_response.status_code == 200
+        upgrades = upgrades_response.json()
+        row = next(item for item in upgrades if item["id"] == building.id)
+        assert row["level"] == 2
+        assert row["upgrades"] == ["expanded"]
+        assert row["next_level"] == 3
+        assert "required_reserve" in row
+
+        details_response = client.get(f"/api/buildings/{building.id}/details")
+        assert details_response.status_code == 200
+        detail = details_response.json()
+        assert detail["id"] == building.id
+        assert detail["level"] == 2
+        assert detail["decoration_score"] == pytest.approx(0.72)
+        assert detail["upgrades"] == ["expanded"]
+        assert "special_feature" in detail
+        assert "visit_willingness" in detail
+    finally:
+        building.level = original_level
+        building.upgrades = original_upgrades
+        building.decoration_score = original_decoration
+
+
 def test_vote_lifecycle_and_history_applies_world_effect(client):
     state = client.app.state.simulation_state
     original_tick = state.world.current_tick
@@ -151,6 +187,39 @@ def test_get_weather_returns_current_weather_season_and_forecast(client):
     assert set(payload["forecast"]).issubset({"sunny", "cloudy", "rainy", "stormy", "snowy"})
 
 
+def test_get_world_health_returns_epidemic_stats(client):
+    state = client.app.state.simulation_state
+    residents = state.world.agents[:2]
+    from engine.types import Illness
+
+    residents[0].resident.health.illness = Illness(type="cold", contagious=True, severity=0.35)
+    residents[0].resident.health.hp = 0.7
+    residents[0].resident.location = "hospital1"
+    residents[1].resident.health.illness = Illness(type="flu", contagious=True, severity=0.65)
+    residents[1].resident.health.hp = 0.5
+
+    response = client.get("/api/world/health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["active_cases"] >= 2
+    assert payload["illness_counts"]["cold"] >= 1
+    assert payload["illness_counts"]["flu"] >= 1
+    assert "treatment_rate" in payload
+
+
+def test_transport_endpoint_returns_road_network_and_stats(client):
+    response = client.get("/api/world/transport")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert isinstance(payload["roads"], list)
+    assert payload["roads"]
+    assert "stats" in payload
+    assert "mode_share" in payload["stats"]
+    assert "congestion_hotspots" in payload["stats"]
+
+
 def test_list_families(client):
     response = client.get("/api/world/families")
 
@@ -204,6 +273,50 @@ def test_list_festivals_exposes_current_and_history(client):
     finally:
         state._active_festivals = original_active
         state._festival_history = original_history
+
+
+def test_world_bulletin_returns_posts_and_hot_topics(client):
+    state = client.app.state.simulation_state
+    original_posts = list(getattr(state, "_bulletin_posts", []))
+    original_topics = list(getattr(state, "_bulletin_hot_topics", []))
+
+    try:
+        state._bulletin_posts = [
+            {
+                "id": "post-1",
+                "author_id": "a1",
+                "author_name": "小明",
+                "content": "春日祭太棒了，今晚广场全是笑声。",
+                "tick": 96,
+                "likes": ["a2", "a3"],
+                "category": "festival",
+                "topic": "spring_festival",
+                "subject_id": "a1",
+                "tone": "positive",
+            }
+        ]
+        state._bulletin_hot_topics = [
+            {
+                "topic": "spring_festival",
+                "label": "春日祭",
+                "category": "festival",
+                "post_count": 3,
+                "heat": 1.0,
+                "sentiment": "positive",
+            }
+        ]
+
+        response = client.get("/api/world/bulletin")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["posts"][0]["author_name"] == "小明"
+        assert payload["posts"][0]["likes"] == ["a2", "a3"]
+        assert payload["posts"][0]["topic"] == "spring_festival"
+        assert payload["hot_topics"][0]["label"] == "春日祭"
+        assert payload["hot_topics"][0]["heat"] == 1.0
+    finally:
+        state._bulletin_posts = original_posts
+        state._bulletin_hot_topics = original_topics
 
 
 def test_family_dinner_event_triggers_every_50_ticks(client):

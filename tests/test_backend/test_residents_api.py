@@ -141,6 +141,19 @@ def test_get_resident_pets(client):
     assert payload[0]["owner_id"] == pet_owner["id"]
 
 
+def test_get_resident_health(client):
+    residents = client.get("/api/residents").json()
+    rid = residents[0]["id"]
+
+    response = client.get(f"/api/residents/{rid}/health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["resident_id"] == rid
+    assert "health" in payload
+    assert "hp" in payload["health"]
+
+
 def test_get_resident_family_profile(client):
     residents = client.get("/api/residents").json()
     rid = residents[0]["id"]

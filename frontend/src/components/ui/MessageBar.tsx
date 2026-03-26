@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { FeedMessage } from '../../stores/simulation'
@@ -27,7 +27,8 @@ const KIND_STYLES: Record<FeedMessage['kind'], { dot: string; bg: string; textCl
 
 export function MessageBar() {
   const { t } = useTranslation()
-  const messages = useSimulationStore((state) => state.messageFeed)
+  const messageFeed = useSimulationStore((state) => state.messageFeed)
+  const messages = useMemo(() => messageFeed ?? [], [messageFeed])
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const isEmpty = messages.length === 0

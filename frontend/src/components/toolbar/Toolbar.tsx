@@ -1,32 +1,11 @@
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { BuildPanel } from './BuildPanel'
-import { ComparePanel } from './ComparePanel'
 import { DirectorConsole } from './DirectorConsole'
-import { DialogueHistory } from './DialogueHistory'
-import { EconomyPanel } from './EconomyPanel'
-import { ExportPanel } from './ExportPanel'
 import { PersonaEditor } from './PersonaEditor'
 import { QuestPanel } from './QuestPanel'
-import { ReputationPanel } from './ReputationPanel'
-import { ResidentCreationWizard } from './ResidentCreationWizard'
-import { SavesPanel } from './SavesPanel'
-import { SettingsPanel } from './SettingsPanel'
-import { SecurityPanel } from './SecurityPanel'
-import { TimelinePanel } from './TimelinePanel'
-import { VotePanel } from './VotePanel'
-import { FamilyPanel } from './FamilyPanel'
 import { ReportsPanel } from '../report'
-import { ActivityLog } from '../ui/ActivityLog'
-import { DashboardView } from './DashboardView'
-import { LeaderboardPanel } from './LeaderboardPanel'
-import { AchievementWall } from './AchievementWall'
-import { NewspaperPanel } from './NewspaperPanel'
-import { WhatIfPanel } from './WhatIfPanel'
-import { MapEditor } from '../town/MapEditor'
-import { RulesPanel } from './RulesPanel'
-import { KnowledgeGraphPanel } from './KnowledgeGraphPanel'
+import { PanelSpinner } from '../ui/PanelStates'
 
 const StatsPanel = lazy(() =>
   import('./StatsPanel').then((module) => ({ default: module.StatsPanel })),
@@ -34,10 +13,85 @@ const StatsPanel = lazy(() =>
 const HeatmapPanel = lazy(() =>
   import('./HeatmapPanel').then((module) => ({ default: module.HeatmapPanel })),
 )
+const BuildPanel = lazy(() =>
+  import('./BuildPanel').then((module) => ({ default: module.BuildPanel })),
+)
+const ComparePanel = lazy(() =>
+  import('./ComparePanel').then((module) => ({ default: module.ComparePanel })),
+)
+const CulturePanel = lazy(() =>
+  import('./CulturePanel').then((module) => ({ default: module.CulturePanel })),
+)
+const DialogueHistory = lazy(() =>
+  import('./DialogueHistory').then((module) => ({ default: module.DialogueHistory })),
+)
+const BulletinPanel = lazy(() =>
+  import('./BulletinPanel').then((module) => ({ default: module.BulletinPanel })),
+)
+const EconomyPanel = lazy(() =>
+  import('./EconomyPanel').then((module) => ({ default: module.EconomyPanel })),
+)
+const ExportPanel = lazy(() =>
+  import('./ExportPanel').then((module) => ({ default: module.ExportPanel })),
+)
+const ReputationPanel = lazy(() =>
+  import('./ReputationPanel').then((module) => ({ default: module.ReputationPanel })),
+)
+const ResidentCreationWizard = lazy(() =>
+  import('./ResidentCreationWizard').then((module) => ({ default: module.ResidentCreationWizard })),
+)
+const SavesPanel = lazy(() =>
+  import('./SavesPanel').then((module) => ({ default: module.SavesPanel })),
+)
+const SettingsPanel = lazy(() =>
+  import('./SettingsPanel').then((module) => ({ default: module.SettingsPanel })),
+)
+const SecurityPanel = lazy(() =>
+  import('./SecurityPanel').then((module) => ({ default: module.SecurityPanel })),
+)
+const HealthPanel = lazy(() =>
+  import('./HealthPanel').then((module) => ({ default: module.HealthPanel })),
+)
+const TimelinePanel = lazy(() =>
+  import('./TimelinePanel').then((module) => ({ default: module.TimelinePanel })),
+)
+const VotePanel = lazy(() =>
+  import('./VotePanel').then((module) => ({ default: module.VotePanel })),
+)
+const FamilyPanel = lazy(() =>
+  import('./FamilyPanel').then((module) => ({ default: module.FamilyPanel })),
+)
+const ActivityLog = lazy(() =>
+  import('../ui/ActivityLog').then((module) => ({ default: module.ActivityLog })),
+)
+const DashboardView = lazy(() =>
+  import('./DashboardView').then((module) => ({ default: module.DashboardView })),
+)
+const LeaderboardPanel = lazy(() =>
+  import('./LeaderboardPanel').then((module) => ({ default: module.LeaderboardPanel })),
+)
+const AchievementWall = lazy(() =>
+  import('./AchievementWall').then((module) => ({ default: module.AchievementWall })),
+)
+const NewspaperPanel = lazy(() =>
+  import('./NewspaperPanel').then((module) => ({ default: module.NewspaperPanel })),
+)
+const WhatIfPanel = lazy(() =>
+  import('./WhatIfPanel').then((module) => ({ default: module.WhatIfPanel })),
+)
+const MapEditor = lazy(() =>
+  import('../town/MapEditor').then((module) => ({ default: module.MapEditor })),
+)
+const RulesPanel = lazy(() =>
+  import('./RulesPanel').then((module) => ({ default: module.RulesPanel })),
+)
+const KnowledgeGraphPanel = lazy(() =>
+  import('./KnowledgeGraphPanel').then((module) => ({ default: module.KnowledgeGraphPanel })),
+)
 
 const OPEN_SETTINGS_EVENT = 'populace:open-settings'
 
-type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'votes' | 'security' | 'family' | 'economy' | 'reputation' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard' | 'leaderboard' | 'achievements' | 'newspaper' | 'fullreport' | 'whatif' | 'mapeditor' | 'rules' | 'knowledge'
+type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'votes' | 'security' | 'health' | 'family' | 'economy' | 'culture' | 'reputation' | 'bulletin' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard' | 'leaderboard' | 'achievements' | 'newspaper' | 'fullreport' | 'whatif' | 'mapeditor' | 'rules' | 'knowledge'
 
 interface ToolDef {
   key: ToolKey
@@ -61,7 +115,7 @@ function toneClass(_tone: string, active: boolean): string {
 
 const SECONDARY_KEYS: ReadonlySet<ToolKey> = new Set([
   'create', 'build', 'stats', 'dialogue', 'activity', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings', 'dashboard', 'leaderboard', 'achievements', 'newspaper', 'fullreport', 'whatif', 'mapeditor', 'rules', 'knowledge',
-  'votes', 'security', 'family', 'economy', 'reputation',
+  'votes', 'security', 'health', 'family', 'economy', 'culture', 'reputation', 'bulletin',
 ])
 
 export function Toolbar() {
@@ -128,9 +182,12 @@ export function Toolbar() {
     { key: 'build', label: t('toolbar.build'), icon: '\uD83C\uDFD7', tone: 'emerald' },
     { key: 'votes', label: t('toolbar.votes', { defaultValue: '社区投票' }), icon: '\uD83D\uDDD3\uFE0F', tone: 'amber' },
     { key: 'security', label: t('toolbar.security', { defaultValue: '治安面板' }), icon: '\uD83D\uDEE1\uFE0F', tone: 'rose' },
+    { key: 'health', label: t('toolbar.health', { defaultValue: '健康面板' }), icon: '\uD83E\uDE7A', tone: 'emerald' },
     { key: 'family', label: t('toolbar.family', { defaultValue: '家族谱系' }), icon: '\uD83C\uDF33', tone: 'emerald' },
     { key: 'economy', label: t('toolbar.economy', { defaultValue: '经济面板' }), icon: '\uD83D\uDCB0', tone: 'emerald' },
+    { key: 'culture', label: t('toolbar.culture', { defaultValue: '文化面板' }), icon: '\uD83C\uDFA8', tone: 'rose' },
     { key: 'reputation', label: t('toolbar.reputation', { defaultValue: '声望排行榜' }), icon: '\u2B50', tone: 'amber' },
+    { key: 'bulletin', label: t('toolbar.bulletin', { defaultValue: '公告板' }), icon: '\uD83D\uDCCC', tone: 'rose' },
     { key: 'stats', label: t('toolbar.stats'), icon: '\uD83D\uDCCA', tone: 'cyan' },
     { key: 'dialogue', label: t('toolbar.dialogue_history'), icon: '\uD83D\uDCAC', tone: 'amber' },
     { key: 'activity', label: t('toolbar.activity_log', '\u6D3B\u52A8\u65E5\u5FD7'), icon: '\uD83D\uDCDC', tone: 'cyan' },
@@ -165,7 +222,6 @@ export function Toolbar() {
     if (activeTool === 'director') return <DirectorConsole />
     if (activeTool === 'persona') return <PersonaEditor />
     if (activeTool === 'quest') return <QuestPanel />
-    if (activeTool === 'saves') return <SavesPanel />
     if (activeTool === 'stats') {
       return (
         <Suspense fallback={<PanelLoading label={t('toolbar.stats')} />}>
@@ -173,16 +229,20 @@ export function Toolbar() {
         </Suspense>
       )
     }
-    if (activeTool === 'dialogue') return <DialogueHistory />
-    if (activeTool === 'activity') return <ActivityLog />
-    if (activeTool === 'build') return <BuildPanel />
-    if (activeTool === 'votes') return <VotePanel />
-    if (activeTool === 'security') return <SecurityPanel />
-    if (activeTool === 'family') return <FamilyPanel />
-    if (activeTool === 'economy') return <EconomyPanel />
-    if (activeTool === 'reputation') return <ReputationPanel />
-    if (activeTool === 'create') return <ResidentCreationWizard />
-    if (activeTool === 'export') return <ExportPanel />
+    if (activeTool === 'dialogue') return <LazyPanel label={t('toolbar.dialogue_history')}><DialogueHistory /></LazyPanel>
+    if (activeTool === 'activity') return <LazyPanel label={t('toolbar.activity_log', '活动日志')}><ActivityLog /></LazyPanel>
+    if (activeTool === 'build') return <LazyPanel label={t('toolbar.build')}><BuildPanel /></LazyPanel>
+    if (activeTool === 'votes') return <LazyPanel label={t('toolbar.votes', { defaultValue: '社区投票' })}><VotePanel /></LazyPanel>
+    if (activeTool === 'security') return <LazyPanel label={t('toolbar.security', { defaultValue: '治安面板' })}><SecurityPanel /></LazyPanel>
+    if (activeTool === 'health') return <LazyPanel label={t('toolbar.health', { defaultValue: '健康面板' })}><HealthPanel /></LazyPanel>
+    if (activeTool === 'family') return <LazyPanel label={t('toolbar.family', { defaultValue: '家族谱系' })}><FamilyPanel /></LazyPanel>
+    if (activeTool === 'economy') return <LazyPanel label={t('toolbar.economy', { defaultValue: '经济面板' })}><EconomyPanel /></LazyPanel>
+    if (activeTool === 'culture') return <LazyPanel label={t('toolbar.culture', { defaultValue: '文化面板' })}><CulturePanel /></LazyPanel>
+    if (activeTool === 'reputation') return <LazyPanel label={t('toolbar.reputation', { defaultValue: '声望排行榜' })}><ReputationPanel /></LazyPanel>
+    if (activeTool === 'bulletin') return <LazyPanel label={t('toolbar.bulletin', { defaultValue: '公告板' })}><BulletinPanel /></LazyPanel>
+    if (activeTool === 'create') return <LazyPanel label={t('toolbar.create')}><ResidentCreationWizard /></LazyPanel>
+    if (activeTool === 'export') return <LazyPanel label={t('toolbar.export')}><ExportPanel /></LazyPanel>
+    if (activeTool === 'saves') return <LazyPanel label={t('toolbar.saves')}><SavesPanel /></LazyPanel>
     if (activeTool === 'heatmap') {
       return (
         <Suspense fallback={<PanelLoading label={t('toolbar.heatmap')} />}>
@@ -190,17 +250,23 @@ export function Toolbar() {
         </Suspense>
       )
     }
-    if (activeTool === 'compare') return <ComparePanel />
-    if (activeTool === 'timeline') return <TimelinePanel />
-    if (activeTool === 'settings') return <SettingsPanel />
-    if (activeTool === 'dashboard') return <DashboardView />
-    if (activeTool === 'leaderboard') return <LeaderboardPanel />
-    if (activeTool === 'achievements') return <AchievementWall />
-    if (activeTool === 'newspaper' || activeTool === 'fullreport') return <NewspaperPanel />
-    if (activeTool === 'whatif') return <WhatIfPanel />
-    if (activeTool === 'mapeditor') return <MapEditor onTilesChanged={() => window.dispatchEvent(new CustomEvent('populace:tiles-changed'))} onClose={() => { setActiveTool('director'); setShowSecondary(false) }} />
-    if (activeTool === 'rules') return <RulesPanel />
-    if (activeTool === 'knowledge') return <KnowledgeGraphPanel />
+    if (activeTool === 'compare') return <LazyPanel label={t('toolbar.compare')}><ComparePanel /></LazyPanel>
+    if (activeTool === 'timeline') return <LazyPanel label={t('toolbar.timeline')}><TimelinePanel /></LazyPanel>
+    if (activeTool === 'settings') return <LazyPanel label={t('toolbar.settings')}><SettingsPanel /></LazyPanel>
+    if (activeTool === 'dashboard') return <LazyPanel label={t('toolbar.dashboard', { defaultValue: 'Dashboard' })}><DashboardView /></LazyPanel>
+    if (activeTool === 'leaderboard') return <LazyPanel label={t('toolbar.leaderboard', { defaultValue: 'Rankings' })}><LeaderboardPanel /></LazyPanel>
+    if (activeTool === 'achievements') return <LazyPanel label={t('toolbar.achievements', { defaultValue: 'Achievements' })}><AchievementWall /></LazyPanel>
+    if (activeTool === 'newspaper' || activeTool === 'fullreport') return <LazyPanel label={t('toolbar.newspaper', { defaultValue: 'Gazette' })}><NewspaperPanel /></LazyPanel>
+    if (activeTool === 'whatif') return <LazyPanel label={t('toolbar.whatif', { defaultValue: 'What-If' })}><WhatIfPanel /></LazyPanel>
+    if (activeTool === 'mapeditor') {
+      return (
+        <LazyPanel label={t('toolbar.mapeditor', { defaultValue: '\u5730\u56FE\u7F16\u8F91' })}>
+          <MapEditor onTilesChanged={() => window.dispatchEvent(new CustomEvent('populace:tiles-changed'))} onClose={() => { setActiveTool('director'); setShowSecondary(false) }} />
+        </LazyPanel>
+      )
+    }
+    if (activeTool === 'rules') return <LazyPanel label={t('toolbar.rules', { defaultValue: '\u89C4\u5219\u5F15\u64CE' })}><RulesPanel /></LazyPanel>
+    if (activeTool === 'knowledge') return <LazyPanel label={t('toolbar.knowledge', { defaultValue: 'Knowledge Graph' })}><KnowledgeGraphPanel /></LazyPanel>
     return <ReportsPanel />
   }, [activeTool, t])
 
@@ -266,9 +332,9 @@ export function Toolbar() {
 }
 
 function PanelLoading({ label }: { label: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-slate-300">
-      {label}
-    </div>
-  )
+  return <PanelSpinner title={label} message="模块正在按需加载…" />
+}
+
+function LazyPanel({ label, children }: { label: string; children: React.ReactNode }) {
+  return <Suspense fallback={<PanelLoading label={label} />}>{children}</Suspense>
 }

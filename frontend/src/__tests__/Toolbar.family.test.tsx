@@ -85,6 +85,6 @@ describe('Toolbar family tool', () => {
     render(<Toolbar />)
     await userEvent.click(screen.getByTestId('more-toggle'))
     await userEvent.click(screen.getByRole('button', { name: /家族谱系/i }))
-    expect(screen.getByTestId('family-panel')).toBeInTheDocument()
+    expect(await screen.findByTestId('family-panel')).toBeInTheDocument()
   })
 })

@@ -18,6 +18,18 @@ export interface Pet {
   y?: number
 }
 
+export interface Illness {
+  type: string
+  contagious?: boolean
+  severity?: number
+}
+
+export interface HealthState {
+  hp: number
+  illness?: Illness | null
+  recovery_tick: number
+}
+
 export interface ApiResident {
   id: string
   name: string
@@ -40,6 +52,7 @@ export interface ApiResident {
   energy?: number
   reputation?: number
   pets?: Pet[]
+  health?: HealthState
 }
 
 export interface ResidentJob {
@@ -123,6 +136,33 @@ export interface FestivalRecord {
 export interface FestivalListResponse {
   current: FestivalRecord[]
   history: FestivalRecord[]
+}
+
+export interface BulletinPostRecord {
+  id: string
+  author_id: string
+  author_name: string
+  content: string
+  tick: number
+  likes: string[]
+  category: string
+  topic: string
+  subject_id: string
+  tone: 'positive' | 'negative' | 'neutral' | string
+}
+
+export interface BulletinTopicRecord {
+  topic: string
+  label: string
+  category: string
+  post_count: number
+  heat: number
+  sentiment: 'positive' | 'negative' | 'neutral' | string
+}
+
+export interface WorldBulletinPayload {
+  posts: BulletinPostRecord[]
+  hot_topics: BulletinTopicRecord[]
 }
 
 interface VotePayload {
@@ -267,6 +307,10 @@ export function getFestivals() {
   return request<FestivalListResponse>('/api/world/festivals')
 }
 
+export function getWorldBulletin() {
+  return request<WorldBulletinPayload>('/api/world/bulletin')
+}
+
 export function getResidents() {
   return request<ApiResident[]>('/api/residents')
 }
@@ -333,6 +377,22 @@ export interface ResidentMoodLogEntry {
   cause: string
 }
 
+export interface ResidentHealthPayload {
+  resident_id: string
+  resident_name: string
+  health: HealthState
+}
+
+export interface WorldHealthPayload {
+  active_cases: number
+  contagious_cases: number
+  hospitalized_count: number
+  treatment_rate: number
+  average_hp: number
+  illness_counts: Record<string, number>
+  outbreak_hotspots: Array<{ location: string; cases: number; intensity: number }>
+}
+
 export interface ReputationHistoryEntry {
   tick: number
   source: string
@@ -381,7 +441,7 @@ export interface ResidentEducationPayload {
   }
 }
 
-export interface WorldPetPayload extends Pet {}
+export type WorldPetPayload = Pet
 
 export interface TradeResidentItemPayload {
   buyer_id: string
@@ -496,6 +556,10 @@ export function getResidentMoodLog(id: string) {
   return request<ResidentMoodLogEntry[]>(`/api/residents/${id}/mood-log`)
 }
 
+export function getResidentHealth(id: string) {
+  return request<ResidentHealthPayload>(`/api/residents/${id}/health`)
+}
+
 export function getResidentReputation(id: string) {
   return request<ResidentReputation>(`/api/residents/${id}/reputation`)
 }
@@ -600,6 +664,35 @@ export function getSafetyStats() {
   return request<SafetyStats>('/api/world/safety')
 }
 
+export interface TransportRoad {
+  from_building: string
+  to_building: string
+  distance: number
+  road_type: string
+  traffic: number
+}
+
+export interface TransportHotspot {
+  road_key: string
+  traffic: number
+  slowdown: number
+}
+
+export interface TransportStats {
+  mode_share: Record<string, number>
+  average_travel_ticks: number
+  congestion_hotspots: TransportHotspot[]
+}
+
+export interface WorldTransportPayload {
+  roads: TransportRoad[]
+  stats: TransportStats
+}
+
+export function getWorldTransport() {
+  return request<WorldTransportPayload>('/api/world/transport')
+}
+
 export interface RelationshipHistoryPoint {
   tick: number
   time: string
@@ -671,6 +764,9 @@ export interface BuildingData {
   name: string
   capacity: number
   position: [number, number]
+  level?: number
+  upgrades?: string[]
+  decoration_score?: number
 }
 
 export interface ZoneData {
@@ -700,8 +796,46 @@ export interface WorldEducationCourse {
   registration_count: number
 }
 
+export interface CultureEvent {
+  type: string
+  name: string
+  venue_id: string
+  organizer_id: string
+  participants: string[]
+  tick_start: number
+  duration: number
+}
+
+export interface CultureProsperityPoint {
+  tick: number
+  prosperity_index: number
+}
+
+export interface CultureTalentRanking {
+  resident_id: string
+  resident_name: string
+  artistic_talent: number
+  art_skill: number
+  art_knowledge?: number
+}
+
+export interface WorldCulturePayload {
+  events: CultureEvent[]
+  prosperity_index: number
+  prosperity_history: CultureProsperityPoint[]
+  talent_rankings: CultureTalentRanking[]
+}
+
 export function getWorldEducation() {
   return request<WorldEducationCourse[]>('/api/world/education')
+}
+
+export function getWorldCulture() {
+  return request<WorldCulturePayload>('/api/world/culture')
+}
+
+export function getWorldHealth() {
+  return request<WorldHealthPayload>('/api/world/health')
 }
 
 export function getWorldPets() {
@@ -757,12 +891,41 @@ export interface BuildingDetailData {
   capacity: number
   position: [number, number]
   occupants: number
+  level: number
+  upgrades: string[]
+  decoration_score: number
+  next_level: number | null
+  required_reserve: number
+  reserve_ready: boolean
+  vote_passed: boolean
+  special_feature: string | null
+  visit_willingness: number
   current_residents: BuildingOccupantInfo[]
   recent_visits: BuildingVisitRecord[]
 }
 
 export function getBuildingDetails(id: string) {
-  return request<BuildingDetailData>(`/api/world/buildings/${id}/details`)
+  return request<BuildingDetailData>(`/api/buildings/${id}/details`)
+}
+
+export interface BuildingUpgradeData {
+  id: string
+  type: string
+  name: string
+  level: number
+  capacity: number
+  upgrades: string[]
+  decoration_score: number
+  next_level: number | null
+  required_reserve: number
+  reserve_ready: boolean
+  vote_passed: boolean
+  can_upgrade: boolean
+  special_feature: string | null
+}
+
+export function getBuildingUpgrades() {
+  return request<BuildingUpgradeData[]>('/api/world/buildings/upgrades')
 }
 
 export function generateReport() {

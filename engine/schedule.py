@@ -133,10 +133,23 @@ class DailySchedule:
         ticks_per_hour = tick_per_day / 24.0
         tick_in_day = world.current_tick % tick_per_day
         hour = tick_in_day / ticks_per_hour
+        phase_end_hour = {
+            "sleep": 6.0,
+            "morning": 8.0,
+            "work": 12.0,
+            "lunch": 13.0,
+            "afternoon": 17.0,
+            "evening": 18.0 if self._ptype == "introvert" else 21.0 if self._ptype == "extrovert" else 20.0,
+            "home": 22.0,
+        }
 
         phase = self.current_phase(hour)
         resident = agent.resident  # type: ignore[attr-defined]
         weather = getattr(world, "weather", WeatherType.sunny)
+        remaining_ticks_in_phase = max(
+            1,
+            int(round((phase_end_hour.get(phase.name, hour + 1) - hour) * ticks_per_hour)),
+        )
 
         # Energy override: force home when energy is critically low
         energy = getattr(resident, "energy", 1.0)
@@ -250,6 +263,16 @@ class DailySchedule:
             candidates = sorted(
                 candidates,
                 key=lambda building: (
+                    world.estimate_travel_ticks(
+                        resident,
+                        world.get_building(resident.location) if resident.location else (resident.x, resident.y),
+                        building,
+                    ) > remaining_ticks_in_phase,
+                    world.estimate_travel_ticks(
+                        resident,
+                        world.get_building(resident.location) if resident.location else (resident.x, resident.y),
+                        building,
+                    ),
                     -world.score_zone_for_resident(
                         resident,
                         world.get_zone_at_position(*building.position) or world.zones[0],

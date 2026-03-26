@@ -3,18 +3,15 @@ import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../components/ui', () => ({
-  FirstRunGuide: () => null,
-  LanguageSwitcher: () => <button type="button">Lang</button>,
-  LoadingTransition: () => <div>Loading</div>,
-  MessageBar: () => <div>MessageBar</div>,
-  RightPanel: () => <div>RightPanel</div>,
+vi.mock('../components/ui/ScenePicker', () => ({
   ScenePicker: ({ onEnter }: { onEnter: () => void }) => (
     <button type="button" onClick={onEnter}>
       Enter
     </button>
   ),
-  ThemeToggle: () => <button type="button">Theme</button>,
+}))
+
+vi.mock('../components/ui/WelcomePage', () => ({
   WelcomePage: ({ onStart, onGuide }: { onStart: () => void; onGuide: () => void }) => (
     <div>
       <button type="button" onClick={onStart}>
@@ -36,6 +33,10 @@ vi.mock('../pages/GuidePage', () => ({
       </button>
     </div>
   ),
+}))
+
+vi.mock('../pages/SimulationView', () => ({
+  SimulationView: () => <div>TownCanvas</div>,
 }))
 
 vi.mock('../components/ui/SplitPane', () => ({
@@ -69,6 +70,10 @@ vi.mock('../components/toolbar/Toolbar', () => ({
 
 vi.mock('../components/town/TownCanvas', () => ({
   TownCanvas: () => <div>TownCanvas</div>,
+}))
+
+vi.mock('../pages/SimulationView', () => ({
+  SimulationView: () => <div>TownCanvas</div>,
 }))
 
 vi.mock('../components/graph/GraphPanel', () => ({
@@ -142,10 +147,10 @@ describe('App guide navigation', () => {
     render(<App />)
 
     await user.click(screen.getByRole('button', { name: 'Guide' }))
-    expect(screen.getByRole('heading', { name: 'Guide Page' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Guide Page' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Back' }))
-    expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Start' })).toBeInTheDocument()
   })
 
   it('opens the guide page from simulation settings events and returns to simulation', async () => {
@@ -154,14 +159,14 @@ describe('App guide navigation', () => {
     render(<App />)
 
     await user.click(screen.getByRole('button', { name: 'Start' }))
-    await user.click(screen.getByRole('button', { name: 'Enter' }))
+    await user.click(await screen.findByRole('button', { name: 'Enter' }))
 
     act(() => {
       window.dispatchEvent(new CustomEvent('populace:open-guide'))
     })
-    expect(screen.getByRole('heading', { name: 'Guide Page' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Guide Page' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Back' }))
-    expect(screen.getByText('TownCanvas')).toBeInTheDocument()
+    expect(await screen.findByText('TownCanvas')).toBeInTheDocument()
   })
 })

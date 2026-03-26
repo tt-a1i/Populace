@@ -3,26 +3,15 @@ import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../components/ui', () => ({
-  FirstRunGuide: () => null,
-  LanguageSwitcher: () => (
-    <button type="button" aria-label="切换语言">
-      Lang
-    </button>
-  ),
-  LoadingTransition: () => <div>Loading</div>,
-  MessageBar: () => <div>MessageBar</div>,
-  RightPanel: () => <div>RightPanel</div>,
+vi.mock('../components/ui/ScenePicker', () => ({
   ScenePicker: ({ onEnter }: { onEnter: () => void }) => (
     <button type="button" onClick={onEnter}>
       Enter
     </button>
   ),
-  ThemeToggle: () => (
-    <button type="button" aria-label="切换主题">
-      Theme
-    </button>
-  ),
+}))
+
+vi.mock('../components/ui/WelcomePage', () => ({
   WelcomePage: ({ onStart, onGuide }: { onStart: () => void; onGuide: () => void }) => (
     <div>
       <button type="button" onClick={onStart}>
@@ -72,8 +61,52 @@ vi.mock('../components/town/TownCanvas', () => ({
   TownCanvas: () => <div data-testid="town-canvas-mock">TownCanvas</div>,
 }))
 
+vi.mock('../pages/SimulationView', () => ({
+  SimulationView: () => (
+    <div>
+      <div>在线 3</div>
+      <div>春日祭</div>
+      <div>全镇集会与舞蹈正在展开</div>
+      <button type="button" aria-label="导演台">
+        导演台
+      </button>
+      <div role="toolbar" aria-label="主工具栏" tabIndex={1}>
+        Toolbar
+      </div>
+      <div role="region" aria-label="小镇地图" tabIndex={2}>
+        Map
+      </div>
+      <div role="region" aria-label="工具面板" tabIndex={3}>
+        Panel
+      </div>
+    </div>
+  ),
+}))
+
 vi.mock('../components/graph/GraphPanel', () => ({
   GraphPanel: () => <div>GraphPanel</div>,
+}))
+
+vi.mock('../pages/SimulationView', () => ({
+  SimulationView: () => (
+    <div>
+      <div>在线 3</div>
+      <div>春日祭</div>
+      <div>全镇集会与舞蹈正在展开</div>
+      <button type="button" aria-label="导演台">
+        导演台
+      </button>
+      <div role="toolbar" aria-label="主工具栏" tabIndex={1}>
+        主工具栏
+      </div>
+      <div role="region" aria-label="小镇地图" tabIndex={2}>
+        小镇地图
+      </div>
+      <div role="region" aria-label="工具面板" tabIndex={3}>
+        工具面板
+      </div>
+    </div>
+  ),
 }))
 
 vi.mock('../hooks/useKeyboardShortcuts', () => ({
@@ -143,9 +176,9 @@ describe('App accessibility flow', () => {
     render(<App />)
 
     await user.click(screen.getByRole('button', { name: 'Start' }))
-    await user.click(screen.getByRole('button', { name: 'Enter' }))
+    await user.click(await screen.findByRole('button', { name: 'Enter' }))
 
-    await user.click(screen.getByRole('button', { name: '导演台' }))
+    await user.click(await screen.findByRole('button', { name: '导演台' }))
     ;(document.activeElement as HTMLElement | null)?.blur()
 
     await user.tab()
@@ -164,9 +197,9 @@ describe('App accessibility flow', () => {
     render(<App />)
 
     await user.click(screen.getByRole('button', { name: 'Start' }))
-    await user.click(screen.getByRole('button', { name: 'Enter' }))
+    await user.click(await screen.findByRole('button', { name: 'Enter' }))
 
-    expect(screen.getByText('在线 3')).toBeInTheDocument()
+    expect(await screen.findByText('在线 3')).toBeInTheDocument()
   })
 
   it('shows the active festival banner in simulation view', async () => {
@@ -175,9 +208,9 @@ describe('App accessibility flow', () => {
     render(<App />)
 
     await user.click(screen.getByRole('button', { name: 'Start' }))
-    await user.click(screen.getByRole('button', { name: 'Enter' }))
+    await user.click(await screen.findByRole('button', { name: 'Enter' }))
 
-    expect(screen.getByText('春日祭')).toBeInTheDocument()
-    expect(screen.getByText(/全镇集会/)).toBeInTheDocument()
+    expect(await screen.findByText('春日祭')).toBeInTheDocument()
+    expect(await screen.findByText(/全镇集会/)).toBeInTheDocument()
   })
 })

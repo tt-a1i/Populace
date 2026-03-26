@@ -45,7 +45,7 @@ from backend.api.schemas import (
 )
 from backend.core.simulation import SimulationLoop
 from backend.llm.client import validate_llm_config
-from engine.types import EventUpdate, Festival, FestivalUpdate, RelationType, VoteUpdate
+from engine.types import BulletinPost, EventUpdate, Festival, FestivalUpdate, RelationType, VoteUpdate
 
 
 router = APIRouter(prefix="/api/simulation", tags=["simulation"])
@@ -173,6 +173,9 @@ class SimulationState:
         self._world_timeline: list[dict[str, Any]] = []
         self._population_history: list[dict[str, Any]] = []
         self._trade_history: list[dict[str, Any]] = []
+        self._bulletin_posts: list[dict[str, Any]] = []
+        self._bulletin_hot_topics: list[dict[str, Any]] = []
+        self._bulletin_last_post_tick: dict[str, int] = {}
         self._active_votes: list[dict[str, Any]] = []
         self._vote_history: list[dict[str, Any]] = []
         self._active_festivals: list[dict[str, Any]] = []
@@ -336,6 +339,9 @@ class SimulationState:
         self._world_timeline = []
         self._population_history = []
         self._trade_history = []
+        self._bulletin_posts = []
+        self._bulletin_hot_topics = []
+        self._bulletin_last_post_tick = {}
         self._active_votes = []
         self._vote_history = []
         self._active_festivals = []
@@ -440,6 +446,11 @@ class SimulationState:
             "world_timeline": list(getattr(self, "_world_timeline", [])),
             "population_history": list(getattr(self, "_population_history", [])),
             "trade_history": list(getattr(self, "_trade_history", [])),
+            "economic_output": float(getattr(self.world, "economic_output", 0.0)),
+            "gdp_history": list(getattr(self.world, "gdp_history", [])),
+            "bulletin_posts": list(getattr(self, "_bulletin_posts", [])),
+            "bulletin_hot_topics": list(getattr(self, "_bulletin_hot_topics", [])),
+            "bulletin_last_post_tick": dict(getattr(self, "_bulletin_last_post_tick", {})),
             "active_votes": list(getattr(self, "_active_votes", [])),
             "vote_history": list(getattr(self, "_vote_history", [])),
             "active_festivals": list(getattr(self, "_active_festivals", [])),
@@ -455,6 +466,8 @@ class SimulationState:
             "completed_quests": list(getattr(self, "_completed_quests", [])),
             "replay_snapshots": list(getattr(self, "_replay_snapshots", [])),
             "stray_pets": [_asdict(pet) for pet in getattr(self.world, "stray_pets", [])],
+            "cultural_events": [_asdict(event) for event in getattr(self.world, "cultural_events", [])],
+            "culture_prosperity_history": list(getattr(self.world, "culture_prosperity_history", [])),
         }
 
     async def load_state(self, data: dict[str, Any]) -> None:
@@ -463,7 +476,7 @@ class SimulationState:
         from engine.generative_agent import GenerativeAgent
         from engine.memory import MemoryStream
         from engine.types import (
-            Achievement, Building, Course, CourseHistoryEntry, DiaryEntry, Education, Item, Job, Memory, MoodEntry, Reflection,
+            Achievement, Building, Course, CourseHistoryEntry, CulturalEvent, DiaryEntry, Education, Health, Illness, Item, Job, Memory, MoodEntry, Reflection,
             Pet, Relationship, RelationType, Resident, WorldConfig,
         )
         from engine.world import World
@@ -491,6 +504,9 @@ class SimulationState:
         self._world_timeline = []
         self._population_history = []
         self._trade_history = []
+        self._bulletin_posts = []
+        self._bulletin_hot_topics = []
+        self._bulletin_last_post_tick = {}
         self._active_votes = []
         self._vote_history = []
         self._active_festivals = []
@@ -511,6 +527,9 @@ class SimulationState:
             world.add_building(Building(
                 id=b["id"], type=b["type"], name=b["name"],
                 capacity=b["capacity"], position=tuple(b["position"]),  # type: ignore[arg-type]
+                level=int(b.get("level", 1)),
+                upgrades=list(b.get("upgrades", [])),
+                decoration_score=float(b.get("decoration_score", 0.0)),
             ))
 
         # Restore grid
@@ -547,6 +566,12 @@ class SimulationState:
                 mood_history=[MoodEntry(**entry) for entry in res_data.get("mood_history", [])],
                 mental_state=res_data.get("mental_state", "stable"),
                 low_mood_ticks=int(res_data.get("low_mood_ticks", 0)),
+                health=Health(
+                    hp=float(res_data.get("health", {}).get("hp", 1.0)),
+                    illness=Illness(**res_data["health"]["illness"]) if res_data.get("health", {}).get("illness") else None,
+                    recovery_tick=int(res_data.get("health", {}).get("recovery_tick", 0)),
+                    work_streak=int(res_data.get("health", {}).get("work_streak", 0)),
+                ),
                 education=Education(
                     courses=[Course(**course) for course in res_data.get("education", {}).get("courses", [])],
                     knowledge_level=dict(res_data.get("education", {}).get("knowledge_level", {})),
@@ -555,6 +580,7 @@ class SimulationState:
                         for entry in res_data.get("education", {}).get("course_history", [])
                     ],
                 ),
+                artistic_talent=float(res_data.get("artistic_talent", 0.0)),
             )
             resident.achievements = [Achievement(**entry) for entry in res_data.get("achievements", [])]
             for d in res_data.get("diary", []):
@@ -578,7 +604,11 @@ class SimulationState:
             world.add_agent(agent)
 
         world.stray_pets = [Pet(**pet) for pet in data.get("stray_pets", [])]
+        world.cultural_events = [CulturalEvent(**event) for event in data.get("cultural_events", [])]
+        world.culture_prosperity_history = list(data.get("culture_prosperity_history", []))
         world._rebuild_pet_registry()
+        world.economic_output = float(data.get("economic_output", 0.0))
+        world.gdp_history = list(data.get("gdp_history", []))
 
         # Restore relationships
         for rel_data in data.get("relationships", []):
@@ -616,6 +646,9 @@ class SimulationState:
         self._world_timeline = list(data.get("world_timeline", []))
         self._population_history = list(data.get("population_history", []))
         self._trade_history = list(data.get("trade_history", []))
+        self._bulletin_posts = list(data.get("bulletin_posts", []))
+        self._bulletin_hot_topics = list(data.get("bulletin_hot_topics", []))
+        self._bulletin_last_post_tick = {k: int(v) for k, v in data.get("bulletin_last_post_tick", {}).items()}
         self._active_votes = list(data.get("active_votes", []))
         self._vote_history = list(data.get("vote_history", []))
         self._active_festivals = list(data.get("active_festivals", []))
@@ -970,34 +1003,61 @@ class SimulationState:
         effects: list[str] = []
         winning_option = vote.get("winning_option") or ""
         issue = vote.get("issue", "")
-        if "公园" not in f"{issue}{winning_option}" and "park" not in f"{issue}{winning_option}".lower():
-            return effects
+        combined = f"{issue}{winning_option}"
+        combined_lower = combined.lower()
+        support_markers = ("同意", "通过", "批准", "支持", "升级", "扩建", "豪华", "approve", "upgrade", "expand", "luxury")
 
-        park_count = sum(1 for building in self.world.buildings if building.type == "park")
-        position = self._find_open_building_position()
-        building = {
-            "id": f"community_park_{park_count + 1}",
-            "type": "park",
-            "name": f"社区公园 {park_count + 1}",
-            "capacity": 24,
-            "position": position,
-        }
-        from engine.types import Building
+        if "公园" in combined or "park" in combined_lower:
+            park_count = sum(1 for building in self.world.buildings if building.type == "park")
+            position = self._find_open_building_position()
+            building = {
+                "id": f"community_park_{park_count + 1}",
+                "type": "park",
+                "name": f"社区公园 {park_count + 1}",
+                "capacity": 24,
+                "position": position,
+            }
+            from engine.types import Building
 
-        self.world.add_building(Building(**building))
-        x, y = position
-        self.world.grid[y][x] = True
-        for dy in range(1, 3):
-            for dx in range(0, 2):
-                self.world.grid[y + dy][x + dx] = False
-        self.world.path_cache.clear()
-        self.world.mark_grid_index_dirty()
-        effects.append(f"新增建筑：{building['name']}")
-        self._add_timeline_event(
-            "vote_effect",
-            f"投票结果生效：{building['name']} 已建成",
-            {"vote_id": vote["id"], "building_id": building["id"]},
-        )
+            self.world.add_building(Building(**building))
+            x, y = position
+            self.world.grid[y][x] = True
+            for dy in range(1, 3):
+                for dx in range(0, 2):
+                    self.world.grid[y + dy][x + dx] = False
+            self.world.path_cache.clear()
+            self.world.mark_grid_index_dirty()
+            effects.append(f"新增建筑：{building['name']}")
+            self._add_timeline_event(
+                "vote_effect",
+                f"投票结果生效：{building['name']} 已建成",
+                {"vote_id": vote["id"], "building_id": building["id"]},
+            )
+
+        if ("升级" in combined or "扩建" in combined or "豪华" in combined or "upgrade" in combined_lower) and any(
+            marker in str(winning_option).lower() for marker in support_markers
+        ):
+            target_level = 3 if ("lv3" in combined_lower or "三级" in combined or "豪华" in combined) else 2
+            for building in self.world.buildings:
+                if building.id not in issue and building.name not in issue:
+                    continue
+                while building.level < target_level:
+                    cost = self.world.get_building_upgrade_cost(building)
+                    upgraded = self.world.upgrade_building(
+                        building.id,
+                        town_funds=self.world.economic_output,
+                        vote_passed=True,
+                    )
+                    if not upgraded:
+                        break
+                    self.world.economic_output = round(max(0.0, self.world.economic_output - cost), 2)
+                    effects.append(f"{building.name} 升至 Lv.{building.level}")
+                    self._add_timeline_event(
+                        "building_upgrade",
+                        f"投票结果生效：{building.name} 升至 Lv.{building.level}",
+                        {"vote_id": vote["id"], "building_id": building.id, "level": building.level},
+                    )
+                break
         return effects
 
     def _process_votes_for_tick(self) -> list[dict[str, Any]]:
@@ -1159,6 +1219,67 @@ class SimulationState:
             self._active_festivals = []
         if not hasattr(self, "_festival_history"):
             self._festival_history = []
+
+    def _ensure_bulletin_state(self) -> None:
+        if not hasattr(self, "_bulletin_posts"):
+            self._bulletin_posts = []
+        if not hasattr(self, "_bulletin_hot_topics"):
+            self._bulletin_hot_topics = []
+        if not hasattr(self, "_bulletin_last_post_tick"):
+            self._bulletin_last_post_tick = {}
+
+    def _update_bulletin_board(self) -> None:
+        from engine.bulletin import (
+            build_bulletin_post,
+            infer_bulletin_experience,
+            process_bulletin_reactions,
+            serialize_posts,
+            summarize_hot_topics,
+        )
+
+        self._ensure_bulletin_state()
+        current_tick = self.world.current_tick
+        interval = max(8, self.world.config.tick_per_day // 4)
+        new_posts = []
+
+        for agent in self.world.agents:
+            resident = agent.resident
+            if current_tick - self._bulletin_last_post_tick.get(resident.id, -10_000) < interval:
+                continue
+            experience = infer_bulletin_experience(self, resident)
+            if experience is None:
+                continue
+            post = build_bulletin_post(resident, tick=current_tick, experience=experience)
+            if post is None:
+                continue
+            self._bulletin_last_post_tick[resident.id] = current_tick
+            new_posts.append(post)
+
+        if new_posts:
+            process_bulletin_reactions(self.world, new_posts)
+            resident_names = {agent.resident.id: agent.resident.name for agent in self.world.agents}
+            existing_posts = [dict(item) for item in self._bulletin_posts]
+            self._bulletin_posts = serialize_posts(
+                [*new_posts, *[
+                    BulletinPost(**item)
+                    for item in existing_posts
+                ]],
+                resident_names,
+            )[:120]
+
+        topic_source = [
+            BulletinPost(**item)
+            for item in self._bulletin_posts
+            if current_tick - int(item.get("tick", 0)) <= max(interval * 4, self.world.config.tick_per_day)
+        ]
+        self._bulletin_hot_topics = summarize_hot_topics(topic_source)
+
+    def get_bulletin_board(self) -> dict[str, Any]:
+        self._ensure_bulletin_state()
+        return {
+            "posts": list(self._bulletin_posts),
+            "hot_topics": list(self._bulletin_hot_topics),
+        }
 
     def get_festivals(self) -> dict[str, list[dict[str, Any]]]:
         self._ensure_festival_state()
@@ -1353,6 +1474,12 @@ class SimulationState:
             self._population_history = []
         if not hasattr(self, "_trade_history"):
             self._trade_history = []
+        if not hasattr(self, "_bulletin_posts"):
+            self._bulletin_posts = []
+        if not hasattr(self, "_bulletin_hot_topics"):
+            self._bulletin_hot_topics = []
+        if not hasattr(self, "_bulletin_last_post_tick"):
+            self._bulletin_last_post_tick = {}
         if not hasattr(self, "_world_timeline"):
             self._world_timeline = []
         if not hasattr(self, "_timeline_id_counter"):
@@ -1917,6 +2044,7 @@ class SimulationState:
 
         tick_state.events.extend(EventUpdate(description=description) for description in family_event_descriptions)
         self._close_finished_festivals(tick_state)
+        self._update_bulletin_board()
 
         # --- Relationship milestone events ---
         if not hasattr(self, "_rel_events_fired"):
@@ -2447,7 +2575,8 @@ async def get_social_indicators(request: Request) -> SocialIndicatorsResponse:
     import math
     norm_wealth = min(math.log1p(avg_coins) / math.log1p(1000), 1.0)
 
-    happiness = round(0.5 * norm_mood + 0.3 * norm_energy + 0.2 * norm_wealth, 3)
+    culture_bonus = float(getattr(state.world, "culture_prosperity_index", lambda: 0.0)())
+    happiness = round(min(1.0, 0.5 * norm_mood + 0.3 * norm_energy + 0.2 * norm_wealth + culture_bonus * 0.1), 3)
 
     return SocialIndicatorsResponse(
         gini_coefficient=gini,
@@ -2555,9 +2684,12 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
         Building,
         Course,
         CourseHistoryEntry,
+        CulturalEvent,
         DiaryEntry,
         Education,
         Event as EngineEvent,
+        Health,
+        Illness,
         Item,
         Job,
         Memory,
@@ -2626,6 +2758,12 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
             mood_history=[MoodEntry(**entry) for entry in res_data.get("mood_history", [])],
             mental_state=res_data.get("mental_state", "stable"),
             low_mood_ticks=int(res_data.get("low_mood_ticks", 0)),
+            health=Health(
+                hp=float(res_data.get("health", {}).get("hp", 1.0)),
+                illness=Illness(**res_data["health"]["illness"]) if res_data.get("health", {}).get("illness") else None,
+                recovery_tick=int(res_data.get("health", {}).get("recovery_tick", 0)),
+                work_streak=int(res_data.get("health", {}).get("work_streak", 0)),
+            ),
             education=Education(
                 courses=[Course(**course) for course in res_data.get("education", {}).get("courses", [])],
                 knowledge_level=dict(res_data.get("education", {}).get("knowledge_level", {})),
@@ -2634,6 +2772,7 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
                     for entry in res_data.get("education", {}).get("course_history", [])
                 ],
             ),
+            artistic_talent=float(res_data.get("artistic_talent", 0.0)),
         )
         resident.achievements = [Achievement(**entry) for entry in res_data.get("achievements", [])]
         for d in res_data.get("diary", []):
@@ -2652,6 +2791,8 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
         branch_world.add_agent(agent)
 
     branch_world.stray_pets = [Pet(**pet) for pet in saved.get("stray_pets", [])]
+    branch_world.cultural_events = [CulturalEvent(**event) for event in saved.get("cultural_events", [])]
+    branch_world.culture_prosperity_history = list(saved.get("culture_prosperity_history", []))
     branch_world._rebuild_pet_registry()
 
     for rel_data in saved.get("relationships", []):

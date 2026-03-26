@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { getReputationRankings, type ReputationRankingEntry } from '../../services/api'
 import { PanelShell } from '../ui/PanelShell'
+import { PanelEmptyState, PanelSkeletonGrid, PanelSpinner } from '../ui/PanelStates'
 
 export function ReputationPanel() {
   const [rankings, setRankings] = useState<ReputationRankingEntry[]>([])
@@ -44,11 +45,16 @@ export function ReputationPanel() {
       </div>
 
       {error ? <p className="text-sm text-rose-300">{error}</p> : null}
-      {loading ? <p className="text-sm text-slate-400">声望数据加载中…</p> : null}
+      {loading ? (
+        <>
+          <PanelSpinner title="声望数据加载中…" message="正在整理居民名望波动和近期热点事件。" />
+          <PanelSkeletonGrid columns={2} rows={2} />
+        </>
+      ) : null}
 
       <section className="grid gap-3">
         {rankings.length === 0 && !loading ? (
-          <p className="text-sm text-slate-500">当前还没有声望记录。</p>
+          <PanelEmptyState title="当前还没有声望记录" message="等居民积累更多社交事件后，这里会出现排行榜。" />
         ) : (
           rankings.map((entry, index) => (
             <article

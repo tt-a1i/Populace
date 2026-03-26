@@ -5,9 +5,12 @@ import pytest
 
 from engine.types import (
     Building,
+    BulletinPost,
     DiaryEntry,
     Education,
     Event,
+    Health,
+    Illness,
     Item,
     Memory,
     MoodEntry,
@@ -41,6 +44,8 @@ def test_resident_defaults():
     assert r.mental_state == "stable"
     assert r.low_mood_ticks == 0
     assert r.memories == []
+    assert r.health.hp == 1.0
+    assert r.health.illness is None
     assert isinstance(r.education, Education)
     assert r.education.courses == []
     assert r.education.knowledge_level == {}
@@ -72,6 +77,23 @@ def test_diary_entry_fields_round_trip():
     assert entry.summary == entry.content
 
 
+def test_bulletin_post_defaults_and_topic_fallback():
+    post = BulletinPost(
+        id="post-1",
+        author_id="r1",
+        content="今天在春日祭认识了不少朋友。",
+        tick=48,
+        likes=["r2"],
+        category="festival",
+    )
+
+    assert post.author_id == "r1"
+    assert post.category == "festival"
+    assert post.topic == "festival"
+    assert post.subject_id == "r1"
+    assert post.tone == "positive"
+
+
 def test_building_creation():
     b = Building(id="b1", type="cafe", name="咖啡馆", capacity=4, position=(5, 5))
     assert b.capacity == 4
@@ -90,6 +112,14 @@ def test_pet_creation():
     assert pet.owner_id == "r1"
     assert pet.hunger == 0.7
     assert pet.x == 3 and pet.y == 4
+
+
+def test_health_creation():
+    health = Health(hp=0.8, illness=Illness(type="cold", contagious=True, severity=0.35), recovery_tick=12)
+    assert health.hp == 0.8
+    assert health.illness is not None
+    assert health.illness.type == "cold"
+    assert health.recovery_tick == 12
 
 
 def test_memory_creation():

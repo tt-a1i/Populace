@@ -115,8 +115,7 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
   // -------------------------------------------------------------------------
   // Message handler
   // -------------------------------------------------------------------------
-  const handleMessage = useCallback(
-    (event: MessageEvent) => {
+  const handleMessage = useCallback((event: MessageEvent) => {
       let msg: { type?: string; data?: unknown }
       try {
         msg = JSON.parse(event.data as string)
@@ -333,9 +332,7 @@ export function useWebSocket(enabled = true): UseWebSocketReturn {
           simApplyResidentOperation(payload.resident, payload.operation)
         }
       }
-    },
-    [play, pushToast, relAddFlashingKeys, relApplyPopulationEvents, relInitFromSnapshot, relSetAbsolute, relUpdateFromTick, simApplyPopulationEvents, simApplyResidentOperation, simApplyVoteTick, simInitFromSnapshot, simSetActiveVotes, simSetVoteHistory, simUpdateFromTick],
-  )
+    }, [play, pushToast, relAddFlashingKeys, relApplyPopulationEvents, relInitFromSnapshot, relSetAbsolute, relUpdateFromTick, simApplyFestivalTick, simApplyPopulationEvents, simApplyResidentOperation, simApplyVoteTick, simInitFromSnapshot, simSetActiveVotes, simSetVoteHistory, simUpdateFromTick])
 
   // -------------------------------------------------------------------------
   // Connect (called initially and after each disconnect)

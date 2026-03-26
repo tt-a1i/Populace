@@ -17,8 +17,8 @@ export function PanelShell({ icon, title, badge, children, onClose, headerRight 
   }
 
   return (
-    <div className="rounded-xl bg-slate-800/80 backdrop-blur-lg border border-white/[0.08] p-4 text-slate-100 shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
-      <div className="flex items-center justify-between gap-3 mb-3">
+    <div className="rounded-2xl border border-white/[0.08] bg-slate-900/88 p-4 text-slate-100 shadow-[0_18px_48px_rgba(2,6,23,0.32)] backdrop-blur-lg sm:p-5">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className="text-lg leading-none">{icon}</span>
           <div>
@@ -40,7 +40,7 @@ export function PanelShell({ icon, title, badge, children, onClose, headerRight 
           </button>
         </div>
       </div>
-      <div className="grid gap-3">
+      <div className="grid max-h-[min(65vh,42rem)] gap-3 overflow-y-auto pr-1 sm:gap-4">
         {children}
       </div>
     </div>

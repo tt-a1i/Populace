@@ -572,6 +572,8 @@ async def initiate_dialogue(
     # Social interaction costs energy for both participants
     agent_a.resident.energy = max(0.0, agent_a.resident.energy - 0.02)
     agent_b.resident.energy = max(0.0, agent_b.resident.energy - 0.02)
+    world.maybe_transmit_illness(agent_a.resident, agent_b.resident)
+    world.maybe_transmit_illness(agent_b.resident, agent_a.resident)
 
     taught = maybe_conduct_knowledge_teaching(world, agent_a, agent_b)
     if not taught:

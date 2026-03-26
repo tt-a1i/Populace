@@ -107,6 +107,9 @@ class BuildingResponse(BaseModel):
     name: str
     capacity: int
     position: tuple[int, int]
+    level: int = 1
+    upgrades: list[str] = Field(default_factory=list)
+    decoration_score: float = 0.0
     occupants: int = 0
 
 
@@ -131,9 +134,34 @@ class BuildingDetailResponse(BaseModel):
     name: str
     capacity: int
     position: tuple[int, int]
+    level: int = 1
+    upgrades: list[str] = Field(default_factory=list)
+    decoration_score: float = 0.0
     occupants: int = 0
+    next_level: int | None = None
+    required_reserve: float = 0.0
+    reserve_ready: bool = False
+    vote_passed: bool = False
+    special_feature: str | None = None
+    visit_willingness: float = 0.0
     current_residents: list[BuildingOccupantInfo] = Field(default_factory=list)
     recent_visits: list[BuildingVisitRecord] = Field(default_factory=list)
+
+
+class BuildingUpgradeResponse(BaseModel):
+    id: str
+    type: str
+    name: str
+    level: int = 1
+    capacity: int
+    upgrades: list[str] = Field(default_factory=list)
+    decoration_score: float = 0.0
+    next_level: int | None = None
+    required_reserve: float = 0.0
+    reserve_ready: bool = False
+    vote_passed: bool = False
+    can_upgrade: bool = False
+    special_feature: str | None = None
 
 
 class PetResponse(BaseModel):
@@ -146,6 +174,40 @@ class PetResponse(BaseModel):
     location: str | None = None
     x: int = 0
     y: int = 0
+
+
+class IllnessResponse(BaseModel):
+    type: str
+    contagious: bool = False
+    severity: float = 0.0
+
+
+class ResidentHealthStateResponse(BaseModel):
+    hp: float = 1.0
+    illness: IllnessResponse | None = None
+    recovery_tick: int = 0
+
+
+class WorldHealthHotspotResponse(BaseModel):
+    location: str
+    cases: int
+    intensity: float = 0.0
+
+
+class ResidentHealthResponse(BaseModel):
+    resident_id: str
+    resident_name: str
+    health: ResidentHealthStateResponse
+
+
+class WorldHealthResponse(BaseModel):
+    active_cases: int = 0
+    contagious_cases: int = 0
+    hospitalized_count: int = 0
+    treatment_rate: float = 0.0
+    average_hp: float = 1.0
+    illness_counts: dict[str, int] = Field(default_factory=dict)
+    outbreak_hotspots: list[WorldHealthHotspotResponse] = Field(default_factory=list)
 
 
 class ResidentResponse(BaseModel):
@@ -182,6 +244,7 @@ class ResidentResponse(BaseModel):
     family: FamilyInfoResponse = Field(default_factory=FamilyInfoResponse)
     education: "EducationResponse" = Field(default_factory=lambda: EducationResponse())
     pets: list[PetResponse] = Field(default_factory=list)
+    health: ResidentHealthStateResponse = Field(default_factory=ResidentHealthStateResponse)
 
 
 class PopulationResidentResponse(BaseModel):
@@ -206,6 +269,7 @@ class PopulationResidentResponse(BaseModel):
     goals: list[str] = Field(default_factory=list)
     education: "EducationResponse" = Field(default_factory=lambda: EducationResponse())
     pets: list[PetResponse] = Field(default_factory=list)
+    health: ResidentHealthStateResponse = Field(default_factory=ResidentHealthStateResponse)
 
 
 class MarketStatsResponse(BaseModel):
@@ -325,6 +389,36 @@ class WorldEducationCourseResponse(BaseModel):
     name: str
     building_id: str | None = None
     registration_count: int = 0
+
+
+class CulturalEventResponse(BaseModel):
+    type: str
+    name: str
+    venue_id: str
+    organizer_id: str
+    participants: list[str] = Field(default_factory=list)
+    tick_start: int = 0
+    duration: int = 0
+
+
+class CultureProsperityPointResponse(BaseModel):
+    tick: int
+    prosperity_index: float
+
+
+class CultureTalentRankingResponse(BaseModel):
+    resident_id: str
+    resident_name: str
+    artistic_talent: float
+    art_skill: float
+    art_knowledge: float = 0.0
+
+
+class WorldCultureResponse(BaseModel):
+    events: list[CulturalEventResponse] = Field(default_factory=list)
+    prosperity_index: float = 0.0
+    prosperity_history: list[CultureProsperityPointResponse] = Field(default_factory=list)
+    talent_rankings: list[CultureTalentRankingResponse] = Field(default_factory=list)
 
 
 class ResidentReflectionResponse(BaseModel):
@@ -477,6 +571,33 @@ class FestivalListResponse(BaseModel):
     history: list[FestivalResponse] = Field(default_factory=list)
 
 
+class BulletinPostResponse(BaseModel):
+    id: str
+    author_id: str
+    author_name: str
+    content: str
+    tick: int
+    likes: list[str] = Field(default_factory=list)
+    category: str
+    topic: str
+    subject_id: str
+    tone: str = "neutral"
+
+
+class BulletinTopicResponse(BaseModel):
+    topic: str
+    label: str
+    category: str
+    post_count: int
+    heat: float
+    sentiment: str = "neutral"
+
+
+class WorldBulletinResponse(BaseModel):
+    posts: list[BulletinPostResponse] = Field(default_factory=list)
+    hot_topics: list[BulletinTopicResponse] = Field(default_factory=list)
+
+
 class AchievementLeaderboardEntryResponse(BaseModel):
     resident_id: str
     resident_name: str
@@ -585,6 +706,31 @@ class WorldEconomyResponse(BaseModel):
     employment_distribution: list[OccupationDistEntry] = Field(default_factory=list)
     income_distribution: list[dict[str, float | int | str]] = Field(default_factory=list)
     gdp_history: list[dict[str, float | int]] = Field(default_factory=list)
+
+
+class RoadResponse(BaseModel):
+    from_building: str
+    to_building: str
+    distance: float
+    road_type: str
+    traffic: int = 0
+
+
+class TransportHotspotResponse(BaseModel):
+    road_key: str
+    traffic: int
+    slowdown: float
+
+
+class TransportStatsResponse(BaseModel):
+    mode_share: dict[str, int] = Field(default_factory=dict)
+    average_travel_ticks: float = 0.0
+    congestion_hotspots: list[TransportHotspotResponse] = Field(default_factory=list)
+
+
+class WorldTransportResponse(BaseModel):
+    roads: list[RoadResponse] = Field(default_factory=list)
+    stats: TransportStatsResponse = Field(default_factory=TransportStatsResponse)
 
 
 class MemoirResponse(BaseModel):

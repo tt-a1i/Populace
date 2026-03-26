@@ -94,6 +94,47 @@ def test_zone_stats_include_residents_buildings_and_atmosphere(mock_world):
     assert stats["atmosphere"]["beauty"] >= 0
 
 
+def test_building_upgrade_requires_vote_and_funds_and_unlocks_lv3_special(mock_world):
+    school = Building(id="school-upgrade", type="school", name="进阶学校", capacity=8, position=(12, 4))
+    mock_world.add_building(school)
+
+    assert mock_world.upgrade_building("school-upgrade", town_funds=500, vote_passed=False) is False
+    assert school.level == 1
+
+    assert mock_world.upgrade_building("school-upgrade", town_funds=60, vote_passed=True) is False
+    assert school.level == 1
+
+    assert mock_world.upgrade_building("school-upgrade", town_funds=180, vote_passed=True) is True
+    assert school.level == 2
+    assert school.capacity == 12
+    assert "expanded" in school.upgrades
+
+    assert mock_world.upgrade_building("school-upgrade", town_funds=360, vote_passed=True) is True
+    assert school.level == 3
+    assert "luxury" in school.upgrades
+    assert mock_world.get_building_special_feature(school) == "advanced_courses"
+
+
+def test_home_decoration_boosts_mood_and_visit_willingness(mock_world):
+    home = mock_world.get_building("home1")
+    resident = mock_world.agents[0].resident
+    visitor = mock_world.agents[1].resident
+    resident.home_building_id = home.id
+    resident.location = home.id
+    resident.mood = "neutral"
+
+    before = mock_world.get_building_visit_willingness(visitor, home)
+
+    assert mock_world.decorate_home(resident, effort=0.3) is True
+
+    after = mock_world.get_building_visit_willingness(visitor, home)
+    mock_world.apply_building_effects(mock_world.agents[0])
+
+    assert home.decoration_score > 0
+    assert after > before
+    assert resident.mood in {"calm", "content", "happy", "excited", "ecstatic"}
+
+
 def test_get_nearby_agents_uses_grid_index_without_full_agent_scan(mock_world):
     mock_world.rebuild_grid_index()
 
@@ -327,6 +368,22 @@ def test_stormy_weather_sends_residents_home(mock_world):
     assert agent.resident.location == home.id or (agent.resident.x, agent.resident.y) == home.position
 
 
+def test_stormy_outdoor_weather_can_trigger_cold(mock_world, monkeypatch):
+    agent = mock_world.agents[0]
+    agent.resident.location = None
+    agent.resident.x = 4
+    agent.resident.y = 4
+    agent.resident.health.illness = None
+    mock_world.weather = __import__("engine.types", fromlist=["WeatherType"]).WeatherType.stormy
+
+    monkeypatch.setattr("engine.world.random.random", lambda: 0.0)
+
+    mock_world.tick()
+
+    assert agent.resident.health.illness is not None
+    assert agent.resident.health.illness.type == "cold"
+
+
 def test_decay_resident_memories_reduces_negative_weight(mock_world):
     resident = mock_world.agents[0].resident
     resident.memories.append(
@@ -403,6 +460,30 @@ def test_process_crime_tick_reduces_victim_mood_and_town_safety(mock_world, monk
     assert perpetrator.resident.reputation == pytest.approx(-0.3)
     assert mock_world.mood_score(victim.resident.mood) < mock_world.mood_score("happy")
     assert all(agent.resident.safety_feeling < 1.0 for agent in mock_world.agents)
+    assert victim.resident.health.illness is not None
+    assert victim.resident.health.illness.type == "injury"
+
+
+def test_hospital_treatment_recovers_resident_faster_with_doctor(mock_world):
+    patient = mock_world.agents[0]
+    doctor = mock_world.agents[1]
+    hospital = Building(id="hospital1", type="hospital", name="镇医院", capacity=8, position=(6, 6))
+    mock_world.add_building(hospital)
+
+    patient.resident.health.illness = __import__("engine.types", fromlist=["Illness"]).Illness(type="flu", contagious=True, severity=0.65)
+    patient.resident.health.recovery_tick = 3
+    patient.resident.health.hp = 0.55
+    patient.resident.location = hospital.id
+    doctor.resident.location = hospital.id
+    doctor.resident.job.title = "doctor"
+    doctor.resident.occupation = "doctor"
+
+    for _ in range(2):
+        mock_world.apply_building_effects(patient)
+
+    assert patient.resident.health.recovery_tick <= 0
+    assert patient.resident.health.illness is None
+    assert patient.resident.health.hp > 0.55
 
 
 def test_police_station_patrol_halves_crime_probability(mock_world, monkeypatch):
@@ -447,3 +528,40 @@ def test_social_probability_prefers_high_reputation_and_avoids_low_reputation(mo
     low_probability = mock_world.get_social_probability(initiator, avoided)
 
     assert high_probability > low_probability
+
+
+def test_generate_road_network_connects_buildings_and_records_distance(mock_world):
+    mock_world.add_building(Building(id="shop1", type="shop", name="杂货铺", capacity=4, position=(15, 5)))
+    mock_world.add_building(Building(id="park1", type="park", name="公园", capacity=10, position=(12, 12)))
+
+    roads = mock_world.get_road_network()
+
+    assert roads
+    assert all(road.distance > 0 for road in roads)
+    connected_buildings = {road.from_building for road in roads} | {road.to_building for road in roads}
+    assert {"cafe1", "home1", "shop1", "park1"} <= connected_buildings
+
+
+def test_transport_stats_reports_modes_and_hotspots(mock_world):
+    mock_world.add_building(Building(id="shop1", type="shop", name="杂货铺", capacity=4, position=(15, 5)))
+    traveler = mock_world.agents[0]
+    traveler.resident.inventory.append(__import__("engine.types", fromlist=["Item"]).Item(name="bicycle"))
+
+    overview = mock_world.get_transport_overview(traveler.resident, "cafe1", "shop1")
+
+    assert overview["roads"]
+    assert overview["stats"]["mode_share"]["bicycle"] >= 1
+    assert "congestion_hotspots" in overview["stats"]
+
+
+def test_congestion_slows_travel_on_busy_road(mock_world):
+    mock_world.add_building(Building(id="shop1", type="shop", name="杂货铺", capacity=4, position=(15, 5)))
+    road = mock_world.find_road_between("cafe1", "shop1")
+    assert road is not None
+
+    quiet_steps = mock_world.compute_travel_steps(mock_world.agents[0].resident, road)
+    for _ in range(5):
+        mock_world.record_road_usage(road, mock_world.agents[0].resident.id)
+    congested_steps = mock_world.compute_travel_steps(mock_world.agents[0].resident, road)
+
+    assert congested_steps < quiet_steps

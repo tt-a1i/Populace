@@ -24,6 +24,9 @@ vi.mock('../components/toolbar/StatsPanel', () => ({
 vi.mock('../components/toolbar/ReputationPanel', () => ({
   ReputationPanel: () => <div data-testid="reputation-panel">ReputationPanel</div>,
 }))
+vi.mock('../components/toolbar/BulletinPanel', () => ({
+  BulletinPanel: () => <div data-testid="bulletin-panel">BulletinPanel</div>,
+}))
 vi.mock('../components/toolbar/SecurityPanel', () => ({
   SecurityPanel: () => <div data-testid="security-panel">SecurityPanel</div>,
 }))
@@ -125,6 +128,7 @@ describe('Toolbar', () => {
     expect(screen.getByRole('button', { name: /治安面板|治安/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /经济面板|经济/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /声望排行榜|声望/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /公告板|Bulletin/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /数据统计/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /对话记录/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /创建居民/ })).toBeInTheDocument()
@@ -183,7 +187,7 @@ describe('Toolbar', () => {
     })
     // Secondary row should now be visible with settings active
     expect(screen.getByTestId('secondary-row')).toBeInTheDocument()
-    expect(screen.getByTestId('settings-panel')).toBeInTheDocument()
+    expect(await screen.findByTestId('settings-panel')).toBeInTheDocument()
   })
 
   it('auto-expands secondary row when clicking a secondary tool after expanding', async () => {
@@ -201,28 +205,35 @@ describe('Toolbar', () => {
     render(<Toolbar />)
     await userEvent.click(screen.getByTestId('more-toggle'))
     await userEvent.click(screen.getByRole('button', { name: /对话记录/ }))
-    expect(screen.getByTestId('dialogue-history-panel')).toBeInTheDocument()
+    expect(await screen.findByTestId('dialogue-history-panel')).toBeInTheDocument()
   })
 
   it('switches to SecurityPanel when 治安面板 is clicked', async () => {
     render(<Toolbar />)
     await userEvent.click(screen.getByTestId('more-toggle'))
     await userEvent.click(screen.getByRole('button', { name: /治安面板|治安/ }))
-    expect(screen.getByTestId('security-panel')).toBeInTheDocument()
+    expect(await screen.findByTestId('security-panel')).toBeInTheDocument()
   })
 
   it('switches to EconomyPanel when 经济面板 is clicked', async () => {
     render(<Toolbar />)
     await userEvent.click(screen.getByTestId('more-toggle'))
     await userEvent.click(screen.getByRole('button', { name: /经济面板|经济/ }))
-    expect(screen.getByTestId('economy-panel')).toBeInTheDocument()
+    expect(await screen.findByTestId('economy-panel')).toBeInTheDocument()
   })
 
   it('switches to ReputationPanel when 声望排行榜 is clicked', async () => {
     render(<Toolbar />)
     await userEvent.click(screen.getByTestId('more-toggle'))
     await userEvent.click(screen.getByRole('button', { name: /声望排行榜|声望/ }))
-    expect(screen.getByTestId('reputation-panel')).toBeInTheDocument()
+    expect(await screen.findByTestId('reputation-panel')).toBeInTheDocument()
+  })
+
+  it('switches to BulletinPanel when 公告板 is clicked', async () => {
+    render(<Toolbar />)
+    await userEvent.click(screen.getByTestId('more-toggle'))
+    await userEvent.click(screen.getByRole('button', { name: /公告板|Bulletin/ }))
+    expect(await screen.findByTestId('bulletin-panel')).toBeInTheDocument()
   })
 
   // Sound toggle is now in App.tsx HUD, not in Toolbar

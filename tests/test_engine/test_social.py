@@ -102,6 +102,23 @@ async def test_initiate_dialogue_records_shared_memory_and_reuses_it_in_dialogue
     assert any("还记得" in message["text"] or "上次" in message["text"] for message in follow_up.messages)
 
 
+@pytest.mark.asyncio
+async def test_initiate_dialogue_can_spread_contagious_illness(mock_world, monkeypatch):
+    from engine.types import Illness
+
+    a = mock_world.agents[0]
+    b = mock_world.agents[1]
+    a.resident.health.illness = Illness(type="cold", contagious=True, severity=0.35)
+    b.resident.health.illness = None
+
+    monkeypatch.setattr("engine.social.random.random", lambda: 0.0)
+
+    await initiate_dialogue(a, b, mock_world)
+
+    assert b.resident.health.illness is not None
+    assert b.resident.health.illness.type == "cold"
+
+
 def test_decay_reduces_intensity(mock_world):
     from engine.types import Relationship as Rel
     mock_world.set_relationship(Rel(

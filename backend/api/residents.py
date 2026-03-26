@@ -10,6 +10,7 @@ from backend.api.schemas import (
     DiaryEntryResponse,
     EducationResponse,
     PetResponse,
+    ResidentHealthResponse,
     ResidentMemoryResponse,
     ResidentEducationResponse,
     ResidentJobResponse,
@@ -204,6 +205,19 @@ async def get_resident_pets(resident_id: str, request: Request) -> list[PetRespo
     if agent is None:
         raise _NOT_FOUND
     return [PetResponse(**asdict(pet)) for pet in state.world.list_resident_pets(resident_id)]
+
+
+@router.get(
+    "/{resident_id}/health",
+    response_model=ResidentHealthResponse,
+    responses=error_responses(404, 503),
+)
+async def get_resident_health(resident_id: str, request: Request) -> ResidentHealthResponse:
+    state = get_simulation_state(request)
+    profile = state.world.get_resident_health_profile(resident_id)
+    if profile is None:
+        raise _NOT_FOUND
+    return ResidentHealthResponse(**profile)
 
 
 @router.get(
