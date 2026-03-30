@@ -1056,3 +1056,52 @@ async def get_resident_goals(resident_id: str, request: Request) -> Optional[Res
     if data is None:
         return None
     return ResidentLifeGoalResponse(**data)
+
+
+class WishResponse(BaseModel):
+    index: int
+    type: str
+    description: str
+    priority: float = 0.5
+    fulfilled: bool = False
+    fulfilled_tick: int | None = None
+    target_id: str | None = None
+
+
+class FulfillWishResponse(BaseModel):
+    fulfilled: bool = False
+    already_fulfilled: bool = False
+    wish: WishResponse
+
+
+@router.get(
+    "/{resident_id}/wishes",
+    response_model=list[WishResponse],
+    responses=error_responses(404, 503),
+)
+async def get_resident_wishes(resident_id: str, request: Request) -> list[WishResponse]:
+    from engine.wishes import get_resident_wishes as _get_wishes
+
+    state = get_simulation_state(request)
+    for agent in state.world.agents:
+        if agent.resident.id == resident_id:
+            return [WishResponse(**w) for w in _get_wishes(agent.resident)]
+    raise _NOT_FOUND
+
+
+@router.post(
+    "/{resident_id}/wishes/{wish_index}/fulfill",
+    response_model=FulfillWishResponse,
+    responses=error_responses(400, 404, 503),
+)
+async def fulfill_resident_wish(resident_id: str, wish_index: int, request: Request) -> FulfillWishResponse:
+    from engine.wishes import fulfill_wish_by_god
+
+    state = get_simulation_state(request)
+    found = any(agent.resident.id == resident_id for agent in state.world.agents)
+    if not found:
+        raise _NOT_FOUND
+    result = fulfill_wish_by_god(state, resident_id, wish_index)
+    if result is None:
+        raise api_error(400, "Invalid wish index", "invalid_wish_index")
+    return FulfillWishResponse(**result)

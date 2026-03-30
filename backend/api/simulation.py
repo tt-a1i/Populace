@@ -549,7 +549,7 @@ class SimulationState:
         from engine.memory import MemoryStream
         from engine.types import (
             Achievement, Appearance, Building, ClothingItem, Course, CourseHistoryEntry, CulturalEvent, DiaryEntry, Education, ExternalTown, Health, Illness, Item, Job, LifeGoal, Memory, MoodEntry, Reflection,
-            Pet, Party, Religion, Relationship, RelationType, ReligiousEvent, Resident, TradeRoute, WorldConfig,
+            Pet, Party, Religion, Relationship, RelationType, ReligiousEvent, Resident, TradeRoute, Wish, WorldConfig,
         )
         from engine.world import World
 
@@ -670,6 +670,7 @@ class SimulationState:
                 ),
                 artistic_talent=float(res_data.get("artistic_talent", 0.0)),
                 life_goal=LifeGoal(**res_data["life_goal"]) if res_data.get("life_goal") else None,
+                wishlist=[Wish(**w) for w in res_data.get("wishlist", [])],
             )
             resident.achievements = [Achievement(**entry) for entry in res_data.get("achievements", [])]
             for d in res_data.get("diary", []):
@@ -3073,6 +3074,10 @@ class SimulationState:
                     EventUpdate(description=f"🎯 {gc['resident_name']}达成了人生目标！")
                 )
 
+        # --- Wishlist processing ---
+        from engine.wishes import process_wishes
+        process_wishes(self)
+
         family_event_descriptions: list[str] = []
         current_tick = self.world.current_tick
         families = self.world.list_families()
@@ -3794,6 +3799,7 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
         Resident,
         TradeRoute,
         WeatherType,
+        Wish,
         WorldConfig,
     )
     from engine.world import World
@@ -3878,6 +3884,7 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
             ),
             artistic_talent=float(res_data.get("artistic_talent", 0.0)),
             life_goal=LifeGoal(**res_data["life_goal"]) if res_data.get("life_goal") else None,
+            wishlist=[Wish(**w) for w in res_data.get("wishlist", [])],
         )
         resident.achievements = [Achievement(**entry) for entry in res_data.get("achievements", [])]
         for d in res_data.get("diary", []):

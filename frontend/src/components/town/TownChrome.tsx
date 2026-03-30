@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { GraphRelationship } from '../../stores/relationships'
 import type { ResidentPosition } from '../../stores/simulation'
 import {
+  getTownLevel,
   teleportResident,
 } from '../../services/api'
 import { BuildingDetailPanel } from '../toolbar/BuildingDetailPanel'
@@ -79,6 +80,17 @@ export function TownChrome({
 }: TownChromeProps) {
   const { t } = useTranslation()
   const [detailBuildingId, setDetailBuildingId] = useState<string | null>(null)
+  const [townLevel, setTownLevel] = useState(1)
+
+  useEffect(() => {
+    let cancelled = false
+    const load = () => {
+      void getTownLevel().then((d) => { if (!cancelled) setTownLevel(d.level) }).catch(() => {})
+    }
+    load()
+    const timer = setInterval(load, 15000)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [])
 
   const followedResident = followedResidentId
     ? residents.find((r) => r.id === followedResidentId)

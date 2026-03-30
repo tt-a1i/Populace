@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { getWorldEconomy, getEconomyCycle, type WorldEconomyPayload, type EconomyCyclePayload } from '../../services/api'
+import { AnimatedNumber } from '../ui/AnimatedNumber'
 import { PanelShell } from '../ui/PanelShell'
 import { PanelEmptyState, PanelSkeletonGrid, PanelSpinner } from '../ui/PanelStates'
 import { SparkLine } from '../ui/SparkLine'
@@ -95,15 +96,15 @@ export function EconomyPanel() {
       <div className="grid gap-2 sm:grid-cols-3">
         <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
           <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">{t('economy.employment', 'Employment')}</p>
-          <p className="mt-1 text-lg font-semibold text-white">{Math.round((data?.employment_rate ?? 0) * 100)}%</p>
+          <AnimatedNumber value={Math.round((data?.employment_rate ?? 0) * 100)} suffix="%" className="mt-1 block text-lg font-semibold text-white" />
         </div>
         <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
           <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">{t('economy.avg_income', 'Avg Income')}</p>
-          <p className="mt-1 text-lg font-semibold text-white">${Math.round(data?.average_income ?? 0)}</p>
+          <AnimatedNumber value={Math.round(data?.average_income ?? 0)} prefix="$" className="mt-1 block text-lg font-semibold text-white" />
         </div>
         <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
           <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">GDP</p>
-          <p className="mt-1 text-lg font-semibold text-white">${Math.round(data?.gdp ?? 0)}</p>
+          <AnimatedNumber value={Math.round(data?.gdp ?? 0)} prefix="$" className="mt-1 block text-lg font-semibold text-white" />
         </div>
       </div>
 

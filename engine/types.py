@@ -309,6 +309,15 @@ else:
         completed_tick: int = 0
 
     @dataclass
+    class Wish:
+        type: str
+        description: str
+        priority: float = 0.5
+        fulfilled: bool = False
+        fulfilled_tick: int = 0
+        target_id: str = ""
+
+    @dataclass
     class ExternalTown:
         name: str
         relation_score: float = 0.0
@@ -404,6 +413,7 @@ else:
         diary: List["DiaryEntry"] = field(default_factory=list)
         relationship_status: "RelationshipStatus" = RelationshipStatus.single
         life_goal: Optional["LifeGoal"] = None
+        wishlist: List["Wish"] = field(default_factory=list)
 
 
     @dataclass
@@ -686,6 +696,21 @@ else:
         festival_updates: List["FestivalUpdate"] = field(default_factory=list)
         disaster_updates: List["DisasterUpdate"] = field(default_factory=list)
 
+
+    # ---------------------------------------------------------------------------
+    # Town level / milestones (§96)
+    # ---------------------------------------------------------------------------
+
+    @dataclass
+    class Milestone:
+        """A town milestone that unlocks new content when achieved."""
+        id: str = ""
+        name: str = ""
+        description: str = ""
+        condition: str = ""       # human-readable condition
+        achieved: bool = False
+        achieved_tick: int = 0
+        unlocks: List[str] = field(default_factory=list)
 
     # ---------------------------------------------------------------------------
     # Economic cycle (§93)

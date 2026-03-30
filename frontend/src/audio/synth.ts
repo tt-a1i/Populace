@@ -1,4 +1,4 @@
-export type SoundCue = 'event' | 'dialogue' | 'relationship' | 'report' | 'achievement'
+export type SoundCue = 'event' | 'dialogue' | 'relationship' | 'report' | 'achievement' | 'click' | 'panel_open' | 'notification'
 
 interface AudioEngine {
   context: AudioContext
@@ -143,7 +143,53 @@ export function playSoundCue(engine: AudioEngine, cue: SoundCue): void {
     case 'achievement':
       playAchievementFanfare(engine)
       return
+    case 'click':
+      playClick(engine)
+      return
+    case 'panel_open':
+      playPanelOpen(engine)
+      return
+    case 'notification':
+      playNotification(engine)
+      return
     default:
       return
   }
+}
+
+
+function playClick(engine: AudioEngine): void {
+  const { oscillator, gain } = createVoice(engine, 'sine', 600)
+  const now = engine.context.currentTime
+  oscillator.frequency.setValueAtTime(600, now)
+  oscillator.frequency.exponentialRampToValueAtTime(400, now + 0.06)
+  const endAt = applyEnvelope(gain, engine.context, 0.005, 0.12, 0.06)
+  oscillator.start(now)
+  oscillator.stop(endAt + 0.02)
+}
+
+function playPanelOpen(engine: AudioEngine): void {
+  const { oscillator, gain } = createVoice(engine, 'triangle', 440)
+  const now = engine.context.currentTime
+  oscillator.frequency.setValueAtTime(440, now)
+  oscillator.frequency.exponentialRampToValueAtTime(660, now + 0.12)
+  const endAt = applyEnvelope(gain, engine.context, 0.01, 0.1, 0.18)
+  oscillator.start(now)
+  oscillator.stop(endAt + 0.04)
+}
+
+function playNotification(engine: AudioEngine): void {
+  const notes = [660, 880]
+  const now = engine.context.currentTime
+  notes.forEach((freq, i) => {
+    const { oscillator, gain } = createVoice(engine, 'sine', freq)
+    const start = now + i * 0.08
+    oscillator.frequency.setValueAtTime(freq, start)
+    gain.gain.cancelScheduledValues(start)
+    gain.gain.setValueAtTime(0.0001, start)
+    gain.gain.exponentialRampToValueAtTime(0.15, start + 0.01)
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.2)
+    oscillator.start(start)
+    oscillator.stop(start + 0.24)
+  })
 }

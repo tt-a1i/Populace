@@ -1308,6 +1308,27 @@ export function getResidentGoals(id: string) {
   return request<ResidentLifeGoal | null>(`/api/residents/${id}/goals`)
 }
 
+export interface ResidentWish {
+  index: number
+  type: string
+  description: string
+  priority: number
+  fulfilled: boolean
+  fulfilled_tick: number | null
+  target_id: string | null
+}
+
+export function getResidentWishes(id: string) {
+  return request<ResidentWish[]>(`/api/residents/${id}/wishes`)
+}
+
+export function fulfillResidentWish(id: string, wishIndex: number) {
+  return request<{ fulfilled: boolean; already_fulfilled: boolean; wish: ResidentWish }>(
+    `/api/residents/${id}/wishes/${wishIndex}/fulfill`,
+    { method: 'POST' },
+  )
+}
+
 export interface ResidentJobPayload {
   resident_id: string
   resident_name: string
@@ -1397,6 +1418,37 @@ export interface EconomyCyclePayload {
 
 export function getEconomyCycle() {
   return request<EconomyCyclePayload>('/api/world/economy/cycle')
+}
+
+export interface TownMilestone {
+  id: string
+  name: string
+  description: string
+  achieved: boolean
+  achieved_tick: number
+  unlocks: string[]
+}
+
+export interface TownRating {
+  composite: number
+  population: number
+  happiness: number
+  economy: number
+  safety: number
+  education: number
+  culture: number
+}
+
+export interface TownLevelPayload {
+  level: number
+  rating: TownRating
+  next_level_threshold: number
+  milestones: TownMilestone[]
+  unlocks: string[]
+}
+
+export function getTownLevel() {
+  return request<TownLevelPayload>('/api/world/level')
 }
 
 export function getWorldFashion() {

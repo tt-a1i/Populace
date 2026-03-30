@@ -34,6 +34,7 @@ from backend.api.schemas import (
     WorldDemographicsResponse,
     WorldHealthResponse,
     EconomyCycleResponse,
+    TownLevelResponse,
     WorldEconomyResponse,
     WorldFashionResponse,
     WorldNewsResponse,
@@ -346,6 +347,16 @@ async def get_world_economy(request: Request) -> WorldEconomyResponse:
 async def get_economy_cycle(request: Request) -> EconomyCycleResponse:
     state = get_simulation_state(request)
     return EconomyCycleResponse(**state.world.get_economy_cycle_overview())
+
+
+@router.get(
+    "/level",
+    response_model=TownLevelResponse,
+    responses=error_responses(503),
+)
+async def get_town_level(request: Request) -> TownLevelResponse:
+    state = get_simulation_state(request)
+    return TownLevelResponse(**state.world.get_town_level_overview())
 
 
 @router.get(

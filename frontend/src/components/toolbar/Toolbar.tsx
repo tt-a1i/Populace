@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useSound } from '../../audio/SoundProvider'
 import { DirectorConsole } from './DirectorConsole'
 import { PersonaEditor } from './PersonaEditor'
 import { QuestPanel } from './QuestPanel'
@@ -36,6 +37,9 @@ const DiplomacyPanel = lazy(() =>
 )
 const EconomyPanel = lazy(() =>
   import('./EconomyPanel').then((module) => ({ default: module.EconomyPanel })),
+)
+const MilestonePanel = lazy(() =>
+  import('./MilestonePanel').then((module) => ({ default: module.MilestonePanel })),
 )
 const PoliticsPanel = lazy(() =>
   import('./PoliticsPanel').then((module) => ({ default: module.PoliticsPanel })),
@@ -241,13 +245,16 @@ export function Toolbar() {
     { key: 'mapeditor', label: t('toolbar.mapeditor', { defaultValue: '\u5730\u56FE\u7F16\u8F91' }), icon: '\u{1F5FA}\uFE0F', tone: 'emerald' },
     { key: 'rules', label: t('toolbar.rules', { defaultValue: '\u89C4\u5219\u5F15\u64CE' }), icon: '\u2699\uFE0F', tone: 'cyan' },
     { key: 'knowledge', label: t('toolbar.knowledge', { defaultValue: 'Knowledge Graph' }), icon: '\uD83E\uDDE0', tone: 'violet' },
+    { key: 'milestones', label: t('toolbar.milestones', { defaultValue: '里程碑' }), icon: '🏅', tone: 'amber' },
   ]
 
   const allTools = [...primaryTools, ...secondaryTools]
   const activeTone = allTools.find((tool) => tool.key === activeTool)?.tone ?? 'cyan'
 
+  const { play } = useSound()
   const handleToolClick = (key: ToolKey) => {
     setActiveTool(key)
+    play('panel_open')
     // Auto-expand secondary row when a secondary tool is selected
     if (SECONDARY_KEYS.has(key)) {
       setShowSecondary(true)
@@ -309,6 +316,7 @@ export function Toolbar() {
     }
     if (activeTool === 'rules') return <LazyPanel label={t('toolbar.rules', { defaultValue: '\u89C4\u5219\u5F15\u64CE' })}><RulesPanel /></LazyPanel>
     if (activeTool === 'knowledge') return <LazyPanel label={t('toolbar.knowledge', { defaultValue: 'Knowledge Graph' })}><KnowledgeGraphPanel /></LazyPanel>
+    if (activeTool === 'milestones') return <LazyPanel label={t('toolbar.milestones', { defaultValue: '里程碑' })}><MilestonePanel /></LazyPanel>
     return <ReportsPanel />
   }, [activeTool, t])
 

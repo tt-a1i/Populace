@@ -40,6 +40,7 @@ from engine.types import (
     MoodEntry,
     MovementUpdate,
     EconomicCycle,
+    Milestone,
     NewsArticle,
     Newspaper,
     Party,
@@ -235,6 +236,9 @@ class World:
         self.grid_index: Dict[Tuple[int, int], List[Agent]] = {}
         self._grid_index_dirty = True
         self.news_archive: List[Newspaper] = []
+        self.town_level: int = 1
+        self.milestones: List[Milestone] = self._default_milestones()
+        self.unlocks: List[str] = []
         ensure_world_fashion_state(self)
 
     def _default_zones(self) -> List[Zone]:
@@ -642,6 +646,17 @@ class World:
         if not mood:
             return 0.0
         return _MOOD_SCORE.get(mood.strip().lower(), 0.0)
+
+    def mood_from_score(self, score: float) -> str:
+        """Return the mood string closest to the given numeric score."""
+        best = "neutral"
+        best_dist = abs(score)
+        for mood, mood_score in _MOOD_SCORE.items():
+            dist = abs(score - mood_score)
+            if dist < best_dist:
+                best_dist = dist
+                best = mood
+        return best
 
     def set_resident_mood(self, agent_or_resident: Agent | Resident, mood: str, cause: str) -> bool:
         resident = agent_or_resident.resident if isinstance(agent_or_resident, Agent) else agent_or_resident
@@ -1450,6 +1465,146 @@ class World:
             "next_phase": next_phase,
             "seasonal_modifier": self.seasonal_income_modifier(),
             "gdp_history": list(self.gdp_history)[-30:],
+        }
+
+    # ------------------------------------------------------------------
+    # Town level / milestone system
+    # ------------------------------------------------------------------
+
+    _LEVEL_THRESHOLDS = [
+        # (level, min_rating)
+        (1, 0.0), (2, 0.15), (3, 0.25), (4, 0.35), (5, 0.45),
+        (6, 0.55), (7, 0.65), (8, 0.75), (9, 0.85), (10, 0.95),
+    ]
+
+    @staticmethod
+    def _default_milestones() -> "List[Milestone]":
+        return [
+            Milestone(id="pop10", name="小有人气", description="人口达到10人", condition="population>=10", unlocks=["market", "shopkeeper"]),
+            Milestone(id="happy07", name="和谐小镇", description="平均幸福度>0.7", condition="happiness>0.7", unlocks=["park", "artist"]),
+            Milestone(id="gdp5000", name="经济腾飞", description="GDP超过5000", condition="gdp>=5000", unlocks=["luxury_home", "banker"]),
+            Milestone(id="safe09", name="安全之城", description="治安评分>0.9", condition="safety>0.9", unlocks=["concert_hall", "musician"]),
+            Milestone(id="edu05", name="书香门第", description="平均教育水平>0.5", condition="education>0.5", unlocks=["university", "professor"]),
+            Milestone(id="culture06", name="文化兴盛", description="文化繁荣度>0.6", condition="culture>0.6", unlocks=["museum", "curator"]),
+            Milestone(id="pop25", name="繁华都市", description="人口达到25人", condition="population>=25", unlocks=["hospital", "stadium"]),
+            Milestone(id="gdp15000", name="黄金时代", description="GDP超过15000", condition="gdp>=15000", unlocks=["skyscraper", "ceo"]),
+        ]
+
+    def compute_town_rating(self) -> dict:
+        """Compute a composite 0..1 rating from key indicators."""
+        pop = len(self.agents)
+        pop_score = min(1.0, pop / 30.0)
+
+        moods = [self.mood_score(a.resident.mood) for a in self.agents] if self.agents else [0.0]
+        happiness = (sum(moods) / len(moods) + 1.0) / 2.0  # normalize -1..1 to 0..1
+
+        gdp = float(getattr(self, "economic_output", 0.0))
+        gdp_score = min(1.0, gdp / 20000.0)
+
+        safety_scores = [float(getattr(a.resident, "safety_feeling", 1.0)) for a in self.agents]
+        safety = sum(safety_scores) / len(safety_scores) if safety_scores else 1.0
+
+        edu_scores = []
+        for a in self.agents:
+            kl = getattr(getattr(a.resident, "education", None), "knowledge_level", {}) or {}
+            if kl:
+                edu_scores.append(sum(kl.values()) / len(kl))
+        education = sum(edu_scores) / len(edu_scores) if edu_scores else 0.0
+
+        culture = min(1.0, len(getattr(self, "cultural_events", [])) / 20.0)
+
+        composite = round(
+            pop_score * 0.20
+            + happiness * 0.20
+            + gdp_score * 0.20
+            + safety * 0.15
+            + education * 0.15
+            + culture * 0.10,
+            3,
+        )
+        return {
+            "composite": composite,
+            "population": round(pop_score, 3),
+            "happiness": round(happiness, 3),
+            "economy": round(gdp_score, 3),
+            "safety": round(safety, 3),
+            "education": round(education, 3),
+            "culture": round(culture, 3),
+        }
+
+    def check_milestones(self) -> list[str]:
+        """Check milestone conditions and return newly achieved milestone names."""
+        pop = len(self.agents)
+        gdp = float(getattr(self, "economic_output", 0.0))
+        rating = self.compute_town_rating()
+        tick = int(getattr(self, "current_tick", 0))
+
+        newly_achieved: list[str] = []
+        for ms in self.milestones:
+            if ms.achieved:
+                continue
+            achieved = False
+            if ms.id == "pop10" and pop >= 10:
+                achieved = True
+            elif ms.id == "happy07" and rating["happiness"] > 0.7:
+                achieved = True
+            elif ms.id == "gdp5000" and gdp >= 5000:
+                achieved = True
+            elif ms.id == "safe09" and rating["safety"] > 0.9:
+                achieved = True
+            elif ms.id == "edu05" and rating["education"] > 0.5:
+                achieved = True
+            elif ms.id == "culture06" and rating["culture"] > 0.6:
+                achieved = True
+            elif ms.id == "pop25" and pop >= 25:
+                achieved = True
+            elif ms.id == "gdp15000" and gdp >= 15000:
+                achieved = True
+
+            if achieved:
+                ms.achieved = True
+                ms.achieved_tick = tick
+                self.unlocks.extend(ms.unlocks)
+                newly_achieved.append(ms.name)
+
+        return newly_achieved
+
+    def update_town_level(self) -> Optional[int]:
+        """Recalculate town level based on composite rating. Returns new level if changed."""
+        rating = self.compute_town_rating()["composite"]
+        old_level = self.town_level
+        new_level = 1
+        for level, threshold in self._LEVEL_THRESHOLDS:
+            if rating >= threshold:
+                new_level = level
+        self.town_level = new_level
+        return new_level if new_level != old_level else None
+
+    def get_town_level_overview(self) -> dict:
+        """Return town level data for the API."""
+        rating = self.compute_town_rating()
+        next_threshold = 1.0
+        for level, threshold in self._LEVEL_THRESHOLDS:
+            if level == self.town_level + 1:
+                next_threshold = threshold
+                break
+
+        return {
+            "level": self.town_level,
+            "rating": rating,
+            "next_level_threshold": next_threshold,
+            "milestones": [
+                {
+                    "id": ms.id,
+                    "name": ms.name,
+                    "description": ms.description,
+                    "achieved": ms.achieved,
+                    "achieved_tick": ms.achieved_tick,
+                    "unlocks": ms.unlocks,
+                }
+                for ms in self.milestones
+            ],
+            "unlocks": list(self.unlocks),
         }
 
     def get_building_upgrade_cost(self, building: Building) -> float:
@@ -3106,6 +3261,18 @@ class World:
             fashion_events.append(f"经济进入{new_phase}期。")
         cycle_events = self.apply_cycle_effects()
 
+        # ── Town level + milestone checks (every 5 ticks) ──
+        milestone_events: list[str] = []
+        if self.current_tick > 0 and self.current_tick % 5 == 0:
+            new_milestones = self.check_milestones()
+            for name in new_milestones:
+                milestone_events.append(f"里程碑达成：{name}！全镇庆祝！")
+                for agent in self.agents:
+                    self.shift_resident_mood(agent.resident, 2, "milestone_celebration")
+            new_level = self.update_town_level()
+            if new_level is not None:
+                milestone_events.append(f"城镇升级至 Lv.{new_level}！")
+
         # ── Mood contagion: co-occupants influence each other's mood ──────
         from engine.act import apply_mood_contagion
         apply_mood_contagion(self)
@@ -3158,6 +3325,7 @@ class World:
                 *[EventUpdate(description=description) for description in weather_events],
                 *[EventUpdate(description=description) for description in fashion_events],
                 *[EventUpdate(description=description) for description in cycle_events],
+                *[EventUpdate(description=description) for description in milestone_events],
                 *pet_events,
                 *culture_events,
                 *religion_events,

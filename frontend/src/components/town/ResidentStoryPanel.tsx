@@ -26,10 +26,13 @@ import {
   getResidentPets,
   getResidentRelationships,
   getResidentSkills,
+  getResidentWishes,
+  fulfillResidentWish,
   injectResidentMemory,
   patchResidentAttributes,
   tradeResidentItem,
   type ResidentLifeGoal,
+  type ResidentWish,
 } from '../../services/api'
 import { generateResidentAvatarDataUrl } from '../../lib/residentAvatar'
 import { useToast } from '../ui/ToastProvider'
@@ -179,6 +182,7 @@ export function ResidentStoryPanel({
   const [pets, setPets] = useState<Pet[]>([])
   const [achievements, setAchievements] = useState<ResidentAchievement[]>([])
   const [lifeGoal, setLifeGoal] = useState<ResidentLifeGoal | null>(null)
+  const [wishes, setWishes] = useState<ResidentWish[]>([])
   const [healthInfo, setHealthInfo] = useState<ResidentHealthPayload | null>(null)
   const [jobInfo, setJobInfo] = useState<ResidentJobPayload | null>(null)
   const [memoirBusy, setMemoirBusy] = useState(false)
@@ -201,6 +205,7 @@ export function ResidentStoryPanel({
       { key: 'family' as const, label: t('resident_panel.tab_family') },
       { key: 'achievements' as const, label: t('resident_panel.tab_achievements') },
       { key: 'life_goal' as const, label: t('resident_panel.tab_life_goal', '人生目标') },
+      { key: 'wishes' as const, label: t('resident_panel.tab_wishes', '心愿') },
     ],
     [t],
   )
@@ -222,6 +227,7 @@ export function ResidentStoryPanel({
     setPets([])
     setAchievements([])
     setLifeGoal(null)
+    setWishes([])
     setJobInfo(null)
     setHealthInfo(null)
     setKnowledgeLevel({})
@@ -277,6 +283,9 @@ export function ResidentStoryPanel({
         break
       case 'life_goal':
         void getResidentGoals(residentId).then((d) => { if (ok()) setLifeGoal(d) }).catch(() => { if (ok()) setLifeGoal(null) }).finally(done)
+        break
+      case 'wishes':
+        void getResidentWishes(residentId).then((d) => { if (ok()) setWishes(d) }).catch(() => { if (ok()) setWishes([]) }).finally(done)
         break
       default:
         done()
@@ -905,6 +914,59 @@ export function ResidentStoryPanel({
             <p className="text-sm text-slate-500">{t('resident_panel.no_life_goal', '暂无人生目标')}</p>
           )}
         </div>
+
+        {/* Wishes tab */}
+        <div className={activeTab === 'wishes' ? '' : 'hidden'}>
+          {wishes.length > 0 ? (
+            <div className="grid gap-2">
+              {wishes.map((wish) => (
+                <div
+                  key={`${wish.index}-${wish.type}`}
+                  className={`rounded-xl border p-3 transition ${
+                    wish.fulfilled
+                      ? 'border-white/[0.04] bg-white/[0.01] opacity-50'
+                      : 'border-white/[0.06] bg-white/[0.03]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-lg">{wish.fulfilled ? '✅' : _wishIcon(wish.type)}</span>
+                      <div>
+                        <p className={`text-sm ${wish.fulfilled ? 'text-slate-500 line-through' : 'text-white'}`}>
+                          {wish.description}
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          {_wishLabel(wish.type)} · {t('resident_panel.wish_priority', '优先级')} {Math.round(wish.priority * 100)}%
+                        </p>
+                      </div>
+                    </div>
+                    {!wish.fulfilled && (
+                      <button
+                        type="button"
+                        className="shrink-0 rounded-lg border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-[11px] font-medium text-amber-200 transition hover:bg-amber-400/20"
+                        title={t('resident_panel.fulfill_wish', '帮助实现')}
+                        onClick={async () => {
+                          try {
+                            await fulfillResidentWish(residentId, wish.index)
+                            loadedTabsRef.current.delete('wishes')
+                            loadTabData('wishes')
+                          } catch { /* ignore */ }
+                        }}
+                      >
+                        {t('resident_panel.fulfill_wish', '实现')}
+                      </button>
+                    )}
+                    {wish.fulfilled && wish.fulfilled_tick != null && (
+                      <span className="text-[10px] text-slate-600">Tick #{wish.fulfilled_tick}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">{t('resident_panel.no_wishes', '暂无心愿')}</p>
+          )}
+        </div>
       </div>
 
       {/* ---- God actions: icon buttons with tooltips ---- */}
@@ -1066,6 +1128,23 @@ function ScheduleTabContent({
       compareResidents={compareResidents}
     />
   )
+}
+
+
+function _wishIcon(type: string): string {
+  const map: Record<string, string> = {
+    want_item: '🎁', want_friend: '🤝', want_job: '💼',
+    want_home_upgrade: '🏠', want_travel: '✈️',
+  }
+  return map[type] ?? '💫'
+}
+
+function _wishLabel(type: string): string {
+  const map: Record<string, string> = {
+    want_item: '物品', want_friend: '交友', want_job: '求职',
+    want_home_upgrade: '装修', want_travel: '旅行',
+  }
+  return map[type] ?? type
 }
 
 

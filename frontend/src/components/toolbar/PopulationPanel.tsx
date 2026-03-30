@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { getWorldDemographics, type WorldDemographicsPayload } from '../../services/api'
+import { AnimatedNumber } from '../ui/AnimatedNumber'
 import { PanelShell } from '../ui/PanelShell'
 import { PanelEmptyState, PanelSkeletonGrid, PanelSpinner } from '../ui/PanelStates'
 import { SparkLine } from '../ui/SparkLine'
@@ -93,13 +94,22 @@ export function PopulationPanel() {
       ) : null}
 
       <section className="grid gap-3 md:grid-cols-4">
-        <MetricCard label="平均年龄" value={`${Math.round(data.average_age)} tick`} />
-        <MetricCard label="退休人数" value={String(data.retired_count)} />
-        <MetricCard label="近期离世" value={String(data.recent_deaths)} />
-        <MetricCard
-          label="总人口"
-          value={String(Object.values(data.age_distribution).reduce((sum, count) => sum + count, 0))}
-        />
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">平均年龄</p>
+          <AnimatedNumber value={Math.round(data.average_age)} suffix=" tick" className="mt-2 block text-2xl font-semibold text-white" />
+        </div>
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">退休人数</p>
+          <AnimatedNumber value={data.retired_count} className="mt-2 block text-2xl font-semibold text-white" />
+        </div>
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">近期离世</p>
+          <AnimatedNumber value={data.recent_deaths} className="mt-2 block text-2xl font-semibold text-white" />
+        </div>
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">总人口</p>
+          <AnimatedNumber value={Object.values(data.age_distribution).reduce((s, c) => s + c, 0)} className="mt-2 block text-2xl font-semibold text-white" />
+        </div>
       </section>
 
       {data.generational_timeline.length > 1 && (

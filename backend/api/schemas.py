@@ -889,6 +889,33 @@ class EconomyCycleResponse(BaseModel):
     gdp_history: list[dict[str, float | int]] = Field(default_factory=list)
 
 
+class MilestoneResponse(BaseModel):
+    id: str = ""
+    name: str = ""
+    description: str = ""
+    achieved: bool = False
+    achieved_tick: int = 0
+    unlocks: list[str] = Field(default_factory=list)
+
+
+class TownRatingResponse(BaseModel):
+    composite: float = 0.0
+    population: float = 0.0
+    happiness: float = 0.0
+    economy: float = 0.0
+    safety: float = 0.0
+    education: float = 0.0
+    culture: float = 0.0
+
+
+class TownLevelResponse(BaseModel):
+    level: int = 1
+    rating: TownRatingResponse = Field(default_factory=TownRatingResponse)
+    next_level_threshold: float = 0.15
+    milestones: list[MilestoneResponse] = Field(default_factory=list)
+    unlocks: list[str] = Field(default_factory=list)
+
+
 class FashionTrendResponse(BaseModel):
     color_name: str
     color: str
