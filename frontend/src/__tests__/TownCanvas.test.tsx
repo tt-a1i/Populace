@@ -85,6 +85,7 @@ vi.mock('../services/api', () => ({
   getZones: mockGetZones,
   getWorldTransport: mockGetWorldTransport,
   injectEvent: mockInjectEvent,
+  getTownLevel: vi.fn().mockResolvedValue({ level: 1, rating: { composite: 0.1 }, next_level_threshold: 0.15, milestones: [], unlocks: [] }),
 }))
 
 vi.mock('../audio', () => ({

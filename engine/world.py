@@ -42,6 +42,7 @@ from engine.types import (
     EconomicCycle,
     Milestone,
     NewsArticle,
+    Secret,
     Newspaper,
     Party,
     Pet,
@@ -239,6 +240,7 @@ class World:
         self.town_level: int = 1
         self.milestones: List[Milestone] = self._default_milestones()
         self.unlocks: List[str] = []
+        self.rumor_log: List[dict] = []
         ensure_world_fashion_state(self)
 
     def _default_zones(self) -> List[Zone]:
@@ -312,6 +314,7 @@ class World:
         self._ensure_resident_job(agent.resident)
         self._ensure_resident_health(agent.resident)
         self._ensure_resident_fashion(agent.resident)
+        self._ensure_resident_secrets(agent.resident)
         self.agents.append(agent)
         self._apply_religious_relationship_bias(agent)
         self._rebuild_pet_registry()
@@ -929,6 +932,10 @@ class World:
         ensure_world_fashion_state(self)
         ensure_resident_fashion(self, resident)
 
+    def _ensure_resident_secrets(self, resident: Resident) -> None:
+        if not hasattr(resident, "secrets"):
+            resident.secrets = []  # type: ignore[attr-defined]
+
     def fashion_social_bonus(self, resident: Resident, *, first_impression: bool = False) -> float:
         self._ensure_resident_fashion(resident)
         return calculate_fashion_social_bonus(self, resident, first_impression=first_impression)
@@ -1162,6 +1169,18 @@ class World:
         else:
             self.shift_resident_mood(resident, 1, "memory")
         return memory
+
+    def adjust_reputation(self, resident: Resident, delta: float, source: str = "system") -> float:
+        """Adjust a resident's reputation by delta. Convenience wrapper."""
+        self._ensure_resident_reputation(resident)
+        before = resident.reputation
+        after = max(-1.0, min(1.0, before + delta))
+        resident.reputation = after
+        resident.reputation_history.append(
+            ReputationEntry(tick=self.current_tick, source=source, delta=delta, before=before, after=after)
+        )
+        resident.reputation_history = resident.reputation_history[-100:]
+        return after
 
     def adjust_resident_reputation(self, resident_id: str, delta: float, source: str) -> float:
         agent = self.get_agent(resident_id)
@@ -1605,6 +1624,154 @@ class World:
                 for ms in self.milestones
             ],
             "unlocks": list(self.unlocks),
+        }
+
+    # ------------------------------------------------------------------
+    # Secrets / rumors system
+    # ------------------------------------------------------------------
+
+    _SECRET_TEMPLATES: dict = {
+        "affair": [
+            "曾与某位邻居有过暧昧关系",
+            "暗恋镇上另一位居民",
+            "曾在深夜与人幽会",
+        ],
+        "crime_witness": [
+            "目击过一起盗窃事件但没有举报",
+            "知道某人曾偷拿公物",
+            "无意中看到了不该看的交易",
+        ],
+        "hidden_talent": [
+            "其实是个隐藏的绘画高手",
+            "私下练习舞蹈但从不示人",
+            "偷偷写诗记录生活",
+        ],
+        "past_event": [
+            "搬来之前曾在另一个城市闯过祸",
+            "有一段不为人知的过去",
+            "曾经差点离开这座小镇",
+        ],
+    }
+
+    def _ensure_resident_secrets(self, resident: Resident) -> None:
+        """Initialize 1-2 random secrets for a new resident."""
+        if getattr(resident, "secrets", None):
+            return
+        resident.secrets = []
+        types = list(self._SECRET_TEMPLATES.keys())
+        count = self.rng.randint(1, 2)
+        chosen_types = self.rng.sample(types, min(count, len(types)))
+        for i, stype in enumerate(chosen_types):
+            templates = self._SECRET_TEMPLATES[stype]
+            content = self.rng.choice(templates)
+            resident.secrets.append(Secret(
+                id=f"{resident.id}-secret-{i}",
+                owner_id=resident.id,
+                content=content,
+                type=stype,
+                known_by=[resident.id],
+                spread_probability=round(0.15 + self.rng.random() * 0.25, 2),
+            ))
+
+    def spread_secrets_during_social(self, agent_a: Agent, agent_b: Agent) -> list[str]:
+        """During social interaction, secrets may leak to the other party.
+
+        Higher friendship intensity increases the chance.
+        Returns list of event descriptions for leaked secrets.
+        """
+        events: list[str] = []
+        rel = self.get_relationship(agent_a.resident.id, agent_b.resident.id)
+        friendship_bonus = 0.0
+        if rel is not None and rel.intensity > 0.6:
+            friendship_bonus = (rel.intensity - 0.6) * 0.5
+
+        for secret in getattr(agent_a.resident, "secrets", []):
+            if secret.is_public:
+                continue
+            if agent_b.resident.id in secret.known_by:
+                continue
+            chance = secret.spread_probability + friendship_bonus
+            if self.rng.random() < chance:
+                secret.known_by.append(agent_b.resident.id)
+                self.rumor_log.append({
+                    "tick": self.current_tick,
+                    "secret_id": secret.id,
+                    "owner_id": secret.owner_id,
+                    "owner_name": agent_a.resident.name,
+                    "told_to_id": agent_b.resident.id,
+                    "told_to_name": agent_b.resident.name,
+                    "content": secret.content,
+                    "type": secret.type,
+                    "spread_count": len(secret.known_by),
+                })
+                events.append(f"{agent_b.resident.name}得知了关于{agent_a.resident.name}的秘密。")
+                self._apply_rumor_effects(secret, agent_a.resident, agent_b.resident)
+
+        self.rumor_log = self.rumor_log[-200:]
+        return events
+
+    def _apply_rumor_effects(self, secret: Secret, owner: Resident, listener: Resident) -> None:
+        """Apply reputation/mood effects when a secret is spread."""
+        if secret.type == "affair":
+            self.adjust_resident_reputation(owner.id, -0.05, "secret_leaked")
+            self.shift_resident_mood(owner, -1, "secret_leaked")
+        elif secret.type == "crime_witness":
+            self.adjust_resident_reputation(owner.id, -0.08, "secret_leaked")
+            self.shift_resident_mood(owner, -1, "secret_leaked")
+            owner.safety_feeling = max(0.0, owner.safety_feeling - 0.05)
+        elif secret.type == "hidden_talent":
+            self.adjust_resident_reputation(owner.id, 0.03, "talent_discovered")
+            self.shift_resident_mood(owner, 1, "talent_discovered")
+        elif secret.type == "past_event":
+            self.adjust_resident_reputation(owner.id, -0.03, "secret_leaked")
+
+        # Widespread secrets become public
+        if len(secret.known_by) >= max(3, len(self.agents) // 2):
+            secret.is_public = True
+            secret.revealed_tick = self.current_tick
+
+    def process_secret_tick(self) -> list[str]:
+        """Run secret spreading for co-located residents each tick."""
+        events: list[str] = []
+        processed = set()
+        for agent in self.agents:
+            if agent.resident.location is None:
+                continue
+            for other in self.agents:
+                if other is agent or other.resident.location != agent.resident.location:
+                    continue
+                pair_key = tuple(sorted([agent.resident.id, other.resident.id]))
+                if pair_key in processed:
+                    continue
+                processed.add(pair_key)
+                if self.rng.random() < 0.12:
+                    events.extend(self.spread_secrets_during_social(agent, other))
+                if self.rng.random() < 0.12:
+                    events.extend(self.spread_secrets_during_social(other, agent))
+        return events
+
+    def get_rumors_overview(self) -> dict:
+        """Return active rumors for the API."""
+        active_rumors: list[dict] = []
+        for agent in self.agents:
+            for secret in getattr(agent.resident, "secrets", []):
+                if len(secret.known_by) > 1:
+                    active_rumors.append({
+                        "secret_id": secret.id,
+                        "owner_id": secret.owner_id,
+                        "owner_name": agent.resident.name,
+                        "content": secret.content,
+                        "type": secret.type,
+                        "spread_count": len(secret.known_by),
+                        "is_public": secret.is_public,
+                        "revealed_tick": secret.revealed_tick,
+                    })
+        active_rumors.sort(key=lambda r: -r["spread_count"])
+        return {
+            "rumors": active_rumors[:20],
+            "total_secrets": sum(len(getattr(a.resident, "secrets", [])) for a in self.agents),
+            "total_spread": len(active_rumors),
+            "recent_leaks": list(self.rumor_log[-10:]),
         }
 
     def get_building_upgrade_cost(self, building: Building) -> float:
@@ -3250,6 +3417,7 @@ class World:
         pet_events = self.update_pets()
         culture_events = self.update_cultural_events()
         religion_events = self.update_religious_events()
+        secret_events = self.process_secret_tick()
 
         # ── News generation every 10 ticks ──
         if self.current_tick > 0 and self.current_tick % 10 == 0:
@@ -3326,6 +3494,7 @@ class World:
                 *[EventUpdate(description=description) for description in fashion_events],
                 *[EventUpdate(description=description) for description in cycle_events],
                 *[EventUpdate(description=description) for description in milestone_events],
+                *[EventUpdate(description=description) for description in secret_events],
                 *pet_events,
                 *culture_events,
                 *religion_events,

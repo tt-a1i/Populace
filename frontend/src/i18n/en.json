@@ -975,5 +975,38 @@
     "gdp_chart": "GDP Curve",
     "no_gdp": "No GDP data yet",
     "no_gdp_hint": "GDP chart will appear after a few ticks of simulation."
+  },
+  "milestones": {
+    "title": "Milestones & Town Level",
+    "error": "Failed to load milestone data",
+    "loading": "Loading…",
+    "loading_msg": "Calculating town rating and milestone progress.",
+    "town": "Town",
+    "next_at": "Next level at",
+    "composite": "Composite Rating",
+    "achieved": "Achieved",
+    "pending": "Pending",
+    "unlocked": "Unlocked Content"
+  },
+  "bulletin": {
+    "title": "Bulletin Board",
+    "error": "Failed to load bulletin",
+    "loading": "Loading bulletin…",
+    "refresh": "Refresh",
+    "posts": "new posts",
+    "topics": "hot topics",
+    "hot_topics": "Hot Topics",
+    "no_topics": "No hot topics yet.",
+    "latest_posts": "Latest Posts",
+    "no_posts": "No posts yet.",
+    "topic_label": "Topic",
+    "whispers": "Whispers",
+    "spreading": "spreading",
+    "about": "About",
+    "people_know": "people know",
+    "public": "Public",
+    "recent_leaks": "Recent Leaks",
+    "learned_about": "learned about",
+    "secret_suffix": "'s secret"
   }
 }

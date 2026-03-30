@@ -35,6 +35,7 @@ from backend.api.schemas import (
     WorldHealthResponse,
     EconomyCycleResponse,
     TownLevelResponse,
+    WorldRumorsResponse,
     WorldEconomyResponse,
     WorldFashionResponse,
     WorldNewsResponse,
@@ -360,6 +361,16 @@ async def get_town_level(request: Request) -> TownLevelResponse:
 
 
 @router.get(
+    "/rumors",
+    response_model=WorldRumorsResponse,
+    responses=error_responses(503),
+)
+async def get_world_rumors(request: Request) -> WorldRumorsResponse:
+    state = get_simulation_state(request)
+    return WorldRumorsResponse(**state.world.get_rumors_overview())
+
+
+@router.get(
     "/fashion",
     response_model=WorldFashionResponse,
     responses=error_responses(503),
@@ -666,6 +677,41 @@ async def get_world_bulletin(request: Request) -> WorldBulletinResponse:
 async def get_world_diplomacy(request: Request) -> WorldDiplomacyResponse:
     state = get_simulation_state(request)
     return WorldDiplomacyResponse(**state.get_diplomacy_overview())
+
+
+class RivalryEntryResponse(BaseModel):
+    from_id: str
+    from_name: str
+    target_id: str
+    target_name: str
+    reason: str
+    reason_label: str
+    intensity: float
+
+
+class RivalryHotspotResponse(BaseModel):
+    resident_id: str
+    resident_name: str
+    total_jealousy: float
+
+
+class WorldRivalriesResponse(BaseModel):
+    rivalries: list[RivalryEntryResponse] = Field(default_factory=list)
+    hotspots: list[RivalryHotspotResponse] = Field(default_factory=list)
+    total_rivalries: int = 0
+    avg_intensity: float = 0.0
+
+
+@router.get(
+    "/rivalries",
+    response_model=WorldRivalriesResponse,
+    responses=error_responses(503),
+)
+async def get_world_rivalries(request: Request) -> WorldRivalriesResponse:
+    from engine.jealousy import get_rivalries_overview
+
+    state = get_simulation_state(request)
+    return WorldRivalriesResponse(**get_rivalries_overview(state))
 
 
 @router.get(

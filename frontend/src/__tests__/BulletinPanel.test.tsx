@@ -2,12 +2,14 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockGetWorldBulletin } = vi.hoisted(() => ({
+const { mockGetWorldBulletin, mockGetWorldRumors } = vi.hoisted(() => ({
   mockGetWorldBulletin: vi.fn(),
+  mockGetWorldRumors: vi.fn().mockResolvedValue({ rumors: [], total_secrets: 0, total_spread: 0, recent_leaks: [] }),
 }))
 
 vi.mock('../services/api', () => ({
   getWorldBulletin: mockGetWorldBulletin,
+  getWorldRumors: mockGetWorldRumors,
 }))
 
 import { BulletinPanel } from '../components/toolbar/BulletinPanel'

@@ -889,6 +889,36 @@ class EconomyCycleResponse(BaseModel):
     gdp_history: list[dict[str, float | int]] = Field(default_factory=list)
 
 
+class RumorEntry(BaseModel):
+    secret_id: str = ""
+    owner_id: str = ""
+    owner_name: str = ""
+    content: str = ""
+    type: str = ""
+    spread_count: int = 0
+    is_public: bool = False
+    revealed_tick: int = 0
+
+
+class RecentLeak(BaseModel):
+    tick: int = 0
+    secret_id: str = ""
+    owner_id: str = ""
+    owner_name: str = ""
+    told_to_id: str = ""
+    told_to_name: str = ""
+    content: str = ""
+    type: str = ""
+    spread_count: int = 0
+
+
+class WorldRumorsResponse(BaseModel):
+    rumors: list[RumorEntry] = Field(default_factory=list)
+    total_secrets: int = 0
+    total_spread: int = 0
+    recent_leaks: list[RecentLeak] = Field(default_factory=list)
+
+
 class MilestoneResponse(BaseModel):
     id: str = ""
     name: str = ""

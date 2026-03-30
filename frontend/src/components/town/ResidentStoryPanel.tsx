@@ -93,6 +93,7 @@ type TabKey =
   | 'backpack'
   | 'family'
   | 'achievements'
+  | 'travels'
   | 'schedule'
 
 interface ResidentStoryPanelProps {
@@ -183,6 +184,7 @@ export function ResidentStoryPanel({
   const [achievements, setAchievements] = useState<ResidentAchievement[]>([])
   const [lifeGoal, setLifeGoal] = useState<ResidentLifeGoal | null>(null)
   const [wishes, setWishes] = useState<ResidentWish[]>([])
+  const [travels, setTravels] = useState<Array<{ destination: string; destination_type: string; tick_departed: number; tick_returned: number; souvenirs: string[]; story: string }>>([])
   const [healthInfo, setHealthInfo] = useState<ResidentHealthPayload | null>(null)
   const [jobInfo, setJobInfo] = useState<ResidentJobPayload | null>(null)
   const [memoirBusy, setMemoirBusy] = useState(false)
@@ -206,6 +208,7 @@ export function ResidentStoryPanel({
       { key: 'achievements' as const, label: t('resident_panel.tab_achievements') },
       { key: 'life_goal' as const, label: t('resident_panel.tab_life_goal', '人生目标') },
       { key: 'wishes' as const, label: t('resident_panel.tab_wishes', '心愿') },
+      { key: 'travels' as const, label: t('resident_panel.tab_travels', '旅行足迹') },
     ],
     [t],
   )
@@ -228,6 +231,7 @@ export function ResidentStoryPanel({
     setAchievements([])
     setLifeGoal(null)
     setWishes([])
+    setTravels([])
     setJobInfo(null)
     setHealthInfo(null)
     setKnowledgeLevel({})
@@ -286,6 +290,11 @@ export function ResidentStoryPanel({
         break
       case 'wishes':
         void getResidentWishes(residentId).then((d) => { if (ok()) setWishes(d) }).catch(() => { if (ok()) setWishes([]) }).finally(done)
+        break
+      case 'travels':
+        void import('../../services/api').then(({ getResidentTravels }) =>
+          getResidentTravels(residentId).then((d) => { if (ok()) setTravels(d) }).catch(() => { if (ok()) setTravels([]) }).finally(done)
+        )
         break
       default:
         done()
@@ -965,6 +974,41 @@ export function ResidentStoryPanel({
             </div>
           ) : (
             <p className="text-sm text-slate-500">{t('resident_panel.no_wishes', '暂无心愿')}</p>
+          )}
+        </div>
+
+        {/* Travel log tab */}
+        <div className={activeTab === 'travels' ? '' : 'hidden'}>
+          {travels.length > 0 ? (
+            <div className="grid gap-2">
+              {travels.map((trip, i) => (
+                <div key={`${trip.tick_departed}-${trip.destination}`} className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-lg">
+                        {trip.destination_type === 'mountain' ? '🏔' : trip.destination_type === 'seaside' ? '🏖' : trip.destination_type === 'forest' ? '🌲' : '🏘'}
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-white">{trip.destination}</p>
+                        <p className="text-[11px] text-slate-400">
+                          Tick {trip.tick_departed}{trip.tick_returned > 0 ? ` → ${trip.tick_returned}` : ' (traveling...)'}
+                        </p>
+                      </div>
+                    </div>
+                    {trip.souvenirs.length > 0 && (
+                      <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 text-[10px] text-amber-200">
+                        🎁 {trip.souvenirs[0]}
+                      </span>
+                    )}
+                  </div>
+                  {trip.story && (
+                    <p className="mt-2 text-xs text-slate-300 italic">&ldquo;{trip.story}&rdquo;</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">{t('resident_panel.no_travels', '暂无旅行记录')}</p>
           )}
         </div>
       </div>

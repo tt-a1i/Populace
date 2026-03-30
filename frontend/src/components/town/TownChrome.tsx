@@ -105,6 +105,15 @@ export function TownChrome({
 
   return (
     <>
+      {/* Town level HUD badge */}
+      <div
+        data-testid="town-level-badge"
+        className="absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-full border border-amber-400/25 bg-slate-950/80 px-3 py-1.5 shadow-lg backdrop-blur-md cursor-pointer"
+        onClick={() => window.dispatchEvent(new CustomEvent('populace:open-tool', { detail: { tool: 'milestones' } }))}
+      >
+        <span className="text-xs font-bold text-amber-300">Lv.{townLevel}</span>
+      </div>
+
       {inspection && (
         <section
           data-testid="town-inspection"

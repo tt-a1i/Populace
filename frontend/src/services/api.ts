@@ -440,8 +440,63 @@ export function getWorldBulletin() {
   return request<WorldBulletinPayload>('/api/world/bulletin')
 }
 
+export interface RumorEntry {
+  secret_id: string
+  owner_id: string
+  owner_name: string
+  content: string
+  type: string
+  spread_count: number
+  is_public: boolean
+  revealed_tick: number
+}
+
+export interface WorldRumorsPayload {
+  rumors: RumorEntry[]
+  total_secrets: number
+  total_spread: number
+  recent_leaks: Array<{
+    tick: number
+    owner_name: string
+    told_to_name: string
+    content: string
+    type: string
+  }>
+}
+
+export function getWorldRumors() {
+  return request<WorldRumorsPayload>('/api/world/rumors')
+}
+
 export function getWorldDiplomacy() {
   return request<WorldDiplomacyPayload>('/api/world/diplomacy')
+}
+
+export interface RivalryEntry {
+  from_id: string
+  from_name: string
+  target_id: string
+  target_name: string
+  reason: string
+  reason_label: string
+  intensity: number
+}
+
+export interface RivalryHotspot {
+  resident_id: string
+  resident_name: string
+  total_jealousy: number
+}
+
+export interface WorldRivalriesPayload {
+  rivalries: RivalryEntry[]
+  hotspots: RivalryHotspot[]
+  total_rivalries: number
+  avg_intensity: number
+}
+
+export function getWorldRivalries() {
+  return request<WorldRivalriesPayload>('/api/world/rivalries')
 }
 
 export function getWorldPolitics() {
@@ -467,6 +522,19 @@ export function getWorldRelationships() {
 
 export function getResidentRomance(id: string) {
   return request<ResidentRomancePayload>(`/api/residents/${id}/romance`)
+}
+
+export interface TravelEntryPayload {
+  destination: string
+  destination_type: string
+  tick_departed: number
+  tick_returned: number
+  souvenirs: string[]
+  story: string
+}
+
+export function getResidentTravels(id: string) {
+  return request<TravelEntryPayload[]>(`/api/residents/${id}/travels`)
 }
 
 export function getResidents() {

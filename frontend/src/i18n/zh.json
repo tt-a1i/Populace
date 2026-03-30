@@ -975,5 +975,38 @@
     "gdp_chart": "GDP 曲线",
     "no_gdp": "暂无 GDP 曲线",
     "no_gdp_hint": "等待模拟运行几个 Tick 后，这里会出现经济曲线。"
+  },
+  "milestones": {
+    "title": "里程碑与城镇等级",
+    "error": "里程碑数据加载失败",
+    "loading": "加载中…",
+    "loading_msg": "正在计算城镇评级与里程碑进度。",
+    "town": "小镇",
+    "next_at": "下一级",
+    "composite": "综合评分",
+    "achieved": "已达成",
+    "pending": "待达成",
+    "unlocked": "已解锁内容"
+  },
+  "bulletin": {
+    "title": "公告板",
+    "error": "公告板加载失败",
+    "loading": "公告板加载中…",
+    "refresh": "刷新公告板",
+    "posts": "条新帖",
+    "topics": "个热话题",
+    "hot_topics": "热议话题",
+    "no_topics": "暂无热议。",
+    "latest_posts": "最新帖子",
+    "no_posts": "公告板还没有内容。",
+    "topic_label": "话题",
+    "whispers": "小道消息",
+    "spreading": "条流传中",
+    "about": "关于",
+    "people_know": "人知晓",
+    "public": "已公开",
+    "recent_leaks": "最近泄露",
+    "learned_about": "得知了关于",
+    "secret_suffix": "的秘密"
   }
 }

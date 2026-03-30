@@ -1105,3 +1105,27 @@ async def fulfill_resident_wish(resident_id: str, wish_index: int, request: Requ
     if result is None:
         raise api_error(400, "Invalid wish index", "invalid_wish_index")
     return FulfillWishResponse(**result)
+
+
+class TravelEntryResponse(BaseModel):
+    destination: str = ""
+    destination_type: str = ""
+    tick_departed: int = 0
+    tick_returned: int = 0
+    souvenirs: list[str] = Field(default_factory=list)
+    story: str = ""
+
+
+@router.get(
+    "/{resident_id}/travels",
+    response_model=list[TravelEntryResponse],
+    responses=error_responses(404, 503),
+)
+async def get_resident_travels(resident_id: str, request: Request) -> list[TravelEntryResponse]:
+    from engine.travel import get_resident_travels as _get_travels
+
+    state = get_simulation_state(request)
+    agent = state.world.get_agent(resident_id)
+    if agent is None:
+        raise _NOT_FOUND
+    return [TravelEntryResponse(**entry) for entry in _get_travels(state.world, resident_id)]

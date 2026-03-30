@@ -318,6 +318,21 @@ else:
         target_id: str = ""
 
     @dataclass
+    class TravelEntry:
+        destination: str = ""
+        destination_type: str = "neighboring_town"  # neighboring_town, mountain, seaside, forest
+        tick_departed: int = 0
+        tick_returned: int = 0
+        souvenirs: List[str] = field(default_factory=list)
+        story: str = ""
+
+    @dataclass
+    class JealousyEntry:
+        target_id: str
+        reason: str
+        intensity: float = 0.0
+
+    @dataclass
     class ExternalTown:
         name: str
         relation_score: float = 0.0
@@ -414,6 +429,10 @@ else:
         relationship_status: "RelationshipStatus" = RelationshipStatus.single
         life_goal: Optional["LifeGoal"] = None
         wishlist: List["Wish"] = field(default_factory=list)
+        travel_log: List["TravelEntry"] = field(default_factory=list)
+        traveling: bool = False
+        jealousy_targets: List["JealousyEntry"] = field(default_factory=list)
+        secrets: List["Secret"] = field(default_factory=list)
 
 
     @dataclass
@@ -696,6 +715,22 @@ else:
         festival_updates: List["FestivalUpdate"] = field(default_factory=list)
         disaster_updates: List["DisasterUpdate"] = field(default_factory=list)
 
+
+    # ---------------------------------------------------------------------------
+    # Secrets / rumors (§99)
+    # ---------------------------------------------------------------------------
+
+    @dataclass
+    class Secret:
+        """A resident's secret that can be spread as a rumor."""
+        id: str = ""
+        owner_id: str = ""
+        content: str = ""
+        type: str = "past_event"        # affair, crime_witness, hidden_talent, past_event
+        known_by: List[str] = field(default_factory=list)
+        spread_probability: float = 0.3
+        is_public: bool = False
+        revealed_tick: int = 0
 
     # ---------------------------------------------------------------------------
     # Town level / milestones (§96)
