@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useSimulationStore } from '../../stores/simulation'
@@ -20,6 +20,7 @@ import {
   getResidentEducation,
   getResidentHealth,
   getResidentJob,
+  getResidentGoals,
   getResidentMemories,
   getResidentMoodLog,
   getResidentPets,
@@ -28,6 +29,7 @@ import {
   injectResidentMemory,
   patchResidentAttributes,
   tradeResidentItem,
+  type ResidentLifeGoal,
 } from '../../services/api'
 import { generateResidentAvatarDataUrl } from '../../lib/residentAvatar'
 import { useToast } from '../ui/ToastProvider'
@@ -113,6 +115,7 @@ interface ResidentStoryPanelProps {
     }
     energy?: number
     reputation?: number
+    relationship_status?: string
     currentGoal?: string | null
     currentBuildingId?: string | null
     skinColor?: string | null
@@ -175,6 +178,7 @@ export function ResidentStoryPanel({
   const [moodLog, setMoodLog] = useState<ResidentMoodLogEntry[]>([])
   const [pets, setPets] = useState<Pet[]>([])
   const [achievements, setAchievements] = useState<ResidentAchievement[]>([])
+  const [lifeGoal, setLifeGoal] = useState<ResidentLifeGoal | null>(null)
   const [healthInfo, setHealthInfo] = useState<ResidentHealthPayload | null>(null)
   const [jobInfo, setJobInfo] = useState<ResidentJobPayload | null>(null)
   const [memoirBusy, setMemoirBusy] = useState(false)
@@ -196,103 +200,93 @@ export function ResidentStoryPanel({
       { key: 'schedule' as const, label: t('resident_panel.tab_schedule') },
       { key: 'family' as const, label: t('resident_panel.tab_family') },
       { key: 'achievements' as const, label: t('resident_panel.tab_achievements') },
+      { key: 'life_goal' as const, label: t('resident_panel.tab_life_goal', '人生目标') },
     ],
     [t],
   )
 
+  // ── Lazy per-tab data loading with cancellation ──
+  const loadedTabsRef = useRef(new Set<string>())
+  const [tabLoading, setTabLoading] = useState(false)
+  const versionRef = useRef(0)
+
+  // Reset loaded-tabs when resident changes
+  useEffect(() => {
+    versionRef.current += 1
+    loadedTabsRef.current = new Set<string>()
+    setMemories([])
+    setDiaryEntries([])
+    setRelationships([])
+    setSkills({})
+    setMoodLog([])
+    setPets([])
+    setAchievements([])
+    setLifeGoal(null)
+    setJobInfo(null)
+    setHealthInfo(null)
+    setKnowledgeLevel({})
+    setCourseHistory([])
+    setCourses([])
+  }, [residentId])
+
+  // Always load core header data (job + health) eagerly
   useEffect(() => {
     let cancelled = false
+    void getResidentJob(residentId).then((d) => { if (!cancelled) setJobInfo(d) }).catch(() => { if (!cancelled) setJobInfo(null) })
+    void getResidentHealth(residentId).then((d) => { if (!cancelled) setHealthInfo(d) }).catch(() => { if (!cancelled) setHealthInfo(null) })
+    return () => { cancelled = true }
+  }, [residentId])
 
-    void getResidentMemories(residentId)
-      .then((data) => {
-        if (!cancelled) setMemories(data)
-      })
-      .catch(() => {
-        if (!cancelled) setMemories([])
-      })
+  const loadTabData = useCallback((tab: string) => {
+    if (loadedTabsRef.current.has(tab)) return
+    loadedTabsRef.current.add(tab)
+    setTabLoading(true)
+    const ver = versionRef.current
+    const ok = () => versionRef.current === ver
+    const done = () => { if (ok()) setTabLoading(false) }
 
-    void getResidentRelationships(residentId)
-      .then((data) => {
-        if (!cancelled) setRelationships(data)
-      })
-      .catch(() => {
-        if (!cancelled) setRelationships([])
-      })
-
-    void getResidentSkills(residentId)
-      .then((data) => {
-        if (!cancelled) setSkills(data.skills ?? {})
-      })
-      .catch(() => {
-        if (!cancelled) setSkills(resident?.skills ?? {})
-      })
-
-    void getResidentMoodLog(residentId)
-      .then((data) => {
-        if (!cancelled) setMoodLog(data)
-      })
-      .catch(() => {
-        if (!cancelled) setMoodLog([])
-      })
-
-    void getResidentPets(residentId)
-      .then((data) => {
-        if (!cancelled) setPets(data)
-      })
-      .catch(() => {
-        if (!cancelled) setPets(resident?.pets ?? [])
-      })
-
-    void getResidentDiary(residentId, { limit: 12 })
-      .then((data) => {
-        if (!cancelled) setDiaryEntries(data)
-      })
-      .catch(() => {
-        if (!cancelled) setDiaryEntries([])
-      })
-
-    void getResidentAchievements(residentId)
-      .then((data) => {
-        if (!cancelled) setAchievements(data)
-      })
-      .catch(() => {
-        if (!cancelled) setAchievements([])
-      })
-
-    void getResidentJob(residentId)
-      .then((data) => {
-        if (!cancelled) setJobInfo(data)
-      })
-      .catch(() => {
-        if (!cancelled) setJobInfo(null)
-      })
-
-    void getResidentHealth(residentId)
-      .then((data) => {
-        if (!cancelled) setHealthInfo(data)
-      })
-      .catch(() => {
-        if (!cancelled) setHealthInfo(null)
-      })
-
-    void getResidentEducation(residentId)
-      .then((data) => {
-        if (cancelled) return
-        setKnowledgeLevel(data.education?.knowledge_level ?? {})
-        setCourseHistory(data.education?.course_history ?? [])
-        setCourses(data.education?.courses ?? [])
-      })
-      .catch(() => {
-        if (cancelled) return
-        setKnowledgeLevel({})
-        setCourseHistory([])
-        setCourses([])
-      })
-
-    return () => {
-      cancelled = true
+    switch (tab) {
+      case 'memories':
+        void getResidentMemories(residentId).then((d) => { if (ok()) setMemories(d) }).catch(() => { if (ok()) setMemories([]) }).finally(done)
+        break
+      case 'diary':
+        void getResidentDiary(residentId, { limit: 12 }).then((d) => { if (ok()) setDiaryEntries(d) }).catch(() => { if (ok()) setDiaryEntries([]) }).finally(done)
+        break
+      case 'relations':
+        void getResidentRelationships(residentId).then((d) => { if (ok()) setRelationships(d) }).catch(() => { if (ok()) setRelationships([]) }).finally(done)
+        break
+      case 'skills':
+        void getResidentSkills(residentId).then((d) => { if (ok()) setSkills(d.skills ?? {}) }).catch(() => { if (ok()) setSkills(resident?.skills ?? {}) }).finally(done)
+        break
+      case 'education':
+        void getResidentEducation(residentId).then((d) => {
+          if (!ok()) return
+          setKnowledgeLevel(d.education?.knowledge_level ?? {})
+          setCourseHistory(d.education?.course_history ?? [])
+          setCourses(d.education?.courses ?? [])
+        }).catch(() => { if (ok()) { setKnowledgeLevel({}); setCourseHistory([]); setCourses([]) } }).finally(done)
+        break
+      case 'pets':
+        void getResidentPets(residentId).then((d) => { if (ok()) setPets(d) }).catch(() => { if (ok()) setPets(resident?.pets ?? []) }).finally(done)
+        break
+      case 'mood_log':
+        void getResidentMoodLog(residentId).then((d) => { if (ok()) setMoodLog(d) }).catch(() => { if (ok()) setMoodLog([]) }).finally(done)
+        break
+      case 'achievements':
+        void getResidentAchievements(residentId).then((d) => { if (ok()) setAchievements(d) }).catch(() => { if (ok()) setAchievements([]) }).finally(done)
+        break
+      case 'life_goal':
+        void getResidentGoals(residentId).then((d) => { if (ok()) setLifeGoal(d) }).catch(() => { if (ok()) setLifeGoal(null) }).finally(done)
+        break
+      default:
+        done()
     }
   }, [residentId, resident?.pets, resident?.skills])
+
+  // Load data for the active tab
+  useEffect(() => {
+    loadTabData(activeTab)
+  }, [activeTab, loadTabData])
 
   if (!resident) return null
 
@@ -349,6 +343,9 @@ export function ResidentStoryPanel({
                   {jobInfo?.job?.title ?? resident.occupation}
                 </span>
               )}
+              {resident.relationship_status && resident.relationship_status !== 'single' && (
+                <RomanceBadge residentId={residentId} status={resident.relationship_status} />
+              )}
               {resident.mood && (
                 <span className="text-[11px] text-slate-400">{resident.mood}</span>
               )}
@@ -364,14 +361,25 @@ export function ResidentStoryPanel({
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={t('resident_panel.close')}
-          className="btn-micro rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 transition duration-200 hover:bg-white/10 active:scale-95"
-        >
-          {t('resident_panel.close')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('populace:follow-resident', { detail: { residentId } }))
+            }}
+            className="btn-micro rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-200 transition duration-200 hover:bg-cyan-400/20 active:scale-95"
+          >
+            📍 {t('quick_actions.follow', 'Follow')}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t('resident_panel.close')}
+            className="btn-micro rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 transition duration-200 hover:bg-white/10 active:scale-95"
+          >
+            {t('resident_panel.close')}
+          </button>
+        </div>
       </div>
 
       {/* ---- Status bars: energy + coins ---- */}
@@ -467,6 +475,14 @@ export function ResidentStoryPanel({
 
       {/* ---- Tab content (all rendered, inactive hidden) ---- */}
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
+        {/* Skeleton loading indicator */}
+        {tabLoading && !loadedTabsRef.current.has(activeTab) && (
+          <div className="grid gap-2 py-2" data-testid="tab-skeleton">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-10 animate-pulse rounded-lg bg-white/[0.04]" />
+            ))}
+          </div>
+        )}
         {/* Memoir timeline */}
         <div className={activeTab === 'memories' ? '' : 'hidden'}>
           <div className="relative pl-5">
@@ -849,6 +865,46 @@ export function ResidentStoryPanel({
             <p className="text-sm text-slate-500">{t('resident_panel.no_achievements', 'No achievements yet')}</p>
           )}
         </div>
+
+        {/* Life Goal — progress bar */}
+        <div className={activeTab === 'life_goal' ? '' : 'hidden'}>
+          {lifeGoal ? (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
+                <span className="text-3xl">{lifeGoal.icon}</span>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-white">{lifeGoal.name}</p>
+                  <p className="mt-0.5 text-xs text-slate-400">{lifeGoal.description}</p>
+                </div>
+                {lifeGoal.completed ? (
+                  <span className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-medium text-emerald-300">
+                    {t('resident_panel.goal_completed', '已达成')}
+                  </span>
+                ) : null}
+              </div>
+              <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span>{t('resident_panel.goal_progress', '进度')}</span>
+                  <span>{lifeGoal.percentage.toFixed(1)}%</span>
+                </div>
+                <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-800">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${lifeGoal.completed ? 'bg-emerald-400' : 'bg-amber-400'}`}
+                    style={{ width: `${Math.min(lifeGoal.percentage, 100)}%` }}
+                  />
+                </div>
+                <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                  <span>{lifeGoal.progress} / {lifeGoal.target}</span>
+                  {lifeGoal.completed && lifeGoal.completed_tick != null ? (
+                    <span>Tick #{lifeGoal.completed_tick}</span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">{t('resident_panel.no_life_goal', '暂无人生目标')}</p>
+          )}
+        </div>
       </div>
 
       {/* ---- God actions: icon buttons with tooltips ---- */}
@@ -1009,5 +1065,28 @@ function ScheduleTabContent({
       currentTime={time}
       compareResidents={compareResidents}
     />
+  )
+}
+
+
+function RomanceBadge({ residentId, status }: { residentId: string; status: string }) {
+  const [partnerName, setPartnerName] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void import('../../services/api').then(({ getResidentRomance }) =>
+      getResidentRomance(residentId).then((data) => {
+        if (!cancelled && data.partner) setPartnerName(data.partner.name)
+      }).catch(() => {}),
+    )
+    return () => { cancelled = true }
+  }, [residentId])
+
+  const label = status === 'dating' ? '💕 交往中' : status === 'married' ? '💍 已婚' : '💔 离异'
+
+  return (
+    <span className="rounded-full border border-pink-400/20 bg-pink-400/10 px-2.5 py-0.5 text-[11px] font-medium text-pink-200">
+      {label}{partnerName ? ` · ${partnerName}` : ''}
+    </span>
   )
 }

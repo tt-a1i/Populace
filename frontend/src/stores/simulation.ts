@@ -72,6 +72,7 @@ export interface ResidentPosition {
   energy?: number
   ageDays?: number
   reputation?: number
+  relationship_status?: Resident['relationship_status']
   skills?: Record<string, number>
   inventory?: Resident['inventory']
   pets?: Pet[]
@@ -715,6 +716,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           energy: (r as { energy?: number }).energy ?? prev?.energy ?? 1.0,
           ageDays: (r as { age_days?: number }).age_days ?? prev?.ageDays ?? 0,
           reputation: (r as { reputation?: number }).reputation ?? prev?.reputation ?? 0,
+          relationship_status: (r as { relationship_status?: Resident['relationship_status'] }).relationship_status ?? prev?.relationship_status,
           pets: (r as { pets?: Pet[] }).pets ?? prev?.pets ?? [],
           health: (r as { health?: HealthState }).health ?? prev?.health,
         }

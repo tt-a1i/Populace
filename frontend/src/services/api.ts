@@ -448,6 +448,27 @@ export function getWorldPolitics() {
   return request<WorldPoliticsPayload>('/api/world/politics')
 }
 
+export interface WorldRomanceStatsPayload {
+  couples_count: number
+  marriages: number
+  dating_pairs: number
+  divorces: number
+}
+
+export interface ResidentRomancePayload {
+  relationship_status: string
+  partner: { id: string; name: string } | null
+  love_intensity: number
+}
+
+export function getWorldRelationships() {
+  return request<WorldRomanceStatsPayload>('/api/world/relationships')
+}
+
+export function getResidentRomance(id: string) {
+  return request<ResidentRomancePayload>(`/api/residents/${id}/romance`)
+}
+
 export function getResidents() {
   return request<ApiResident[]>('/api/residents')
 }
@@ -1270,6 +1291,23 @@ export function getResidentAchievements(id: string) {
   return request<ResidentAchievement[]>(`/api/residents/${id}/achievements`)
 }
 
+export interface ResidentLifeGoal {
+  type: string
+  name: string
+  description: string
+  icon: string
+  progress: number
+  target: number
+  percentage: number
+  completed: boolean
+  completed_tick: number | null
+  reward: string
+}
+
+export function getResidentGoals(id: string) {
+  return request<ResidentLifeGoal | null>(`/api/residents/${id}/goals`)
+}
+
 export interface ResidentJobPayload {
   resident_id: string
   resident_name: string
@@ -1343,6 +1381,22 @@ export function getResidentJob(id: string) {
 
 export function getWorldEconomy() {
   return request<WorldEconomyPayload>('/api/world/economy')
+}
+
+export interface EconomyCyclePayload {
+  phase: string
+  gdp_modifier: number
+  unemployment_modifier: number
+  started_tick: number
+  ticks_in_phase: number
+  ticks_remaining: number
+  next_phase: string
+  seasonal_modifier: number
+  gdp_history: Array<{ tick: number; gdp: number }>
+}
+
+export function getEconomyCycle() {
+  return request<EconomyCyclePayload>('/api/world/economy/cycle')
 }
 
 export function getWorldFashion() {

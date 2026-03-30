@@ -470,6 +470,10 @@
     "tab_schedule": "日程",
     "tab_family": "族谱",
     "tab_achievements": "成就",
+    "tab_life_goal": "人生目标",
+    "goal_completed": "已达成",
+    "goal_progress": "进度",
+    "no_life_goal": "暂无人生目标",
     "no_recent": "暂无近期事件",
     "no_memories": "暂无回忆",
     "no_diary": "暂无日记条目",
@@ -776,6 +780,7 @@
     "resident_count": "角色数",
     "ctx_inject_event": "投放事件",
     "ctx_inspect_tile": "查看位置",
+    "ctx_view_building": "查看 {{name}}",
     "ctx_place_placeholder": "放置建筑占位",
     "ctx_teleport": "⚡ 传送到此",
     "ctx_dismiss": "收起菜单",
@@ -938,5 +943,33 @@
     "unfollow": "取消跟踪",
     "chat": "对话",
     "gift": "送礼"
+  },
+  "newspaper": {
+    "title": "小镇日报",
+    "badge": "每日新闻",
+    "prev": "上一期",
+    "next": "下一期",
+    "no_data": "该日暂无新闻。",
+    "footer": "由 Populace 模拟引擎自动生成"
+  },
+  "economy": {
+    "title": "经济面板",
+    "error": "经济数据加载失败",
+    "loading": "经济数据加载中…",
+    "loading_msg": "正在汇总就业率、收入与 GDP 趋势。",
+    "next_phase": "下阶段",
+    "seasonal": "季节",
+    "remaining": "剩余",
+    "employment": "就业率",
+    "avg_income": "平均收入",
+    "employment_dist": "就业结构",
+    "no_employment": "暂无就业结构数据",
+    "no_employment_hint": "等待更多居民进入工作与消费循环后，这里会显示职业分布。",
+    "income_dist": "收入分布",
+    "no_income": "暂无收入分布",
+    "no_income_hint": "等待居民开始领薪、购物和交易后，这里会显示收入分层。",
+    "gdp_chart": "GDP 曲线",
+    "no_gdp": "暂无 GDP 曲线",
+    "no_gdp_hint": "等待模拟运行几个 Tick 后，这里会出现经济曲线。"
   }
 }

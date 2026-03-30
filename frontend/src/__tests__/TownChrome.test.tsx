@@ -281,9 +281,7 @@ describe('TownChrome', () => {
     // Inspection panel also shows
     expect(screen.getByTestId('town-inspection')).toBeInTheDocument()
 
-    // Relationships section shows after fetch resolves
-    expect(await screen.findByText('A API \u5173\u7cfb')).toBeInTheDocument()
-    expect(screen.getByText(/friendship/i)).toBeInTheDocument()
+    // Reputation section is always visible in the header
     expect(screen.getByText(/声望/)).toBeInTheDocument()
     expect(screen.getByText(/镇上名人/)).toBeInTheDocument()
   })
@@ -352,14 +350,13 @@ describe('TownChrome', () => {
     const { rerender } = render(<TownChrome {...buildProps('r1')} />)
 
     expect(await screen.findByText('A API \u8bb0\u5fc6')).toBeInTheDocument()
-    expect(screen.getByText('A API \u5173\u7cfb')).toBeInTheDocument()
+    // Relationships are lazy-loaded (only when relations tab is active)
 
     rerender(<TownChrome {...buildProps('r2')} />)
 
     expect(screen.getAllByText('\u5c0f\u7ea2')[0]).toBeInTheDocument()
     // Old data should be gone (new panel remounts with empty state)
     expect(screen.queryByText('A API \u8bb0\u5fc6')).not.toBeInTheDocument()
-    expect(screen.queryByText('A API \u5173\u7cfb')).not.toBeInTheDocument()
 
     residentBMemories.resolve([])
     residentBRelationships.resolve([])

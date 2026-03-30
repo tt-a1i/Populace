@@ -332,6 +332,8 @@ def process_daily_population(
         )
 
     for resident_id in deceased_ids:
+        from engine.romance import handle_spouse_death
+        handle_spouse_death(world, resident_id)
         world.remove_agent(resident_id)
         summary["deaths"] += 1
 

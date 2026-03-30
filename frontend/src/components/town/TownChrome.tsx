@@ -46,6 +46,7 @@ interface TownChromeProps {
   onCloseContextMenu: () => void
   onInjectEvent: () => void
   onInspectTile: () => void
+  onViewBuilding?: (buildingId: string) => void
   onPlacePlaceholder: () => void
   onClearResidentSelection: () => void
   onDismissInspection: () => void
@@ -67,6 +68,7 @@ export function TownChrome({
   onCloseContextMenu,
   onInjectEvent,
   onInspectTile,
+  onViewBuilding,
   onPlacePlaceholder,
   onClearResidentSelection,
   onDismissInspection,
@@ -354,6 +356,20 @@ export function TownChrome({
               <span className="w-4 text-center text-xs" aria-hidden="true">🔍</span>
               {t('chrome.ctx_inspect_tile')}
             </button>
+
+            {(() => {
+              const bld = buildings.find(b => b.position[0] === contextMenu.tileX && b.position[1] === contextMenu.tileY)
+              return bld ? (
+                <button
+                  type="button"
+                  onClick={() => { onViewBuilding?.(bld.id); onCloseContextMenu() }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-emerald-200 transition duration-150 hover:bg-emerald-400/10 hover:text-emerald-100 active:bg-emerald-400/15"
+                >
+                  <span className="w-4 text-center text-xs" aria-hidden="true">🏠</span>
+                  {t('chrome.ctx_view_building', { name: bld.name })}
+                </button>
+              ) : null
+            })()}
 
             <div className="mx-3 my-1 border-t border-white/6" />
 

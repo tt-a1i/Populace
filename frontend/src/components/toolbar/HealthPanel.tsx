@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { getWorldHealth, type WorldHealthPayload } from '../../services/api'
 import { PanelShell } from '../ui/PanelShell'
 import { PanelEmptyState, PanelSkeletonGrid, PanelSpinner } from '../ui/PanelStates'
+import { SparkLine } from '../ui/SparkLine'
 
 const EMPTY_HEALTH: WorldHealthPayload = {
   active_cases: 0,
@@ -90,6 +91,18 @@ export function HealthPanel() {
         <MetricCard label="治疗率" value={`${Math.round(data.treatment_rate * 100)}%`} />
         <MetricCard label="平均 HP" value={`${Math.round(data.average_hp * 100)}%`} />
       </section>
+
+      {Object.values(data.illness_counts).length > 0 && (
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
+          <SparkLine
+            data={Object.values(data.illness_counts).map(Number)}
+            color="#f43f5e"
+            label="Cases by Type"
+            width={280}
+            height={48}
+          />
+        </div>
+      )}
 
       <section className="grid gap-3 lg:grid-cols-[1fr,1fr]">
         <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">

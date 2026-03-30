@@ -265,6 +265,7 @@ class ResidentResponse(BaseModel):
     education: "EducationResponse" = Field(default_factory=lambda: EducationResponse())
     pets: list[PetResponse] = Field(default_factory=list)
     health: ResidentHealthStateResponse = Field(default_factory=ResidentHealthStateResponse)
+    relationship_status: str = "single"
 
 
 class PopulationResidentResponse(BaseModel):
@@ -876,6 +877,18 @@ class WorldEconomyResponse(BaseModel):
     gdp_history: list[dict[str, float | int]] = Field(default_factory=list)
 
 
+class EconomyCycleResponse(BaseModel):
+    phase: str = "recovery"
+    gdp_modifier: float = 1.0
+    unemployment_modifier: float = 1.0
+    started_tick: int = 0
+    ticks_in_phase: int = 0
+    ticks_remaining: int = 200
+    next_phase: str = "boom"
+    seasonal_modifier: float = 1.0
+    gdp_history: list[dict[str, float | int]] = Field(default_factory=list)
+
+
 class FashionTrendResponse(BaseModel):
     color_name: str
     color: str
@@ -1031,6 +1044,30 @@ class WhatIfResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class NewsArticleResponse(BaseModel):
+    headline: str = ""
+    content: str = ""
+    category: str = "general"
+    importance: float = 0.5
+    tick: int = 0
+    icon: str = ""
+
+
+class NewsArchiveEntry(BaseModel):
+    edition: int = 0
+    tick: int = 0
+    headline: str = ""
+    article_count: int = 0
+
+
+class WorldNewsResponse(BaseModel):
+    headline: str = ""
+    latest_edition: int = 0
+    latest_tick: int = 0
+    articles: list[NewsArticleResponse] = Field(default_factory=list)
+    archive: list[NewsArchiveEntry] = Field(default_factory=list)
+
+
 class KnowledgeGraphNode(BaseModel):
     id: str
     label: str
@@ -1048,3 +1085,21 @@ class KnowledgeGraphEdge(BaseModel):
 class KnowledgeGraphResponse(BaseModel):
     nodes: list[KnowledgeGraphNode] = Field(default_factory=list)
     edges: list[KnowledgeGraphEdge] = Field(default_factory=list)
+
+
+class WorldRomanceStatsResponse(BaseModel):
+    couples_count: int = 0
+    marriages: int = 0
+    dating_pairs: int = 0
+    divorces: int = 0
+
+
+class RomancePartnerInfo(BaseModel):
+    id: str
+    name: str
+
+
+class ResidentRomanceResponse(BaseModel):
+    relationship_status: str = "single"
+    partner: RomancePartnerInfo | None = None
+    love_intensity: float = 0.0

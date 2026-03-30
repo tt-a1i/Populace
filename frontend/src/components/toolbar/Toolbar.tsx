@@ -150,12 +150,23 @@ export function Toolbar() {
     const openReport = () => setActiveTool('report')
     const openDirector = () => setActiveTool('director')
     const closePanel = () => { setActiveTool('director'); setShowSecondary(false) }
+    const cycleTool = (e: Event) => {
+      const reverse = (e as CustomEvent).detail?.reverse === true
+      const keys = ['director', 'persona', 'quest', 'report'] as const
+      setActiveTool((prev) => {
+        const idx = keys.indexOf(prev as typeof keys[number])
+        if (idx < 0) return keys[0]
+        const next = reverse ? (idx - 1 + keys.length) % keys.length : (idx + 1) % keys.length
+        return keys[next]
+      })
+    }
     window.addEventListener(OPEN_SETTINGS_EVENT, openSettings)
     window.addEventListener('populace:open-persona', openPersona)
     window.addEventListener('populace:open-quest', openQuest)
     window.addEventListener('populace:open-report', openReport)
     window.addEventListener('populace:open-director', openDirector)
     window.addEventListener('populace:close-panel', closePanel)
+    window.addEventListener('populace:cycle-tool', cycleTool)
     return () => {
       window.removeEventListener(OPEN_SETTINGS_EVENT, openSettings)
       window.removeEventListener('populace:open-persona', openPersona)
@@ -163,6 +174,7 @@ export function Toolbar() {
       window.removeEventListener('populace:open-report', openReport)
       window.removeEventListener('populace:open-director', openDirector)
       window.removeEventListener('populace:close-panel', closePanel)
+      window.removeEventListener('populace:cycle-tool', cycleTool)
     }
   }, [])
 
@@ -356,7 +368,14 @@ export function Toolbar() {
         )}
       </div>
 
-      {panel}
+      {panel && (
+        <div
+          key={activeTool}
+          className="animate-[slideInRight_250ms_ease-out]"
+        >
+          {panel}
+        </div>
+      )}
     </div>
   )
 }

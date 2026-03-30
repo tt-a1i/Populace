@@ -220,6 +220,7 @@ export interface Resident {
   reputation?: number
   pets?: Pet[]
   health?: HealthState
+  relationship_status?: 'single' | 'dating' | 'married' | 'divorced'
 }
 
 export interface Building {

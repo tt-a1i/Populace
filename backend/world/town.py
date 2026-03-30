@@ -180,6 +180,7 @@ def load_scenario(
     _load_initial_relationships(world, data)
     _generate_families(world)
     world.assign_initial_pets()
+    _assign_life_goals(world)
 
     return world
 
@@ -320,8 +321,19 @@ def load_scenario_from_dict(
     _load_initial_relationships(world, data)
     _generate_families(world)
     world.assign_initial_pets()
+    _assign_life_goals(world)
 
     return world
+
+
+def _assign_life_goals(world: World) -> None:
+    from engine.goals import assign_life_goal
+
+    for i, agent in enumerate(world.agents):
+        resident = agent.resident
+        if resident.life_goal is None:
+            seed = hash(resident.id) + i
+            resident.life_goal = assign_life_goal(resident.personality, seed=seed)
 
 
 def _generate_families(world: World) -> None:

@@ -39,6 +39,9 @@ from engine.types import (
     Memory,
     MoodEntry,
     MovementUpdate,
+    EconomicCycle,
+    NewsArticle,
+    Newspaper,
     Party,
     Pet,
     Religion,
@@ -211,6 +214,7 @@ class World:
         self.generational_history: List[dict] = []
         self.gdp_history: List[dict] = []
         self.economic_output: float = 0.0
+        self.economic_cycle: EconomicCycle = EconomicCycle()
         self.fashion_trend: dict = {}
         self.fashion_trend_history: List[dict] = []
         self.fashion_purchase_history: List[dict] = []
@@ -230,6 +234,7 @@ class World:
         self.grid_chunk_size: int = max(1, self.config.interaction_distance)
         self.grid_index: Dict[Tuple[int, int], List[Agent]] = {}
         self._grid_index_dirty = True
+        self.news_archive: List[Newspaper] = []
         ensure_world_fashion_state(self)
 
     def _default_zones(self) -> List[Zone]:
@@ -917,6 +922,166 @@ class World:
         ensure_world_fashion_state(self)
         return get_world_fashion_overview(self)
 
+    # ------------------------------------------------------------------
+    # News / media system
+    # ------------------------------------------------------------------
+
+    def generate_news(self) -> Optional[Newspaper]:
+        """Auto-generate a newspaper from recent simulation events.
+
+        Called every 10 ticks.  Scans crime_log, active festivals,
+        fashion purchases, economic output, and relationship changes
+        to produce articles, then applies opinion effects.
+        """
+        tick = int(getattr(self, "current_tick", 0))
+        articles: List[NewsArticle] = []
+        headline = ""
+
+        # ── Crime articles ──
+        recent_crimes = [
+            c for c in self.crime_log
+            if c.tick >= tick - 10
+        ]
+        if recent_crimes:
+            worst = max(recent_crimes, key=lambda c: float(getattr(c, "severity", 0.5)))
+            articles.append(NewsArticle(
+                headline=f"{worst.location}发生{worst.type}事件",
+                content=f"犯罪嫌疑人{'已被确认' if worst.resolved else '仍在逃'}，居民安全感下降。",
+                category="crime",
+                importance=min(1.0, float(getattr(worst, "severity", 0.5)) + 0.3),
+                tick=tick,
+                icon="🚨",
+            ))
+
+        # ── Disaster articles ──
+        active_disasters = getattr(self, "active_disasters", [])
+        for disaster in active_disasters:
+            articles.append(NewsArticle(
+                headline=f"紧急：{getattr(disaster, 'name', '灾害')}来袭",
+                content=f"受灾区域需要居民紧急撤离。严重程度 {round(float(getattr(disaster, 'severity', 0.5)) * 100)}%。",
+                category="disaster",
+                importance=0.9,
+                tick=tick,
+                icon="⚠️",
+            ))
+
+        # ── Festival articles ──
+        festival_name = getattr(self, "active_festival", None)
+        if festival_name and int(getattr(self, "active_festival_ticks_remaining", 0)) > 0:
+            articles.append(NewsArticle(
+                headline=f"「{festival_name}」活动正在进行",
+                content="全镇居民热情参与，心情普遍提升。",
+                category="festival",
+                importance=0.6,
+                tick=tick,
+                icon="🎉",
+            ))
+
+        # ── Trade / economy articles ──
+        gdp = float(getattr(self, "economic_output", 0.0))
+        purchases = [
+            p for p in self.fashion_purchase_history
+            if p.get("tick", 0) >= tick - 10
+        ]
+        if purchases or gdp > 0:
+            articles.append(NewsArticle(
+                headline="经济简报",
+                content=f"近期 GDP 累计 {round(gdp, 1)}，服装消费 {len(purchases)} 笔。",
+                category="trade",
+                importance=0.4,
+                tick=tick,
+                icon="📊",
+            ))
+
+        # ── Achievement articles ──
+        recent_achievements = [
+            a for a in getattr(self, "achievement_unlocks", [])
+            if getattr(a, "tick", 0) >= tick - 10
+        ]
+        for ach in recent_achievements[:2]:
+            articles.append(NewsArticle(
+                headline=f"成就解锁：{getattr(ach, 'name', '未知')}",
+                content=getattr(ach, "description", "一位居民达成了新成就！"),
+                category="achievement",
+                importance=0.5,
+                tick=tick,
+                icon="🏆",
+            ))
+
+        # ── Fallback if no events ──
+        if not articles:
+            articles.append(NewsArticle(
+                headline="小镇风平浪静",
+                content="今日无重大事件，居民安居乐业。",
+                category="general",
+                importance=0.2,
+                tick=tick,
+                icon="☀️",
+            ))
+
+        # Pick the highest-importance article as headline
+        articles.sort(key=lambda a: -a.importance)
+        headline = articles[0].headline
+
+        paper = Newspaper(
+            edition=len(self.news_archive) + 1,
+            tick=tick,
+            headline=headline,
+            articles=articles,
+        )
+        self.news_archive.append(paper)
+        self.news_archive = self.news_archive[-50:]
+
+        # ── Opinion effects ──
+        self._apply_news_opinion(paper)
+
+        return paper
+
+    def _apply_news_opinion(self, paper: Newspaper) -> None:
+        """News influences public opinion: crime → safety↓/mood↓, festivals → mood↑."""
+        for article in paper.articles:
+            if article.category == "crime" and article.importance >= 0.6:
+                for agent in self.agents:
+                    self.shift_resident_mood(agent.resident, -1, "news_crime")
+            elif article.category == "disaster":
+                for agent in self.agents:
+                    self.shift_resident_mood(agent.resident, -1, "news_disaster")
+            elif article.category == "festival":
+                for agent in self.agents:
+                    self.shift_resident_mood(agent.resident, 1, "news_festival")
+            elif article.category == "achievement":
+                for agent in self.agents:
+                    self.shift_resident_mood(agent.resident, 1, "news_achievement")
+
+    def get_news_overview(self) -> dict:
+        """Return the news archive for the API."""
+        latest = self.news_archive[-1] if self.news_archive else None
+        return {
+            "headline": latest.headline if latest else "",
+            "latest_edition": latest.edition if latest else 0,
+            "latest_tick": latest.tick if latest else 0,
+            "articles": [
+                {
+                    "headline": a.headline,
+                    "content": a.content,
+                    "category": a.category,
+                    "importance": a.importance,
+                    "tick": a.tick,
+                    "icon": a.icon,
+                }
+                for a in (latest.articles if latest else [])
+            ],
+            "archive": [
+                {
+                    "edition": p.edition,
+                    "tick": p.tick,
+                    "headline": p.headline,
+                    "article_count": len(p.articles),
+                }
+                for p in reversed(self.news_archive[-12:])
+            ],
+        }
+
     def _ensure_resident_memories(self, resident: Resident) -> None:
         resident.memories = list(getattr(resident, "memories", []))
 
@@ -1196,6 +1361,95 @@ class World:
             "employment_distribution": [{"occupation": key, "count": value} for key, value in sorted(occ_count.items())],
             "income_distribution": buckets,
             "gdp_history": list(self.gdp_history)[-20:],
+        }
+
+    # ------------------------------------------------------------------
+    # Economic cycle system
+    # ------------------------------------------------------------------
+
+    _CYCLE_ORDER = ("recovery", "boom", "recession", "depression")
+    _CYCLE_PARAMS: dict = {
+        "boom":       {"gdp_modifier": 1.25, "unemployment_modifier": 0.6},
+        "recession":  {"gdp_modifier": 0.80, "unemployment_modifier": 1.3},
+        "depression": {"gdp_modifier": 0.60, "unemployment_modifier": 1.8},
+        "recovery":   {"gdp_modifier": 1.0,  "unemployment_modifier": 1.0},
+    }
+
+    def advance_economic_cycle(self) -> Optional[str]:
+        """Transition to the next cycle phase every 200 ticks.
+
+        Returns the new phase name if a transition occurred, else None.
+        """
+        tick = int(getattr(self, "current_tick", 0))
+        cycle = self.economic_cycle
+        if tick - cycle.started_tick < 200:
+            return None
+        order = self._CYCLE_ORDER
+        idx = order.index(cycle.phase) if cycle.phase in order else 0
+        new_phase = order[(idx + 1) % len(order)]
+        params = self._CYCLE_PARAMS[new_phase]
+        self.economic_cycle = EconomicCycle(
+            phase=new_phase,
+            gdp_modifier=params["gdp_modifier"],
+            unemployment_modifier=params["unemployment_modifier"],
+            started_tick=tick,
+        )
+        return new_phase
+
+    def seasonal_income_modifier(self, occupation: str = "") -> float:
+        """Return income modifier based on current season and occupation.
+
+        Spring/summer → farmers produce more (+15%).
+        Winter → shopkeepers earn more (+10%).
+        Other combinations → 1.0 (no change).
+        """
+        season = str(getattr(self, "season", "spring")).lower()
+        if hasattr(self.season, "value"):
+            season = self.season.value
+        if season in ("spring", "summer") and occupation == "farmer":
+            return 1.15
+        if season == "winter" and occupation == "shopkeeper":
+            return 1.10
+        return 1.0
+
+    def apply_cycle_effects(self) -> list[str]:
+        """Apply economic cycle effects: mood, crime probability, job seeking."""
+        events: list[str] = []
+        phase = self.economic_cycle.phase
+
+        if phase == "depression":
+            for agent in self.agents:
+                if self.rng.random() < 0.08:
+                    self.shift_resident_mood(agent.resident, -1, "economy_depression")
+            events.append("经济萧条持续，居民情绪低落。")
+        elif phase == "boom":
+            for agent in self.agents:
+                if self.rng.random() < 0.06:
+                    self.shift_resident_mood(agent.resident, 1, "economy_boom")
+            events.append("经济繁荣，居民消费意愿旺盛。")
+
+        return events
+
+    def get_economy_cycle_overview(self) -> dict:
+        """Return economic cycle data for the API."""
+        cycle = self.economic_cycle
+        tick = int(getattr(self, "current_tick", 0))
+        ticks_in_phase = tick - cycle.started_tick
+        ticks_remaining = max(0, 200 - ticks_in_phase)
+        order = self._CYCLE_ORDER
+        idx = order.index(cycle.phase) if cycle.phase in order else 0
+        next_phase = order[(idx + 1) % len(order)]
+
+        return {
+            "phase": cycle.phase,
+            "gdp_modifier": cycle.gdp_modifier,
+            "unemployment_modifier": cycle.unemployment_modifier,
+            "started_tick": cycle.started_tick,
+            "ticks_in_phase": ticks_in_phase,
+            "ticks_remaining": ticks_remaining,
+            "next_phase": next_phase,
+            "seasonal_modifier": self.seasonal_income_modifier(),
+            "gdp_history": list(self.gdp_history)[-30:],
         }
 
     def get_building_upgrade_cost(self, building: Building) -> float:
@@ -2486,7 +2740,8 @@ class World:
                 if not already_paid:
                     bonus_income = round(current_skill * work_profile["base_income"])
                     gross_income = work_profile["base_income"] + bonus_income
-                    earned_income = max(1, round(gross_income * self.health_work_efficiency(agent.resident)))
+                    cycle_mod = self.economic_cycle.gdp_modifier * self.seasonal_income_modifier(work_profile.get("occupation", ""))
+                    earned_income = max(1, round(gross_income * self.health_work_efficiency(agent.resident) * cycle_mod))
                     agent.resident.coins += earned_income
                     agent.resident.wallet = round(agent.resident.wallet + float(earned_income), 2)
                     self._register_gdp(float(earned_income))
@@ -2553,7 +2808,8 @@ class World:
                 if is_work_hour:
                     bonus_income = round(current_skill * work_profile["base_income"])
                     gross_income = work_profile["base_income"] + bonus_income
-                    earned_income = max(1, round(gross_income * self.health_work_efficiency(agent.resident)))
+                    cycle_mod = self.economic_cycle.gdp_modifier * self.seasonal_income_modifier(work_profile.get("occupation", ""))
+                    earned_income = max(1, round(gross_income * self.health_work_efficiency(agent.resident) * cycle_mod))
                     agent.resident.coins += earned_income
                     agent.resident.wallet = round(agent.resident.wallet + float(earned_income), 2)
                     self._register_gdp(float(earned_income))
@@ -2840,6 +3096,16 @@ class World:
         culture_events = self.update_cultural_events()
         religion_events = self.update_religious_events()
 
+        # ── News generation every 10 ticks ──
+        if self.current_tick > 0 and self.current_tick % 10 == 0:
+            self.generate_news()
+
+        # ── Economic cycle advancement ──
+        new_phase = self.advance_economic_cycle()
+        if new_phase:
+            fashion_events.append(f"经济进入{new_phase}期。")
+        cycle_events = self.apply_cycle_effects()
+
         # ── Mood contagion: co-occupants influence each other's mood ──────
         from engine.act import apply_mood_contagion
         apply_mood_contagion(self)
@@ -2891,6 +3157,7 @@ class World:
             events=[
                 *[EventUpdate(description=description) for description in weather_events],
                 *[EventUpdate(description=description) for description in fashion_events],
+                *[EventUpdate(description=description) for description in cycle_events],
                 *pet_events,
                 *culture_events,
                 *religion_events,

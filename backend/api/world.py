@@ -33,12 +33,15 @@ from backend.api.schemas import (
     WorldDiplomacyResponse,
     WorldDemographicsResponse,
     WorldHealthResponse,
+    EconomyCycleResponse,
     WorldEconomyResponse,
     WorldFashionResponse,
+    WorldNewsResponse,
     WorldEducationCourseResponse,
     WorldEventResponse,
     WorldPoliticsResponse,
     WorldReligionResponse,
+    WorldRomanceStatsResponse,
     WorldTransportResponse,
     ZoneResponse,
     api_error,
@@ -336,6 +339,16 @@ async def get_world_economy(request: Request) -> WorldEconomyResponse:
 
 
 @router.get(
+    "/economy/cycle",
+    response_model=EconomyCycleResponse,
+    responses=error_responses(503),
+)
+async def get_economy_cycle(request: Request) -> EconomyCycleResponse:
+    state = get_simulation_state(request)
+    return EconomyCycleResponse(**state.world.get_economy_cycle_overview())
+
+
+@router.get(
     "/fashion",
     response_model=WorldFashionResponse,
     responses=error_responses(503),
@@ -343,6 +356,16 @@ async def get_world_economy(request: Request) -> WorldEconomyResponse:
 async def get_world_fashion(request: Request) -> WorldFashionResponse:
     state = get_simulation_state(request)
     return WorldFashionResponse(**state.world.get_fashion_overview())
+
+
+@router.get(
+    "/news",
+    response_model=WorldNewsResponse,
+    responses=error_responses(503),
+)
+async def get_world_news(request: Request) -> WorldNewsResponse:
+    state = get_simulation_state(request)
+    return WorldNewsResponse(**state.world.get_news_overview())
 
 
 @router.get(
@@ -425,6 +448,18 @@ async def get_achievement_leaderboard(request: Request) -> list[AchievementLeade
 async def get_world_pets(request: Request) -> list[PetResponse]:
     state = get_simulation_state(request)
     return [PetResponse(**asdict(pet)) for pet in state.world.list_pets()]
+
+
+@router.get(
+    "/relationships",
+    response_model=WorldRomanceStatsResponse,
+    responses=error_responses(503),
+)
+async def get_world_relationships(request: Request) -> WorldRomanceStatsResponse:
+    from engine.romance import get_romance_stats
+
+    state = get_simulation_state(request)
+    return WorldRomanceStatsResponse(**get_romance_stats(state.world))
 
 
 class GenerateScenarioRequest(BaseModel):

@@ -19,6 +19,8 @@ from backend.api.schemas import (
     ResidentReflectionResponse,
     ResidentRelationshipResponse,
     ResidentResponse,
+    ResidentRomanceResponse,
+    RomancePartnerInfo,
     api_error,
     error_responses,
 )
@@ -1000,3 +1002,57 @@ async def chat_with_resident(
         resident_id=resident.id,
         resident_name=resident.name,
     )
+
+
+@router.get(
+    "/{resident_id}/romance",
+    response_model=ResidentRomanceResponse,
+    responses=error_responses(404, 503),
+)
+async def get_resident_romance(resident_id: str, request: Request) -> ResidentRomanceResponse:
+    from engine.romance import get_resident_romance as _get_romance
+
+    state = get_simulation_state(request)
+    agent = state.world.get_agent(resident_id)
+    if agent is None:
+        raise _NOT_FOUND
+    data = _get_romance(state.world, resident_id)
+    partner = None
+    if data["partner"] is not None:
+        partner = RomancePartnerInfo(**data["partner"])
+    return ResidentRomanceResponse(
+        relationship_status=data["relationship_status"],
+        partner=partner,
+        love_intensity=data["love_intensity"],
+    )
+
+
+class ResidentLifeGoalResponse(BaseModel):
+    type: str
+    name: str
+    description: str
+    icon: str = "🎯"
+    progress: float = 0.0
+    target: float = 1.0
+    percentage: float = 0.0
+    completed: bool = False
+    completed_tick: int | None = None
+    reward: str = ""
+
+
+@router.get(
+    "/{resident_id}/goals",
+    response_model=Optional[ResidentLifeGoalResponse],
+    responses=error_responses(404, 503),
+)
+async def get_resident_goals(resident_id: str, request: Request) -> Optional[ResidentLifeGoalResponse]:
+    from engine.goals import get_resident_goal_view
+
+    state = get_simulation_state(request)
+    found = any(agent.resident.id == resident_id for agent in state.world.agents)
+    if not found:
+        raise _NOT_FOUND
+    data = get_resident_goal_view(state, resident_id)
+    if data is None:
+        return None
+    return ResidentLifeGoalResponse(**data)

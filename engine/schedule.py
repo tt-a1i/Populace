@@ -24,7 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from engine.types import Religion, WeatherType
+from engine.types import RelationshipStatus, Religion, WeatherType
 
 if TYPE_CHECKING:
     from engine.world import World
@@ -237,6 +237,22 @@ class DailySchedule:
         # ------------------------------------------------------------------
         # Work / lunch / afternoon / evening: move toward preferred building
         # ------------------------------------------------------------------
+        # Dating phase: dating residents go to cafe/park together in the evening
+        if phase.name == "evening" and getattr(resident, "relationship_status", None) == RelationshipStatus.dating:
+            partner_id = getattr(resident.family, "partner_id", None)
+            if partner_id:
+                date_venues = [b for b in world.buildings if b.type in {"cafe", "park"}]
+                if date_venues:
+                    venue = min(
+                        date_venues,
+                        key=lambda b: abs(b.position[0] - resident.x) + abs(b.position[1] - resident.y),
+                    )
+                    if resident.location == venue.id:
+                        _set_goal(f"在{venue.name}约会")
+                        return {"action": "idle"}
+                    _set_goal(f"去{venue.name}约会")
+                    return {"action": "move", "target": list(venue.position)}
+
         if phase.name == "evening" and world.has_dog(resident):
             park = next((building for building in world.buildings if building.type == "park"), None)
             if park is not None:

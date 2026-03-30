@@ -4,6 +4,7 @@
  *   Space    — pause / resume simulation
  *   1-5      — set speed to 1×, 2×, 5×, 10×, 50×
  *   Escape   — deselect resident (close sidebar panel)
+ *   Tab      — cycle to next toolbar panel
  */
 import { useCallback, useEffect } from 'react'
 
@@ -69,6 +70,12 @@ export function useKeyboardShortcuts(enabled: boolean): void {
       // Escape → close resident panel
       if (e.code === 'Escape') {
         selectResident(null)
+      }
+
+      // Tab → cycle toolbar panels
+      if (e.code === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault()
+        window.dispatchEvent(new CustomEvent('populace:cycle-tool', { detail: { reverse: e.shiftKey } }))
       }
     },
     [speed, setRunning, setStoreSpeed, selectResident],

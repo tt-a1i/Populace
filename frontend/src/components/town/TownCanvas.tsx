@@ -242,6 +242,25 @@ export function TownCanvas() {
     window.dispatchEvent(new CustomEvent('populace:map-editor-paint', { detail: { tileX: tile.tileX, tileY: tile.tileY } }))
   }, [])
 
+  const handleDoubleClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    const renderer = rendererRef.current
+    const shell = shellRef.current
+    if (!renderer || !shell) return
+
+    const bounds = shell.getBoundingClientRect()
+    const tile = renderer.screenToTile(event.clientX - bounds.left, event.clientY - bounds.top)
+    if (!tile) return
+
+    const bld = buildings.find(b => b.position[0] === tile.tileX && b.position[1] === tile.tileY)
+    if (bld) {
+      window.dispatchEvent(new CustomEvent('populace:open-tool', { detail: { tool: 'building-detail', buildingId: bld.id } }))
+    }
+  }, [buildings])
+
+  const handleViewBuilding = useCallback((buildingId: string) => {
+    window.dispatchEvent(new CustomEvent('populace:open-tool', { detail: { tool: 'building-detail', buildingId } }))
+  }, [])
+
   const handleContextMenu = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     if (replayTick !== null) {
       return
@@ -608,6 +627,19 @@ export function TownCanvas() {
     }
   }, [contextMenu])
 
+  // Listen for follow-resident events from detail panel
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent).detail?.residentId
+      if (id) {
+        setFollowedResidentId(id)
+        rendererRef.current?.setFollowTarget(id)
+      }
+    }
+    window.addEventListener('populace:follow-resident', handler)
+    return () => window.removeEventListener('populace:follow-resident', handler)
+  }, [])
+
   // Listen for tile override changes (map editor) and redraw tiles
   useEffect(() => {
     const handler = () => {
@@ -622,6 +654,7 @@ export function TownCanvas() {
       ref={shellRef}
       data-testid="town-canvas-shell"
       onClick={handleCanvasClick}
+      onDoubleClick={handleDoubleClick}
       onPointerMove={handleCanvasPointerMove}
       onContextMenu={handleContextMenu}
       role="region"
@@ -647,6 +680,7 @@ export function TownCanvas() {
           void handleInjectEvent()
         }}
         onInspectTile={handleInspectTile}
+        onViewBuilding={handleViewBuilding}
         onPlacePlaceholder={handlePlacePlaceholder}
         onClearResidentSelection={() => selectResident(null)}
         onDismissInspection={() => setInspection(null)}

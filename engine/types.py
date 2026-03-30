@@ -78,6 +78,13 @@ else:
         none = "none"
 
 
+    class RelationshipStatus(str, Enum):
+        single = "single"
+        dating = "dating"
+        married = "married"
+        divorced = "divorced"
+
+
     # ---------------------------------------------------------------------------
     # Neo4j node types (§4.5)
     # ---------------------------------------------------------------------------
@@ -293,6 +300,15 @@ else:
         style_score: float = 0.35
 
     @dataclass
+    class LifeGoal:
+        type: str
+        progress: float = 0.0
+        target: float = 1.0
+        reward: str = ""
+        completed: bool = False
+        completed_tick: int = 0
+
+    @dataclass
     class ExternalTown:
         name: str
         relation_score: float = 0.0
@@ -386,6 +402,8 @@ else:
         memories: List["Memory"] = field(default_factory=list)
         pets: List["Pet"] = field(default_factory=list)
         diary: List["DiaryEntry"] = field(default_factory=list)
+        relationship_status: "RelationshipStatus" = RelationshipStatus.single
+        life_goal: Optional["LifeGoal"] = None
 
 
     @dataclass
@@ -668,6 +686,40 @@ else:
         festival_updates: List["FestivalUpdate"] = field(default_factory=list)
         disaster_updates: List["DisasterUpdate"] = field(default_factory=list)
 
+
+    # ---------------------------------------------------------------------------
+    # Economic cycle (§93)
+    # ---------------------------------------------------------------------------
+
+    @dataclass
+    class EconomicCycle:
+        """Tracks the current business cycle phase and its modifiers."""
+        phase: str = "recovery"           # boom, recession, depression, recovery
+        gdp_modifier: float = 1.0         # multiplier on income/GDP
+        unemployment_modifier: float = 1.0 # multiplier on job-seeking difficulty
+        started_tick: int = 0
+
+    # ---------------------------------------------------------------------------
+    # Newspaper / media (§90)
+    # ---------------------------------------------------------------------------
+
+    @dataclass
+    class NewsArticle:
+        """A single article within a newspaper edition."""
+        headline: str = ""
+        content: str = ""
+        category: str = "general"       # crime, election, disaster, festival, achievement, trade, general
+        importance: float = 0.5         # 0..1
+        tick: int = 0
+        icon: str = ""
+
+    @dataclass
+    class Newspaper:
+        """An auto-generated newspaper edition."""
+        edition: int = 0
+        tick: int = 0
+        headline: str = ""
+        articles: List[NewsArticle] = field(default_factory=list)
 
     # ---------------------------------------------------------------------------
     # World configuration (§16)

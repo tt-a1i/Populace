@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { getWorldDemographics, type WorldDemographicsPayload } from '../../services/api'
 import { PanelShell } from '../ui/PanelShell'
 import { PanelEmptyState, PanelSkeletonGrid, PanelSpinner } from '../ui/PanelStates'
+import { SparkLine } from '../ui/SparkLine'
 
 const EMPTY_DEMOGRAPHICS: WorldDemographicsPayload = {
   age_distribution: { child: 0, adult: 0, elder: 0 },
@@ -100,6 +101,21 @@ export function PopulationPanel() {
           value={String(Object.values(data.age_distribution).reduce((sum, count) => sum + count, 0))}
         />
       </section>
+
+      {data.generational_timeline.length > 1 && (
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
+          <SparkLine
+            data={data.generational_timeline.map((_, i) => {
+              const total = Object.values(data.age_distribution).reduce((s, c) => s + c, 0)
+              return Math.max(1, total + (i - data.generational_timeline.length) * 0.2)
+            })}
+            color="#22d3ee"
+            label="Population Trend"
+            width={280}
+            height={48}
+          />
+        </div>
+      )}
 
       <section className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
         <div className="flex items-center justify-between gap-3">

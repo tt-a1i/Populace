@@ -548,7 +548,7 @@ class SimulationState:
         from engine.generative_agent import GenerativeAgent
         from engine.memory import MemoryStream
         from engine.types import (
-            Achievement, Appearance, Building, ClothingItem, Course, CourseHistoryEntry, CulturalEvent, DiaryEntry, Education, ExternalTown, Health, Illness, Item, Job, Memory, MoodEntry, Reflection,
+            Achievement, Appearance, Building, ClothingItem, Course, CourseHistoryEntry, CulturalEvent, DiaryEntry, Education, ExternalTown, Health, Illness, Item, Job, LifeGoal, Memory, MoodEntry, Reflection,
             Pet, Party, Religion, Relationship, RelationType, ReligiousEvent, Resident, TradeRoute, WorldConfig,
         )
         from engine.world import World
@@ -669,6 +669,7 @@ class SimulationState:
                     ],
                 ),
                 artistic_talent=float(res_data.get("artistic_talent", 0.0)),
+                life_goal=LifeGoal(**res_data["life_goal"]) if res_data.get("life_goal") else None,
             )
             resident.achievements = [Achievement(**entry) for entry in res_data.get("achievements", [])]
             for d in res_data.get("diary", []):
@@ -2937,6 +2938,14 @@ class SimulationState:
                             status="started",
                         )
                     )
+        # Romance lifecycle processing (every 5 ticks — confession/proposal/quarrel checks)
+        if self.world.current_tick % 5 == 0:
+            from engine.romance import process_romance_tick
+            romance_events, romance_deltas = process_romance_tick(self.world, getattr(self.world, "rng", None))
+            for rev in romance_events:
+                tick_state.events.append(EventUpdate(description=rev.description))
+            relationship_deltas.extend(romance_deltas)
+
         seasonal_festival = self._start_festival(
             str(self.world.season.value if hasattr(self.world.season, "value") else self.world.season),
             start_tick=self.world.current_tick,
@@ -3054,6 +3063,16 @@ class SimulationState:
                         status="started",
                     )
                 )
+        # --- Life goal tracking ---
+        from engine.goals import track_goals, apply_goal_completions
+        goal_completions = track_goals(self)
+        if goal_completions:
+            apply_goal_completions(self, goal_completions)
+            for gc in goal_completions:
+                tick_state.events.append(
+                    EventUpdate(description=f"🎯 {gc['resident_name']}达成了人生目标！")
+                )
+
         family_event_descriptions: list[str] = []
         current_tick = self.world.current_tick
         families = self.world.list_families()
@@ -3762,6 +3781,7 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
         Illness,
         Item,
         Job,
+        LifeGoal,
         Memory,
         MoodEntry,
         Party,
@@ -3857,6 +3877,7 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
                 ],
             ),
             artistic_talent=float(res_data.get("artistic_talent", 0.0)),
+            life_goal=LifeGoal(**res_data["life_goal"]) if res_data.get("life_goal") else None,
         )
         resident.achievements = [Achievement(**entry) for entry in res_data.get("achievements", [])]
         for d in res_data.get("diary", []):
