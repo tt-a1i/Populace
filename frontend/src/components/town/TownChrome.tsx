@@ -51,6 +51,8 @@ interface TownChromeProps {
   onDismissInspection: () => void
   onDismissZone?: () => void
   onCancelFollow: () => void
+  onFollowResident?: (id: string) => void
+  onGiftResident?: (id: string) => void
 }
 
 export function TownChrome({
@@ -70,6 +72,8 @@ export function TownChrome({
   onDismissInspection,
   onDismissZone = () => {},
   onCancelFollow,
+  onFollowResident,
+  onGiftResident,
 }: TownChromeProps) {
   const { t } = useTranslation()
   const [detailBuildingId, setDetailBuildingId] = useState<string | null>(null)
@@ -194,6 +198,41 @@ export function TownChrome({
           data-testid="resident-sidebar"
           className="absolute bottom-14 right-3 top-3 z-30 flex w-[min(20rem,calc(100%-2rem))] flex-col rounded-xl border border-white/10 bg-slate-950/85 p-4 text-slate-100 shadow-xl backdrop-blur-sm animate-[slideInRight_250ms_ease-out]"
         >
+          {/* Quick-action bar */}
+          <div data-testid="resident-quick-actions" className="mb-3 flex gap-1.5 rounded-lg border border-white/8 bg-white/[0.03] p-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                if (followedResidentId === selectedResidentId) {
+                  onCancelFollow()
+                } else {
+                  onFollowResident?.(selectedResidentId)
+                }
+              }}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-cyan-200 transition duration-150 hover:bg-cyan-400/10 active:scale-95"
+            >
+              <span className="text-sm" aria-hidden="true">📍</span>
+              {followedResidentId === selectedResidentId ? t('quick_actions.unfollow') : t('quick_actions.follow')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('populace:open-tool', { detail: { tool: 'director', residentId: selectedResidentId } }))
+              }}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-amber-200 transition duration-150 hover:bg-amber-400/10 active:scale-95"
+            >
+              <span className="text-sm" aria-hidden="true">💬</span>
+              {t('quick_actions.chat')}
+            </button>
+            <button
+              type="button"
+              onClick={() => onGiftResident?.(selectedResidentId)}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-rose-200 transition duration-150 hover:bg-rose-400/10 active:scale-95"
+            >
+              <span className="text-sm" aria-hidden="true">🎁</span>
+              {t('quick_actions.gift')}
+            </button>
+          </div>
           <ResidentStoryPanel
             key={selectedResidentId}
             residentId={selectedResidentId}

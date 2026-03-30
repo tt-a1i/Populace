@@ -29,6 +29,12 @@ const FALLBACK_SKIN_COLORS = [0xf2d3b1, 0xe5b887, 0xd39a6a, 0xb97c52, 0x8a5a3c, 
 const FALLBACK_HAIR_COLORS = [0x1f2937, 0x5b4636, 0x8b5a2b, 0xd4a373, 0xc084fc, 0xf8fafc]
 const FALLBACK_OUTFIT_COLORS = [0x2563eb, 0x059669, 0xdc2626, 0xd97706, 0x7c3aed, 0xdb2777, 0x0f766e, 0x4b5563]
 const FALLBACK_HAIR_STYLES = ['short', 'long', 'spiky', 'bald', 'ponytail'] as const
+const FASHION_ACCENT_COLOR: Record<string, number> = {
+  work: 0x94a3b8,
+  formal: 0xf59e0b,
+  casual: 0x22d3ee,
+  festive: 0xf472b6,
+}
 
 type HairStyle = (typeof FALLBACK_HAIR_STYLES)[number]
 
@@ -37,6 +43,8 @@ interface ResidentAppearance {
   hairStyle: HairStyle
   hairColor: number
   outfitColor: number
+  fashionAccent: number
+  styleScore: number
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -72,6 +80,8 @@ function normalizeHairStyle(value: string | null | undefined, residentId: string
 function resolveAppearance(resident: ResidentPosition): ResidentAppearance {
   const identitySeed = checksum(resident.id)
   const fallbackOutfit = resident.color || FALLBACK_OUTFIT_COLORS[identitySeed % FALLBACK_OUTFIT_COLORS.length]
+  const clothing = resident.appearance?.clothing ?? 'casual'
+  const styleScore = clamp(resident.appearance?.style_score ?? 0.35, 0, 1)
 
   return {
     skinColor: hexToNumber(
@@ -87,6 +97,8 @@ function resolveAppearance(resident: ResidentPosition): ResidentAppearance {
       resident.outfitColor,
       fallbackOutfit,
     ),
+    fashionAccent: FASHION_ACCENT_COLOR[clothing] ?? 0x22d3ee,
+    styleScore,
   }
 }
 
@@ -96,6 +108,8 @@ function appearanceSignature(appearance: ResidentAppearance): string {
     appearance.hairStyle,
     appearance.hairColor,
     appearance.outfitColor,
+    appearance.fashionAccent,
+    appearance.styleScore,
   ].join(':')
 }
 
@@ -701,9 +715,10 @@ export class ResidentSprite extends Container {
 
   private redrawAvatar(): void {
     this.body.clear()
-    const { outfitColor, skinColor } = this.currentAppearance
+    const { outfitColor, skinColor, fashionAccent, styleScore } = this.currentAppearance
 
     this.body.roundRect(-8, -2, 16, 12, 4).fill({ color: outfitColor })
+    this.body.rect(-6, 0, 12, 1.6).fill({ color: fashionAccent, alpha: 0.92 })
     this.body.roundRect(-7, 9, 14, 5, 2).fill({ color: 0x0f172a, alpha: 0.14 })
     this.body.rect(-8, 0, 2, 10).fill({ color: this.mixColor(outfitColor, 0xffffff, 0.18) })
     this.body.rect(6, 0, 2, 10).fill({ color: this.mixColor(outfitColor, 0x020617, 0.18) })
@@ -725,6 +740,17 @@ export class ResidentSprite extends Container {
     if (occColor) {
       this.body.circle(0, 12, 11)
       this.body.stroke({ color: occColor, width: 1.8, alpha: 0.65 })
+    }
+    if (styleScore >= 0.45) {
+      this.body.circle(0, 12, 9.4)
+      this.body.stroke({
+        color: fashionAccent,
+        width: styleScore >= 0.75 ? 2.2 : 1.2,
+        alpha: 0.35 + styleScore * 0.35,
+      })
+    }
+    if (styleScore >= 0.78) {
+      this.body.circle(7, 4, 1.5).fill({ color: fashionAccent, alpha: 0.95 })
     }
 
     this.body.zIndex = 2

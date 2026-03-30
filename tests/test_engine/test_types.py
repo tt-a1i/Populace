@@ -9,17 +9,22 @@ from engine.types import (
     DiaryEntry,
     Education,
     Event,
+    ExternalTown,
     Health,
     Illness,
     Item,
+    Mayor,
     Memory,
     MoodEntry,
+    Party,
     Pet,
+    Policy,
     Season,
     Reflection,
     RelationType,
     Relationship,
     Resident,
+    TradeRoute,
     TickState,
     Weather,
     WeatherType,
@@ -40,12 +45,16 @@ def test_resident_defaults():
     assert r.hair_color is None
     assert r.outfit_color is None
     assert r.age_days == 0
+    assert r.age_stage == "child"
+    assert r.retirement_tick is None
+    assert r.inheritance == {}
     assert r.mood_history == []
     assert r.mental_state == "stable"
     assert r.low_mood_ticks == 0
     assert r.memories == []
     assert r.health.hp == 1.0
     assert r.health.illness is None
+    assert r.party == Party.neutral
     assert isinstance(r.education, Education)
     assert r.education.courses == []
     assert r.education.knowledge_level == {}
@@ -94,6 +103,25 @@ def test_bulletin_post_defaults_and_topic_fallback():
     assert post.tone == "positive"
 
 
+def test_external_town_and_trade_route_defaults():
+    town = ExternalTown(name="海雾港")
+    route = TradeRoute(
+        from_town="Populace",
+        to_town="海雾港",
+        goods=["coffee", "tea"],
+        profit_per_tick=12.5,
+    )
+
+    assert town.name == "海雾港"
+    assert town.relation_score == 0.0
+    assert town.trade_balance == 0.0
+    assert town.ambassador_id is None
+    assert route.from_town == "Populace"
+    assert route.to_town == "海雾港"
+    assert route.goods == ["coffee", "tea"]
+    assert route.profit_per_tick == 12.5
+
+
 def test_building_creation():
     b = Building(id="b1", type="cafe", name="咖啡馆", capacity=4, position=(5, 5))
     assert b.capacity == 4
@@ -120,6 +148,22 @@ def test_health_creation():
     assert health.illness is not None
     assert health.illness.type == "cold"
     assert health.recovery_tick == 12
+
+
+def test_policy_and_mayor_creation():
+    policy = Policy(type="welfare", effect={"mood_delta": 0.12, "reserve_delta": -18.0}, duration=80)
+    mayor = Mayor(resident_id="r1", term_start=100, term_end=600, policies=[policy])
+
+    assert mayor.resident_id == "r1"
+    assert mayor.policies[0].type == "welfare"
+    assert mayor.policies[0].effect["mood_delta"] == pytest.approx(0.12)
+    assert mayor.policies[0].duration == 80
+
+
+def test_party_enum_values():
+    assert Party.progressive.value == "progressive"
+    assert Party.conservative.value == "conservative"
+    assert Party.neutral.value == "neutral"
 
 
 def test_memory_creation():

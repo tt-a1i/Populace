@@ -2,7 +2,7 @@ import { Application, Container, Graphics, Rectangle, Text } from 'pixi.js'
 
 import type { WorldTransportPayload } from '../../services/api'
 import { useSimulationStore, type ResidentPosition, type SimulationSpeed } from '../../stores/simulation'
-import type { Building, Festival, Zone } from '../../types'
+import type { Building, Disaster, Festival, Zone } from '../../types'
 import { ResidentSprite, type ResidentHoverInfo } from './ResidentSprite'
 import { ResidentSpritePool } from './ResidentSpritePool'
 import { MilestoneEffect } from './effects/MilestoneEffect'
@@ -99,6 +99,7 @@ export class TownRenderer {
   private readonly sunnyGlow = new Graphics()
   private readonly dayNightOverlay = new Graphics()
   private readonly weatherContainer = new Container()
+  private readonly disasterOverlay = new Graphics()
   private readonly festivalMarker = new Container()
   private readonly festivalPulse = new Graphics()
   private readonly festivalCore = new Graphics()
@@ -143,11 +144,13 @@ export class TownRenderer {
   private readonly heatmapHistory: Array<{ id: string; x: number; y: number }[]> = []
   private readonly MAX_HEATMAP_TICKS = 100
   private activeFestival: Festival | null = null
+  private activeDisasters: Disaster[] = []
   private currentTransport: WorldTransportPayload = {
     roads: [],
     stats: { mode_share: {}, average_travel_ticks: 0, congestion_hotspots: [] },
   }
   private festivalPulseTime = 0
+  private disasterPulseTime = 0
   private buildingSignature = ''
   private transportSignature = ''
   private zoneSignature = ''
@@ -215,7 +218,7 @@ export class TownRenderer {
     this.tileLayer.addChild(this.waterOverlay)
     this.effectLayer.addChild(
       this.ambientAccent, this.sunnyGlow, this.dayNightOverlay,
-      this.eventRadiusGraphics, this.heatmapGraphics, this.weatherContainer, this.festivalMarker, this.vignetteGraphics,
+      this.eventRadiusGraphics, this.heatmapGraphics, this.weatherContainer, this.disasterOverlay, this.festivalMarker, this.vignetteGraphics,
     )
     this.festivalMarker.addChild(this.festivalPulse, this.festivalCore, this.festivalLabel)
     this.festivalMarker.visible = false
@@ -362,6 +365,7 @@ export class TownRenderer {
 
     if (this.buildingSignature === nextSignature) {
       this.drawTransport()
+      this.drawDisasterOverlay()
       this.drawFestivalMarker()
       return
     }
@@ -383,6 +387,7 @@ export class TownRenderer {
     if (!buildings.length) {
       this.drawBuildings()
       this.drawTransport()
+      this.drawDisasterOverlay()
       this.drawFestivalMarker()
       return
     }
@@ -507,6 +512,7 @@ export class TownRenderer {
     this.updateBuildingLabelsForZoom()
     this.drawPlaceholderBuildings()
     this.drawTransport()
+    this.drawDisasterOverlay()
     this.drawFestivalMarker()
   }
 
@@ -757,6 +763,11 @@ export class TownRenderer {
     this.drawFestivalMarker()
   }
 
+  setActiveDisasters(disasters: Disaster[]): void {
+    this.activeDisasters = [...disasters]
+    this.drawDisasterOverlay()
+  }
+
   updateWeather(weather: string): void {
     if (weather === this.currentWeather) return
     this.currentWeather = weather
@@ -969,6 +980,7 @@ export class TownRenderer {
 
     // Animate weather particles
     this.tickWeatherEffect(deltaMs)
+    this.tickDisasterOverlay(deltaMs)
     this.tickFestivalMarker(deltaMs)
 
     // Animate water ripple overlay
@@ -1015,6 +1027,15 @@ export class TownRenderer {
     this.festivalPulse.alpha = 0.24 + (Math.sin(this.festivalPulseTime) + 1) * 0.14
   }
 
+  private tickDisasterOverlay(deltaMs: number): void {
+    if (this.activeDisasters.length === 0) {
+      this.disasterOverlay.alpha = 1
+      return
+    }
+    this.disasterPulseTime += deltaMs * 0.004
+    this.disasterOverlay.alpha = 0.6 + (Math.sin(this.disasterPulseTime) + 1) * 0.18
+  }
+
   private drawFestivalMarker(): void {
     this.festivalPulse.clear()
     this.festivalCore.clear()
@@ -1042,6 +1063,30 @@ export class TownRenderer {
     this.festivalCore.fill({ color: 0xf97316, alpha: 0.95 })
     this.festivalCore.circle(0, 0, 4)
     this.festivalCore.fill({ color: 0xfffbeb, alpha: 0.95 })
+  }
+
+  private drawDisasterOverlay(): void {
+    this.disasterOverlay.clear()
+    if (this.activeDisasters.length === 0) {
+      return
+    }
+
+    const affectedIds = new Set(
+      this.activeDisasters.flatMap((disaster) => disaster.affected_buildings ?? []),
+    )
+    for (const building of this.currentBuildings) {
+      if (!affectedIds.has(building.id)) {
+        continue
+      }
+      const x = building.position[0] * TILE_SIZE
+      const y = building.position[1] * TILE_SIZE
+      const width = TILE_SIZE * 2
+      const height = TILE_SIZE * 3
+      this.disasterOverlay.roundRect(x - 2, y - 2, width + 4, height + 4, 10)
+      this.disasterOverlay.fill({ color: 0xef4444, alpha: 0.14 })
+      this.disasterOverlay.roundRect(x - 2, y - 2, width + 4, height + 4, 10)
+      this.disasterOverlay.stroke({ color: 0xf87171, width: 3, alpha: 0.9 })
+    }
   }
 
   private bindCameraControls(): void {

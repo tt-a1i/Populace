@@ -394,7 +394,7 @@ def _generate_families(world: World) -> None:
                     relationship.type = RelationType.friendship
                     relationship.intensity = min(1.0, relationship.intensity + 0.3)
                     relationship.familiarity = min(1.0, relationship.familiarity + 0.2)
-                    relationship.reason = relationship.reason or f"family_bond:{family_name}"
+                    relationship.reason = f"family_bond:{family_name}"
                 world.set_relationship(relationship)
 
 

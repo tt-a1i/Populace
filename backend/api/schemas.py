@@ -210,6 +210,24 @@ class WorldHealthResponse(BaseModel):
     outbreak_hotspots: list[WorldHealthHotspotResponse] = Field(default_factory=list)
 
 
+class AppearanceResponse(BaseModel):
+    hair: str = "short"
+    clothing: str = "casual"
+    style_score: float = 0.35
+
+
+class ClothingItemResponse(BaseModel):
+    id: str
+    name: str
+    category: str = "casual"
+    color_name: str = "sky"
+    color: str = "#38BDF8"
+    style: str = "classic"
+    price: float = 0.0
+    quality: float = 0.0
+    designed_by: str | None = None
+
+
 class ResidentResponse(BaseModel):
     class FamilyInfoResponse(BaseModel):
         parent_ids: list[str] = Field(default_factory=list)
@@ -231,6 +249,8 @@ class ResidentResponse(BaseModel):
     hair_style: str | None = None
     hair_color: str | None = None
     outfit_color: str | None = None
+    appearance: AppearanceResponse = Field(default_factory=AppearanceResponse)
+    wardrobe: list[ClothingItemResponse] = Field(default_factory=list)
     current_goal: str | None = None
     coins: int = 100
     occupation: str = "unemployed"
@@ -260,6 +280,8 @@ class PopulationResidentResponse(BaseModel):
     hair_style: str | None = None
     hair_color: str | None = None
     outfit_color: str | None = None
+    appearance: AppearanceResponse = Field(default_factory=AppearanceResponse)
+    wardrobe: list[ClothingItemResponse] = Field(default_factory=list)
     coins: int = 100
     occupation: str = "unemployed"
     skills: dict[str, float] = Field(default_factory=dict)
@@ -421,6 +443,47 @@ class WorldCultureResponse(BaseModel):
     talent_rankings: list[CultureTalentRankingResponse] = Field(default_factory=list)
 
 
+class ReligionDistributionResponse(BaseModel):
+    religion: str
+    label: str
+    count: int
+    share: float
+
+
+class MoralityPointResponse(BaseModel):
+    tick: int
+    morality_index: float
+
+
+class ReligiousEventResponse(BaseModel):
+    religion: str
+    event_type: str
+    name: str
+    venue_id: str
+    leader_id: str
+    participants: list[str] = Field(default_factory=list)
+    tick_start: int = 0
+    duration: int = 0
+    town_mood_boost: float = 0.0
+    morality_boost: float = 0.0
+
+
+class ReligionLeaderResponse(BaseModel):
+    resident_id: str
+    resident_name: str
+    religion: str
+    piety: float
+    reputation: float
+
+
+class WorldReligionResponse(BaseModel):
+    distribution: list[ReligionDistributionResponse] = Field(default_factory=list)
+    morality_index: float = 0.0
+    morality_history: list[MoralityPointResponse] = Field(default_factory=list)
+    events: list[ReligiousEventResponse] = Field(default_factory=list)
+    leaders: list[ReligionLeaderResponse] = Field(default_factory=list)
+
+
 class ResidentReflectionResponse(BaseModel):
     id: str
     summary: str
@@ -571,6 +634,35 @@ class FestivalListResponse(BaseModel):
     history: list[FestivalResponse] = Field(default_factory=list)
 
 
+class DisasterResponse(BaseModel):
+    type: str
+    severity: float
+    affected_buildings: list[str] = Field(default_factory=list)
+    tick_start: int
+    duration: int
+    casualties: int = 0
+    status: str = "active"
+    end_tick: int | None = None
+    reserve_spent: float = 0.0
+    evacuations: int = 0
+    memorial: str | None = None
+
+
+class DisasterSummaryResponse(BaseModel):
+    active_count: int = 0
+    history_count: int = 0
+    affected_buildings: int = 0
+    total_casualties: int = 0
+    reserve_spent: float = 0.0
+    by_type: dict[str, int] = Field(default_factory=dict)
+
+
+class DisasterListResponse(BaseModel):
+    current: list[DisasterResponse] = Field(default_factory=list)
+    history: list[DisasterResponse] = Field(default_factory=list)
+    summary: DisasterSummaryResponse = Field(default_factory=DisasterSummaryResponse)
+
+
 class BulletinPostResponse(BaseModel):
     id: str
     author_id: str
@@ -596,6 +688,82 @@ class BulletinTopicResponse(BaseModel):
 class WorldBulletinResponse(BaseModel):
     posts: list[BulletinPostResponse] = Field(default_factory=list)
     hot_topics: list[BulletinTopicResponse] = Field(default_factory=list)
+
+
+class PoliticsMayorResponse(BaseModel):
+    resident_id: str
+    resident_name: str
+    party: str = "neutral"
+    term_start: int = 0
+    term_end: int = 0
+    approval: float = 0.0
+
+
+class PoliticsPolicyResponse(BaseModel):
+    type: str
+    effect: dict[str, float] = Field(default_factory=dict)
+    duration: int = 0
+    issued_tick: int = 0
+
+
+class PoliticsElectionResponse(BaseModel):
+    issue: str
+    total_votes: int = 0
+    status: str = "active"
+
+
+class WorldPoliticsResponse(BaseModel):
+    mayor: PoliticsMayorResponse | None = None
+    active_policies: list[PoliticsPolicyResponse] = Field(default_factory=list)
+    election_countdown: int = 0
+    public_satisfaction: float = 0.0
+    party_distribution: dict[str, int] = Field(default_factory=dict)
+    active_election: PoliticsElectionResponse | None = None
+    impeachment_risk: bool = False
+
+
+class DiplomacyTownResponse(BaseModel):
+    name: str
+    relation_score: float = 0.0
+    relation_status: str = "neutral"
+    trade_balance: float = 0.0
+    ambassador_id: str | None = None
+    ambassador_name: str | None = None
+    specialties: list[str] = Field(default_factory=list)
+
+
+class DiplomacyTradeRouteResponse(BaseModel):
+    id: str
+    from_town: str
+    to_town: str
+    goods: list[str] = Field(default_factory=list)
+    profit_per_tick: float = 0.0
+    merchant_id: str | None = None
+    merchant_name: str | None = None
+    relation_status: str = "neutral"
+    rare_goods: list[str] = Field(default_factory=list)
+
+
+class DiplomacyLedgerEntryResponse(BaseModel):
+    tick: int
+    type: str
+    town_name: str
+    route_id: str
+    amount: float = 0.0
+    description: str
+
+
+class DiplomacySummaryResponse(BaseModel):
+    active_routes: int = 0
+    total_profit: float = 0.0
+    total_trade_balance: float = 0.0
+
+
+class WorldDiplomacyResponse(BaseModel):
+    towns: list[DiplomacyTownResponse] = Field(default_factory=list)
+    trade_routes: list[DiplomacyTradeRouteResponse] = Field(default_factory=list)
+    summary: DiplomacySummaryResponse = Field(default_factory=DiplomacySummaryResponse)
+    ledger: list[DiplomacyLedgerEntryResponse] = Field(default_factory=list)
 
 
 class AchievementLeaderboardEntryResponse(BaseModel):
@@ -708,6 +876,41 @@ class WorldEconomyResponse(BaseModel):
     gdp_history: list[dict[str, float | int]] = Field(default_factory=list)
 
 
+class FashionTrendResponse(BaseModel):
+    color_name: str
+    color: str
+    style: str
+    category: str
+    started_tick: int = 0
+
+
+class FashionRankingEntryResponse(BaseModel):
+    resident_id: str
+    resident_name: str
+    style_score: float = 0.0
+    clothing: str = "casual"
+    current_outfit: str = ""
+    accent_color: str = "#38BDF8"
+    trend_match: bool = False
+    designed_by_tailor: bool = False
+
+
+class FashionConsumptionResponse(BaseModel):
+    total_purchases: int = 0
+    total_spent: float = 0.0
+    average_spend: float = 0.0
+    top_category: str | None = None
+    top_color: str | None = None
+    recent_purchases: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class WorldFashionResponse(BaseModel):
+    current_trend: FashionTrendResponse
+    trend_history: list[FashionTrendResponse] = Field(default_factory=list)
+    rankings: list[FashionRankingEntryResponse] = Field(default_factory=list)
+    consumption: FashionConsumptionResponse = Field(default_factory=FashionConsumptionResponse)
+
+
 class RoadResponse(BaseModel):
     from_building: str
     to_building: str
@@ -731,6 +934,23 @@ class TransportStatsResponse(BaseModel):
 class WorldTransportResponse(BaseModel):
     roads: list[RoadResponse] = Field(default_factory=list)
     stats: TransportStatsResponse = Field(default_factory=TransportStatsResponse)
+
+
+class GenerationalTimelineEntryResponse(BaseModel):
+    tick: int
+    type: str
+    resident_id: str | None = None
+    resident_name: str = ""
+    summary: str = ""
+
+
+class WorldDemographicsResponse(BaseModel):
+    age_distribution: dict[str, int] = Field(default_factory=dict)
+    aging_index: float = 0.0
+    average_age: float = 0.0
+    retired_count: int = 0
+    recent_deaths: int = 0
+    generational_timeline: list[GenerationalTimelineEntryResponse] = Field(default_factory=list)
 
 
 class MemoirResponse(BaseModel):

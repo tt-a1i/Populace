@@ -3,6 +3,8 @@ export interface MovementUpdate {
   x: number
   y: number
   action: string
+  outfit_color?: string | null
+  appearance?: ResidentAppearance | null
 }
 
 export interface DialogueUpdate {
@@ -62,6 +64,24 @@ export interface HealthState {
   recovery_tick: number
 }
 
+export interface ResidentAppearance {
+  hair: string
+  clothing: string
+  style_score: number
+}
+
+export interface ClothingItem {
+  id: string
+  name: string
+  category: string
+  color_name: string
+  color: string
+  style: string
+  price: number
+  quality: number
+  designed_by?: string | null
+}
+
 export interface EnergyUpdate {
   id: string
   energy: number
@@ -80,6 +100,8 @@ export interface PopulationResidentSnapshot {
   hair_style?: string | null
   hair_color?: string | null
   outfit_color?: string | null
+  appearance?: ResidentAppearance
+  wardrobe?: ClothingItem[]
   coins?: number
   occupation?: string
   skills?: Record<string, number>
@@ -134,6 +156,26 @@ export interface FestivalUpdate {
   memorial?: string | null
 }
 
+export interface Disaster {
+  type: string
+  severity: number
+  affected_buildings: string[]
+  tick_start: number
+  duration: number
+  casualties: number
+  status?: string
+  end_tick?: number | null
+  reserve_spent?: number
+  evacuations?: number
+  memorial?: string | null
+}
+
+export interface DisasterUpdate {
+  disaster: Disaster
+  status: 'started' | 'ended' | string
+  memorial?: string | null
+}
+
 export interface TickState {
   tick: number
   time: string
@@ -149,6 +191,7 @@ export interface TickState {
   vote_updates?: VoteRecord[]
   vote_announcements?: VoteRecord[]
   festival_updates?: FestivalUpdate[]
+  disaster_updates?: DisasterUpdate[]
 }
 
 export interface Resident {
@@ -164,6 +207,8 @@ export interface Resident {
   hair_style?: string | null
   hair_color?: string | null
   outfit_color?: string | null
+  appearance?: ResidentAppearance
+  wardrobe?: ClothingItem[]
   coins?: number
   occupation?: string
   skills?: Record<string, number>

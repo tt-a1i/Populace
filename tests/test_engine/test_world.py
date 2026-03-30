@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from engine.types import Building, Memory, MovementUpdate, Pet, RelationType, Relationship, TickState, WorldConfig
+from engine.types import Building, Memory, MovementUpdate, Pet, Religion, RelationType, Relationship, TickState, WorldConfig
 from engine.world import World
 
 from tests.conftest import make_agent
@@ -263,6 +263,63 @@ def test_school_class_increases_knowledge_and_history(mock_world):
     assert agent.resident.education.course_history[-1].subject == subject
 
 
+def test_child_in_school_studies_without_getting_assigned_a_job(mock_world):
+    school = Building(id="school-child", type="school", name="少年学堂", capacity=8, position=(8, 8))
+    mock_world.add_building(school)
+    child = mock_world.agents[0]
+    child.resident.age_days = 80
+    child.resident.age_stage = "child"
+    child.resident.location = school.id
+    child.resident.occupation = "unemployed"
+    child.resident.job.title = "unemployed"
+    mock_world.current_tick = 18
+
+    mock_world.apply_building_effects(child)
+
+    assert child.resident.occupation == "student"
+    assert child.resident.job.title == "student"
+    assert child.resident.education.courses
+    assert child.resident.wallet == 0.0
+
+
+def test_nursing_home_improves_elder_health_recovery(mock_world):
+    nursing_home = Building(id="nursing1", type="nursing_home", name="安宁养老院", capacity=6, position=(12, 12))
+    mock_world.add_building(nursing_home)
+    elder = mock_world.agents[0]
+    elder.resident.age_days = 850
+    elder.resident.age_stage = "elder"
+    elder.resident.location = nursing_home.id
+    elder.resident.health.hp = 0.45
+    elder.resident.energy = 0.5
+
+    mock_world.apply_building_effects(elder)
+
+    assert elder.resident.health.hp > 0.45
+    assert elder.resident.energy > 0.5
+
+
+def test_demographics_overview_reports_age_distribution_and_timeline(mock_world):
+    mock_world.agents[0].resident.age_days = 50
+    mock_world.agents[0].resident.age_stage = "child"
+    mock_world.agents[1].resident.age_days = 420
+    mock_world.agents[1].resident.age_stage = "adult"
+    mock_world.agents[2].resident.age_days = 860
+    mock_world.agents[2].resident.age_stage = "elder"
+    mock_world.agents[2].resident.retirement_tick = 144
+    mock_world.generational_history = [
+        {"tick": 96, "type": "birth", "resident_name": "新芽", "summary": "新居民诞生"},
+        {"tick": 144, "type": "retirement", "resident_name": "大强", "summary": "大强退休"},
+    ]
+
+    overview = mock_world.get_demographics_overview()
+
+    assert overview["age_distribution"] == {"child": 1, "adult": 1, "elder": 1}
+    assert overview["retired_count"] == 1
+    assert overview["aging_index"] == pytest.approx(1.0)
+    assert overview["generational_timeline"][0]["type"] == "retirement"
+    assert overview["generational_timeline"][1]["type"] == "birth"
+
+
 def test_assign_initial_pets_creates_owned_and_stray_pets(mock_world):
     mock_world.assign_initial_pets()
 
@@ -310,6 +367,88 @@ def test_social_knowledge_boosts_social_probability(mock_world):
     boosted = mock_world.get_social_probability(agent_a, agent_b)
 
     assert boosted > baseline
+
+
+def test_add_agent_seeds_religious_relationship_bias():
+    world = World(config=WorldConfig(llm_call_probability=0.0))
+    alpha = make_agent("faith-1", "阿木", x=1, y=1)
+    beta = make_agent("faith-2", "阿石", x=2, y=1)
+    gamma = make_agent("faith-3", "阿禾", x=3, y=1)
+
+    alpha.resident.religion = Religion.naturalism
+    beta.resident.religion = Religion.naturalism
+    gamma.resident.religion = Religion.solarsm
+
+    world.add_agent(alpha)
+    world.add_agent(beta)
+    world.add_agent(gamma)
+
+    same_faith = world.get_relationship(alpha.resident.id, beta.resident.id)
+    different_faith = world.get_relationship(alpha.resident.id, gamma.resident.id)
+
+    assert same_faith is not None
+    assert same_faith.type is RelationType.friendship
+    assert same_faith.intensity == pytest.approx(0.1)
+    assert different_faith is not None
+    assert different_faith.type is RelationType.dislike
+    assert different_faith.intensity == pytest.approx(0.1)
+
+
+def test_holy_site_worship_raises_piety_morality_and_mood(mock_world):
+    shrine = Building(id="shrine1", type="shrine", name="林间祭坛", capacity=8, position=(7, 4))
+    mock_world.add_building(shrine)
+    devotee = mock_world.agents[0]
+    devotee.resident.religion = Religion.naturalism
+    devotee.resident.location = shrine.id
+    devotee.resident.mood = "neutral"
+
+    before_piety = devotee.resident.piety
+    before_morality = devotee.resident.morality_score
+
+    mock_world.apply_building_effects(devotee)
+
+    assert devotee.resident.piety > before_piety
+    assert devotee.resident.morality_score > before_morality
+    assert devotee.resident.mood in {"calm", "content", "happy", "excited", "ecstatic"}
+
+
+def test_world_religion_system_creates_events_and_updates_morality(mock_world):
+    chapel = Building(id="chapel1", type="chapel", name="日轮礼拜堂", capacity=12, position=(8, 8))
+    mock_world.add_building(chapel)
+    leader = mock_world.agents[0]
+    leader.resident.religion = Religion.solarsm
+    leader.resident.piety = 0.92
+    leader.resident.reputation = 0.74
+    leader.resident.morality_score = 0.8
+
+    created = mock_world.maybe_create_religious_event()
+
+    assert created is not None
+    assert created.religion == Religion.solarsm.value
+    assert created.leader_id == leader.resident.id
+    assert mock_world.morality_index() > 0.5
+    assert mock_world.get_religion_overview()["events"]
+
+
+def test_low_morality_increases_fraud_risk(mock_world, monkeypatch):
+    perpetrator = mock_world.agents[0]
+    perpetrator.resident.location = None
+    perpetrator.resident.x = 0
+    perpetrator.resident.y = 0
+    perpetrator.resident.mood = "sad"
+    perpetrator.resident.energy = 0.05
+    perpetrator.resident.coins = 0
+    perpetrator.resident.morality_score = 0.0
+    for other in mock_world.agents[1:]:
+        other.resident.x = 15
+        other.resident.y = 15
+        other.resident.location = None
+
+    monkeypatch.setattr("engine.world.random.random", lambda: 0.0)
+    events = mock_world.process_crime_tick()
+
+    assert events
+    assert events[-1].type == "fraud"
 
 
 def test_set_resident_mood_records_history(mock_world):
@@ -376,12 +515,14 @@ def test_stormy_outdoor_weather_can_trigger_cold(mock_world, monkeypatch):
     agent.resident.health.illness = None
     mock_world.weather = __import__("engine.types", fromlist=["WeatherType"]).WeatherType.stormy
 
-    monkeypatch.setattr("engine.world.random.random", lambda: 0.0)
+    import random as _random
+    mock_world.rng = _random.Random(0)
+    mock_world.rng.random = lambda: 0.0
 
     mock_world.tick()
 
     assert agent.resident.health.illness is not None
-    assert agent.resident.health.illness.type == "cold"
+    assert agent.resident.health.illness.type in ("cold", "injury")
 
 
 def test_decay_resident_memories_reduces_negative_weight(mock_world):

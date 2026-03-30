@@ -24,13 +24,15 @@ class SimulationLoop:
         self.tick_handler = tick_handler or self.world.tick
         self.running = False
         self.last_tick_state: Optional[Any] = None
-        self._stop_event = asyncio.Event()
+        self._stop_event: Optional[asyncio.Event] = None
 
     async def start(self) -> None:
         if self.running:
             return
 
         self.running = True
+        if self._stop_event is None:
+            self._stop_event = asyncio.Event()
         self._stop_event.clear()
 
         # Deterministic mode: seed random at simulation start (spec §15)
@@ -61,7 +63,8 @@ class SimulationLoop:
 
     async def stop(self) -> None:
         self.running = False
-        self._stop_event.set()
+        if self._stop_event is not None:
+            self._stop_event.set()
         await asyncio.sleep(0)
 
     async def _wait_for_stop(self, timeout: float) -> None:

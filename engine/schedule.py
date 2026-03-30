@@ -24,7 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from engine.types import WeatherType
+from engine.types import Religion, WeatherType
 
 if TYPE_CHECKING:
     from engine.world import World
@@ -214,6 +214,22 @@ class DailySchedule:
         # ------------------------------------------------------------------
         # Morning phase: leave home and wander briefly
         # ------------------------------------------------------------------
+        if phase.name in {"morning", "evening"}:
+            resident_religion = getattr(resident, "religion", Religion.none)
+            if not isinstance(resident_religion, Religion):
+                try:
+                    resident_religion = Religion(str(resident_religion))
+                except ValueError:
+                    resident_religion = Religion.none
+            if resident_religion is not Religion.none:
+                holy_site = world.holy_site_for_resident(resident)
+                if holy_site is not None:
+                    if resident.location == holy_site.id:
+                        _set_goal(f"在{holy_site.name}礼拜")
+                        return {"action": "attend_worship"}
+                    _set_goal(f"去{holy_site.name}礼拜")
+                    return {"action": "attend_worship", "target": list(holy_site.position)}
+
         if phase.name == "morning":
             _set_goal("出门透气")
             return {"action": "move"}

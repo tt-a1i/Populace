@@ -113,7 +113,7 @@ def test_work_drains_energy_during_work_hours():
     cafe = Building(id="c1", type="cafe", name="Cafe", capacity=10, position=(5, 5))
     world.add_building(cafe)
 
-    resident = Resident(id="r_work", name="Frank", personality="hardworking", energy=1.0)
+    resident = Resident(id="r_work", name="Frank", personality="hardworking", energy=1.0, age_days=500)
     agent = GenerativeAgent(resident)
     world.add_agent(agent)
     world.enter_building(agent, cafe)

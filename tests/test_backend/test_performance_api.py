@@ -1,10 +1,20 @@
 """Tests for GET /api/simulation/performance endpoint."""
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from unittest.mock import patch, MagicMock
 
 from backend.api.simulation import SimulationState, PerformanceResponse
+
+
+@pytest.fixture(autouse=True)
+def _ensure_event_loop():
+    try:
+        asyncio.get_event_loop()
+    except RuntimeError:
+        asyncio.set_event_loop(asyncio.new_event_loop())
 
 
 class TestPerformanceEndpoint:

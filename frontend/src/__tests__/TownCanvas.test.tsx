@@ -67,6 +67,7 @@ vi.mock('../components/town/TownRenderer', () => ({
     syncZones = vi.fn()
     setSelectedZone = vi.fn()
     setActiveFestival = vi.fn()
+    setActiveDisasters = vi.fn()
     showEventRadii = vi.fn()
     syncTransport = vi.fn()
     drawRelationshipLines = vi.fn()
@@ -143,6 +144,7 @@ vi.mock('../stores/simulation', () => ({
           participants: ['r1'],
           status: 'active',
         },
+        currentDisasters: [],
         messageFeed: [],
         replayFrozenFrame: null,
         getFrameByTick: vi.fn().mockReturnValue(null),
@@ -196,6 +198,7 @@ vi.mock('../stores/simulation', () => ({
           participants: ['r1'],
           status: 'active',
         },
+        currentDisasters: [],
       }),
     },
   ),

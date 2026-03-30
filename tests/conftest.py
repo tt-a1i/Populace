@@ -43,7 +43,15 @@ def make_resident(
     x: int = 5,
     y: int = 5,
 ) -> Resident:
-    return Resident(id=rid, name=name, personality=personality, x=x, y=y)
+    return Resident(
+        id=rid,
+        name=name,
+        personality=personality,
+        x=x,
+        y=y,
+        age_days=240,
+        age_stage="adult",
+    )
 
 
 def make_agent(

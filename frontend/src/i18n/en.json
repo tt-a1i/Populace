@@ -81,6 +81,8 @@
     "stats": "Stats",
     "dialogue_history": "Dialogue History",
     "saves": "Saves",
+    "population": "Population",
+    "emergency": "Emergency",
     "export": "Export",
     "heatmap": "Heatmap",
     "compare": "Compare",
@@ -89,6 +91,9 @@
     "current_tool": "Active Tool: ",
     "whatif": "What-If",
     "culture": "Culture",
+    "politics": "Politics",
+    "diplomacy": "Diplomacy",
+    "religion": "Faith",
     "knowledge": "Knowledge Graph"
   },
   "knowledge": {
@@ -901,5 +906,37 @@
     "phase_home": "Home",
     "ptype_extrovert": "Extrovert",
     "ptype_introvert": "Introvert"
+  },
+  "fashion": {
+    "title": "Fashion Panel",
+    "badge": "Fashion",
+    "loading_title": "Loading fashion data…",
+    "loading_message": "Gathering trends, rankings, and purchase records.",
+    "error": "Failed to load fashion data",
+    "current_trend": "Current Trend",
+    "total_spent": "Total Spent",
+    "avg_spend": "Avg. Spend",
+    "trend_section": "Trends",
+    "trend_desc": "Leading category: {{category}}, recommended: {{color}} palette.",
+    "trend_history_empty": "No trend history yet",
+    "trend_history_hint": "Trend shifts will appear here as ticks progress.",
+    "consumption_section": "Consumption",
+    "purchase_count": "Purchases",
+    "top_category": "Top Category",
+    "top_color": "Top Color",
+    "none": "None",
+    "ranking_section": "Style Ranking",
+    "ranking_empty": "No rankings yet",
+    "ranking_hint": "Top-dressed residents will appear here once they start buying clothes.",
+    "recent_section": "Recent Purchases",
+    "recent_empty": "No purchases yet",
+    "recent_hint": "Clothing orders will show up once residents visit the market."
+  },
+  "quick_actions": {
+    "view": "View Details",
+    "follow": "Follow",
+    "unfollow": "Unfollow",
+    "chat": "Chat",
+    "gift": "Send Gift"
   }
 }

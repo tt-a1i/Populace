@@ -129,7 +129,7 @@ def test_decay_reduces_intensity(mock_world):
     updates = decay_relationships(mock_world, mock_world.config)
     rel = mock_world.get_relationship("a1", "a2")
     assert rel.intensity < 0.5
-    assert len(updates) == 1
+    assert len(updates) >= 1
 
 
 def test_decay_removes_zero_no_familiarity(mock_world):

@@ -98,7 +98,7 @@ def test_occupation_set_in_cafe():
     cafe = Building(id="cafe1", type="cafe", name="Cafe", capacity=10, position=(5, 5))
     world.add_building(cafe)
 
-    resident = Resident(id="r1", name="Alice", personality="friendly")
+    resident = Resident(id="r1", name="Alice", personality="friendly", age_days=500)
     agent = GenerativeAgent(resident)
     world.add_agent(agent)
     world.enter_building(agent, cafe)
@@ -120,7 +120,7 @@ def test_occupation_set_in_school():
     school = Building(id="sch1", type="school", name="School", capacity=10, position=(3, 3))
     world.add_building(school)
 
-    resident = Resident(id="r2", name="Bob", personality="calm")
+    resident = Resident(id="r2", name="Bob", personality="calm", age_days=500)
     agent = GenerativeAgent(resident)
     world.add_agent(agent)
     world.enter_building(agent, school)
@@ -164,7 +164,7 @@ def test_occupation_income_during_work_phase():
     shop = Building(id="shop1", type="shop", name="Shop", capacity=10, position=(7, 7))
     world.add_building(shop)
 
-    resident = Resident(id="r4", name="Dave", personality="hardworking", coins=100)
+    resident = Resident(id="r4", name="Dave", personality="hardworking", coins=100, age_days=500)
     agent = GenerativeAgent(resident)
     world.add_agent(agent)
     world.enter_building(agent, shop)
@@ -188,7 +188,7 @@ def test_no_income_outside_work_hours():
     cafe = Building(id="cafe2", type="cafe", name="Night Cafe", capacity=5, position=(9, 9))
     world.add_building(cafe)
 
-    resident = Resident(id="r5", name="Eve", personality="night owl", coins=100)
+    resident = Resident(id="r5", name="Eve", personality="night owl", coins=100, age_days=500)
     agent = GenerativeAgent(resident)
     world.add_agent(agent)
     world.enter_building(agent, cafe)
@@ -211,7 +211,7 @@ def test_job_income_updates_wallet_and_job_title():
     shop = Building(id="shop-job", type="shop", name="Shop", capacity=10, position=(7, 7))
     world.add_building(shop)
 
-    resident = Resident(id="job-1", name="Dora", personality="hardworking")
+    resident = Resident(id="job-1", name="Dora", personality="hardworking", age_days=500)
     agent = GenerativeAgent(resident)
     world.add_agent(agent)
     world.enter_building(agent, shop)

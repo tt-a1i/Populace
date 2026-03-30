@@ -30,6 +30,24 @@ export interface HealthState {
   recovery_tick: number
 }
 
+export interface ResidentAppearance {
+  hair: string
+  clothing: string
+  style_score: number
+}
+
+export interface ClothingItem {
+  id: string
+  name: string
+  category: string
+  color_name: string
+  color: string
+  style: string
+  price: number
+  quality: number
+  designed_by?: string | null
+}
+
 export interface ApiResident {
   id: string
   name: string
@@ -43,6 +61,8 @@ export interface ApiResident {
   hair_style?: string | null
   hair_color?: string | null
   outfit_color?: string | null
+  appearance?: ResidentAppearance
+  wardrobe?: ClothingItem[]
   coins?: number
   occupation?: string
   wallet?: number
@@ -50,6 +70,8 @@ export interface ApiResident {
   skills?: Record<string, number>
   inventory?: Item[]
   energy?: number
+  age_days?: number
+  age_stage?: string
   reputation?: number
   pets?: Pet[]
   health?: HealthState
@@ -138,6 +160,35 @@ export interface FestivalListResponse {
   history: FestivalRecord[]
 }
 
+export interface DisasterRecord {
+  type: string
+  severity: number
+  affected_buildings: string[]
+  tick_start: number
+  duration: number
+  casualties: number
+  status: 'active' | 'completed' | string
+  end_tick?: number | null
+  reserve_spent?: number
+  evacuations?: number
+  memorial?: string | null
+}
+
+export interface DisasterSummaryRecord {
+  active_count: number
+  history_count: number
+  affected_buildings: number
+  total_casualties: number
+  reserve_spent: number
+  by_type: Record<string, number>
+}
+
+export interface DisasterListResponse {
+  current: DisasterRecord[]
+  history: DisasterRecord[]
+  summary: DisasterSummaryRecord
+}
+
 export interface BulletinPostRecord {
   id: string
   author_id: string
@@ -163,6 +214,80 @@ export interface BulletinTopicRecord {
 export interface WorldBulletinPayload {
   posts: BulletinPostRecord[]
   hot_topics: BulletinTopicRecord[]
+}
+
+export interface DiplomacyTown {
+  name: string
+  relation_score: number
+  relation_status: string
+  trade_balance: number
+  ambassador_id: string | null
+  ambassador_name: string | null
+  specialties: string[]
+}
+
+export interface DiplomacyTradeRoute {
+  id: string
+  from_town: string
+  to_town: string
+  goods: string[]
+  profit_per_tick: number
+  merchant_id: string | null
+  merchant_name: string | null
+  relation_status: string
+  rare_goods: string[]
+}
+
+export interface DiplomacyLedgerEntry {
+  tick: number
+  type: string
+  town_name: string
+  route_id: string
+  amount: number
+  description: string
+}
+
+export interface WorldDiplomacyPayload {
+  towns: DiplomacyTown[]
+  trade_routes: DiplomacyTradeRoute[]
+  summary: {
+    active_routes: number
+    total_profit: number
+    total_trade_balance: number
+  }
+  ledger: DiplomacyLedgerEntry[]
+}
+
+export interface PoliticsMayor {
+  resident_id: string
+  resident_name: string
+  party: string
+  term_start: number
+  term_end: number
+  approval: number
+}
+
+export interface PoliticsPolicy {
+  type: string
+  effect: Record<string, number>
+  duration: number
+  issued_tick?: number
+}
+
+export interface PoliticsElection {
+  issue: string
+  total_votes: number
+  status: string
+}
+
+export interface WorldPoliticsPayload {
+  mayor: PoliticsMayor | null
+  active_policies: PoliticsPolicy[]
+  election_countdown: number
+  public_satisfaction: number
+  party_distribution: Record<string, number>
+  active_election: PoliticsElection | null
+  impeachment_risk: boolean
 }
 
 interface VotePayload {
@@ -307,8 +432,20 @@ export function getFestivals() {
   return request<FestivalListResponse>('/api/world/festivals')
 }
 
+export function getWorldDisasters() {
+  return request<DisasterListResponse>('/api/world/disasters')
+}
+
 export function getWorldBulletin() {
   return request<WorldBulletinPayload>('/api/world/bulletin')
+}
+
+export function getWorldDiplomacy() {
+  return request<WorldDiplomacyPayload>('/api/world/diplomacy')
+}
+
+export function getWorldPolitics() {
+  return request<WorldPoliticsPayload>('/api/world/politics')
 }
 
 export function getResidents() {
@@ -693,6 +830,27 @@ export function getWorldTransport() {
   return request<WorldTransportPayload>('/api/world/transport')
 }
 
+export interface GenerationalTimelineEntry {
+  tick: number
+  type: string
+  resident_id?: string | null
+  resident_name: string
+  summary: string
+}
+
+export interface WorldDemographicsPayload {
+  age_distribution: Record<string, number>
+  aging_index: number
+  average_age: number
+  retired_count: number
+  recent_deaths: number
+  generational_timeline: GenerationalTimelineEntry[]
+}
+
+export function getWorldDemographics() {
+  return request<WorldDemographicsPayload>('/api/world/demographics')
+}
+
 export interface RelationshipHistoryPoint {
   tick: number
   time: string
@@ -826,12 +984,57 @@ export interface WorldCulturePayload {
   talent_rankings: CultureTalentRanking[]
 }
 
+export interface ReligionDistribution {
+  religion: string
+  label: string
+  count: number
+  share: number
+}
+
+export interface MoralityPoint {
+  tick: number
+  morality_index: number
+}
+
+export interface ReligiousEvent {
+  religion: string
+  event_type: string
+  name: string
+  venue_id: string
+  leader_id: string
+  participants: string[]
+  tick_start: number
+  duration: number
+  town_mood_boost: number
+  morality_boost: number
+}
+
+export interface ReligionLeader {
+  resident_id: string
+  resident_name: string
+  religion: string
+  piety: number
+  reputation: number
+}
+
+export interface WorldReligionPayload {
+  distribution: ReligionDistribution[]
+  morality_index: number
+  morality_history: MoralityPoint[]
+  events: ReligiousEvent[]
+  leaders: ReligionLeader[]
+}
+
 export function getWorldEducation() {
   return request<WorldEducationCourse[]>('/api/world/education')
 }
 
 export function getWorldCulture() {
   return request<WorldCulturePayload>('/api/world/culture')
+}
+
+export function getWorldReligion() {
+  return request<WorldReligionPayload>('/api/world/religion')
 }
 
 export function getWorldHealth() {
@@ -1085,6 +1288,51 @@ export interface WorldEconomyPayload {
   gdp_history: Array<{ tick: number; gdp: number }>
 }
 
+export interface FashionTrend {
+  color_name: string
+  color: string
+  style: string
+  category: string
+  started_tick: number
+}
+
+export interface FashionRankingEntry {
+  resident_id: string
+  resident_name: string
+  style_score: number
+  clothing: string
+  current_outfit: string
+  accent_color: string
+  trend_match: boolean
+  designed_by_tailor: boolean
+}
+
+export interface FashionConsumptionEntry {
+  tick: number
+  resident_id: string
+  resident_name: string
+  price: number
+  category: string
+  color_name: string
+  style: string
+  item_name: string
+  designed_by?: string | null
+}
+
+export interface WorldFashionPayload {
+  current_trend: FashionTrend
+  trend_history: FashionTrend[]
+  rankings: FashionRankingEntry[]
+  consumption: {
+    total_purchases: number
+    total_spent: number
+    average_spend: number
+    top_category?: string | null
+    top_color?: string | null
+    recent_purchases: FashionConsumptionEntry[]
+  }
+}
+
 export function getAchievementLeaderboard() {
   return request<AchievementLeaderboardEntry[]>('/api/world/achievements/leaderboard')
 }
@@ -1095,6 +1343,10 @@ export function getResidentJob(id: string) {
 
 export function getWorldEconomy() {
   return request<WorldEconomyPayload>('/api/world/economy')
+}
+
+export function getWorldFashion() {
+  return request<WorldFashionPayload>('/api/world/fashion')
 }
 
 export function getReputationRankings() {

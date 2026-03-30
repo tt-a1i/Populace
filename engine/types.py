@@ -65,6 +65,19 @@ else:
         cart = "cart"
 
 
+    class Party(str, Enum):
+        progressive = "progressive"
+        conservative = "conservative"
+        neutral = "neutral"
+
+
+    class Religion(str, Enum):
+        naturalism = "naturalism"
+        ancestor_worship = "ancestor_worship"
+        solarsm = "solarsm"
+        none = "none"
+
+
     # ---------------------------------------------------------------------------
     # Neo4j node types (§4.5)
     # ---------------------------------------------------------------------------
@@ -144,6 +157,20 @@ else:
         work_streak: int = 0
 
     @dataclass
+    class Policy:
+        type: str
+        effect: Dict[str, float] = field(default_factory=dict)
+        duration: int = 0
+        issued_tick: int = 0
+
+    @dataclass
+    class Mayor:
+        resident_id: str
+        term_start: int
+        term_end: int
+        policies: List["Policy"] = field(default_factory=list)
+
+    @dataclass
     class Course:
         subject: str
         name: str
@@ -175,6 +202,15 @@ else:
         participants: List[str] = field(default_factory=list)
 
     @dataclass
+    class Disaster:
+        type: str
+        severity: float
+        affected_buildings: List[str] = field(default_factory=list)
+        tick_start: int = 0
+        duration: int = 0
+        casualties: int = 0
+
+    @dataclass
     class CulturalEvent:
         type: str
         name: str
@@ -183,6 +219,19 @@ else:
         participants: List[str] = field(default_factory=list)
         tick_start: int = 0
         duration: int = 0
+
+    @dataclass
+    class ReligiousEvent:
+        religion: str
+        event_type: str
+        name: str
+        venue_id: str
+        leader_id: str
+        participants: List[str] = field(default_factory=list)
+        tick_start: int = 0
+        duration: int = 0
+        town_mood_boost: float = 0.0
+        morality_boost: float = 0.0
 
     @dataclass
     class BulletinPost:
@@ -224,6 +273,41 @@ else:
         salary: float = 0.0
         work_hours: List[int] = field(default_factory=lambda: [8, 12, 13, 17])
         satisfaction: float = 0.5
+
+    @dataclass
+    class ClothingItem:
+        id: str
+        name: str
+        category: str = "casual"
+        color_name: str = "sky"
+        color: str = "#38BDF8"
+        style: str = "classic"
+        price: float = 8.0
+        quality: float = 0.4
+        designed_by: Optional[str] = None
+
+    @dataclass
+    class Appearance:
+        hair: str = "short"
+        clothing: str = "casual"
+        style_score: float = 0.35
+
+    @dataclass
+    class ExternalTown:
+        name: str
+        relation_score: float = 0.0
+        trade_balance: float = 0.0
+        ambassador_id: Optional[str] = None
+        specialties: List[str] = field(default_factory=list)
+
+    @dataclass
+    class TradeRoute:
+        from_town: str
+        to_town: str
+        goods: List[str] = field(default_factory=list)
+        profit_per_tick: float = 0.0
+        merchant_id: Optional[str] = None
+        rare_goods: List[str] = field(default_factory=list)
 
     @dataclass
     class Achievement:
@@ -278,9 +362,16 @@ else:
         energy: float = 1.0
         transport_mode: "TransportMode" = TransportMode.walk
         age_days: int = 0
+        age_stage: str = "child"
+        retirement_tick: Optional[int] = None
+        inheritance: Dict[str, object] = field(default_factory=dict)
         mood_history: List["MoodEntry"] = field(default_factory=list)
         mental_state: str = "stable"
         low_mood_ticks: int = 0
+        party: "Party" = Party.neutral
+        religion: "Religion" = Religion.none
+        piety: float = 0.0
+        morality_score: float = 0.5
         safety_feeling: float = 1.0
         flagged_for_crime: bool = False
         reputation: float = 0.0
@@ -289,6 +380,8 @@ else:
         artistic_talent: float = 0.0
         health: "Health" = field(default_factory=Health)
         family: "FamilyInfo" = field(default_factory=FamilyInfo)
+        appearance: "Appearance" = field(default_factory=Appearance)
+        wardrobe: List["ClothingItem"] = field(default_factory=list)
         achievements: List["Achievement"] = field(default_factory=list)
         memories: List["Memory"] = field(default_factory=list)
         pets: List["Pet"] = field(default_factory=list)
@@ -411,6 +504,8 @@ else:
         x: int
         y: int
         action: str
+        outfit_color: Optional[str] = None
+        appearance: Optional["Appearance"] = None
 
 
     @dataclass
@@ -498,6 +593,8 @@ else:
         hair_style: Optional[str] = None
         hair_color: Optional[str] = None
         outfit_color: Optional[str] = None
+        appearance: Optional["Appearance"] = None
+        wardrobe: List["ClothingItem"] = field(default_factory=list)
         coins: int = 100
         occupation: str = "unemployed"
         skills: Dict[str, float] = field(default_factory=dict)
@@ -541,6 +638,12 @@ else:
         status: str = "started"
         memorial: Optional[str] = None
 
+    @dataclass
+    class DisasterUpdate:
+        disaster: "Disaster"
+        status: str = "started"
+        memorial: Optional[str] = None
+
 
     @dataclass
     class TickState:
@@ -563,6 +666,7 @@ else:
         vote_updates: List["VoteUpdate"] = field(default_factory=list)
         vote_announcements: List["VoteUpdate"] = field(default_factory=list)
         festival_updates: List["FestivalUpdate"] = field(default_factory=list)
+        disaster_updates: List["DisasterUpdate"] = field(default_factory=list)
 
 
     # ---------------------------------------------------------------------------

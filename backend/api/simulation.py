@@ -45,7 +45,7 @@ from backend.api.schemas import (
 )
 from backend.core.simulation import SimulationLoop
 from backend.llm.client import validate_llm_config
-from engine.types import BulletinPost, EventUpdate, Festival, FestivalUpdate, RelationType, VoteUpdate
+from engine.types import BulletinPost, Disaster, DisasterUpdate, EventUpdate, Festival, FestivalUpdate, Party, RelationType, VoteUpdate
 
 
 router = APIRouter(prefix="/api/simulation", tags=["simulation"])
@@ -129,6 +129,29 @@ _FESTIVAL_BLUEPRINTS: dict[str, dict[str, Any]] = {
     },
 }
 
+_DISASTER_BLUEPRINTS: dict[str, dict[str, Any]] = {
+    "flood": {
+        "duration": 14,
+        "goal": "撤离洪水区域",
+        "description": "连续暴雨引发洪水，低洼建筑和道路都在告急。",
+    },
+    "fire": {
+        "duration": 8,
+        "goal": "远离火场",
+        "description": "火势突然蔓延，附近居民需要立刻撤离。",
+    },
+    "earthquake": {
+        "duration": 6,
+        "goal": "前往空旷地避险",
+        "description": "地震震动了整座小镇，多处建筑出现裂缝。",
+    },
+    "drought": {
+        "duration": 16,
+        "goal": "节约资源并支援受影响区域",
+        "description": "干旱持续扩大，储备物资和水源都变得紧张。",
+    },
+}
+
 
 def _mood_score(mood: str | None) -> float:
     if not mood:
@@ -173,13 +196,24 @@ class SimulationState:
         self._world_timeline: list[dict[str, Any]] = []
         self._population_history: list[dict[str, Any]] = []
         self._trade_history: list[dict[str, Any]] = []
+        self._diplomacy_ledger: list[dict[str, Any]] = []
+        self._diplomacy_last_route_tick: dict[str, int] = {}
+        self._diplomacy_event_log: list[dict[str, Any]] = []
         self._bulletin_posts: list[dict[str, Any]] = []
         self._bulletin_hot_topics: list[dict[str, Any]] = []
         self._bulletin_last_post_tick: dict[str, int] = {}
         self._active_votes: list[dict[str, Any]] = []
         self._vote_history: list[dict[str, Any]] = []
+        self._current_mayor: dict[str, Any] | None = None
+        self._political_satisfaction: float = 0.5
+        self._political_satisfaction_history: list[dict[str, Any]] = []
+        self._low_satisfaction_ticks: int = 0
+        self._last_policy_tick: int = 0
         self._active_festivals: list[dict[str, Any]] = []
         self._festival_history: list[dict[str, Any]] = []
+        self._active_disasters: list[dict[str, Any]] = []
+        self._disaster_history: list[dict[str, Any]] = []
+        self._consecutive_rainy_ticks: int = 0
         self.building_visit_log: list[dict[str, Any]] = []
         self._timeline_id_counter: int = 0
         # Quest system
@@ -339,13 +373,24 @@ class SimulationState:
         self._world_timeline = []
         self._population_history = []
         self._trade_history = []
+        self._diplomacy_ledger = []
+        self._diplomacy_last_route_tick = {}
+        self._diplomacy_event_log = []
         self._bulletin_posts = []
         self._bulletin_hot_topics = []
         self._bulletin_last_post_tick = {}
         self._active_votes = []
         self._vote_history = []
+        self._current_mayor = None
+        self._political_satisfaction = 0.5
+        self._political_satisfaction_history = []
+        self._low_satisfaction_ticks = 0
+        self._last_policy_tick = 0
         self._active_festivals = []
         self._festival_history = []
+        self._active_disasters = []
+        self._disaster_history = []
+        self._consecutive_rainy_ticks = 0
         self._timeline_id_counter = 0
         self._active_quests = []
         self._completed_quests = []
@@ -446,15 +491,40 @@ class SimulationState:
             "world_timeline": list(getattr(self, "_world_timeline", [])),
             "population_history": list(getattr(self, "_population_history", [])),
             "trade_history": list(getattr(self, "_trade_history", [])),
+            "diplomacy_ledger": list(getattr(self, "_diplomacy_ledger", [])),
+            "diplomacy_last_route_tick": {
+                key: int(value) for key, value in getattr(self, "_diplomacy_last_route_tick", {}).items()
+            },
+            "diplomacy_event_log": list(getattr(self, "_diplomacy_event_log", [])),
             "economic_output": float(getattr(self.world, "economic_output", 0.0)),
             "gdp_history": list(getattr(self.world, "gdp_history", [])),
+            "fashion_trend": dict(getattr(self.world, "fashion_trend", {})),
+            "fashion_trend_history": list(getattr(self.world, "fashion_trend_history", [])),
+            "fashion_purchase_history": list(getattr(self.world, "fashion_purchase_history", [])),
+            "fashion_design_history": list(getattr(self.world, "fashion_design_history", [])),
+            "external_towns": [
+                _asdict(item) if is_dataclass(item) else dict(item)
+                for item in getattr(self.world, "external_towns", [])
+            ],
+            "trade_routes": [
+                _asdict(item) if is_dataclass(item) else dict(item)
+                for item in getattr(self.world, "trade_routes", [])
+            ],
             "bulletin_posts": list(getattr(self, "_bulletin_posts", [])),
             "bulletin_hot_topics": list(getattr(self, "_bulletin_hot_topics", [])),
             "bulletin_last_post_tick": dict(getattr(self, "_bulletin_last_post_tick", {})),
             "active_votes": list(getattr(self, "_active_votes", [])),
             "vote_history": list(getattr(self, "_vote_history", [])),
+            "current_mayor": getattr(self, "_current_mayor", None),
+            "political_satisfaction": float(getattr(self, "_political_satisfaction", 0.5)),
+            "political_satisfaction_history": list(getattr(self, "_political_satisfaction_history", [])),
+            "low_satisfaction_ticks": int(getattr(self, "_low_satisfaction_ticks", 0)),
+            "last_policy_tick": int(getattr(self, "_last_policy_tick", 0)),
             "active_festivals": list(getattr(self, "_active_festivals", [])),
             "festival_history": list(getattr(self, "_festival_history", [])),
+            "active_disasters": list(getattr(self, "_active_disasters", [])),
+            "disaster_history": list(getattr(self, "_disaster_history", [])),
+            "consecutive_rainy_ticks": int(getattr(self, "_consecutive_rainy_ticks", 0)),
             "timeline_id_counter": getattr(self, "_timeline_id_counter", 0),
             "rel_events_fired": [list(x) for x in getattr(self, "_rel_events_fired", set())],
             "buildings_visited": {k: list(v) for k, v in getattr(self, "_buildings_visited", {}).items()},
@@ -468,6 +538,8 @@ class SimulationState:
             "stray_pets": [_asdict(pet) for pet in getattr(self.world, "stray_pets", [])],
             "cultural_events": [_asdict(event) for event in getattr(self.world, "cultural_events", [])],
             "culture_prosperity_history": list(getattr(self.world, "culture_prosperity_history", [])),
+            "religious_events": [_asdict(event) for event in getattr(self.world, "religious_events", [])],
+            "morality_history": list(getattr(self.world, "morality_history", [])),
         }
 
     async def load_state(self, data: dict[str, Any]) -> None:
@@ -476,8 +548,8 @@ class SimulationState:
         from engine.generative_agent import GenerativeAgent
         from engine.memory import MemoryStream
         from engine.types import (
-            Achievement, Building, Course, CourseHistoryEntry, CulturalEvent, DiaryEntry, Education, Health, Illness, Item, Job, Memory, MoodEntry, Reflection,
-            Pet, Relationship, RelationType, Resident, WorldConfig,
+            Achievement, Appearance, Building, ClothingItem, Course, CourseHistoryEntry, CulturalEvent, DiaryEntry, Education, ExternalTown, Health, Illness, Item, Job, Memory, MoodEntry, Reflection,
+            Pet, Party, Religion, Relationship, RelationType, ReligiousEvent, Resident, TradeRoute, WorldConfig,
         )
         from engine.world import World
 
@@ -504,6 +576,9 @@ class SimulationState:
         self._world_timeline = []
         self._population_history = []
         self._trade_history = []
+        self._diplomacy_ledger = []
+        self._diplomacy_last_route_tick = {}
+        self._diplomacy_event_log = []
         self._bulletin_posts = []
         self._bulletin_hot_topics = []
         self._bulletin_last_post_tick = {}
@@ -511,6 +586,9 @@ class SimulationState:
         self._vote_history = []
         self._active_festivals = []
         self._festival_history = []
+        self._active_disasters = []
+        self._disaster_history = []
+        self._consecutive_rainy_ticks = 0
         self._timeline_id_counter = 0
         self._active_quests = []
         self._completed_quests = []
@@ -521,6 +599,10 @@ class SimulationState:
 
         world = World(config=config)
         world.current_tick = data.get("tick", 0)
+        world.fashion_trend = dict(data.get("fashion_trend", getattr(world, "fashion_trend", {})))
+        world.fashion_trend_history = list(data.get("fashion_trend_history", getattr(world, "fashion_trend_history", [])))
+        world.fashion_purchase_history = list(data.get("fashion_purchase_history", []))
+        world.fashion_design_history = list(data.get("fashion_design_history", []))
 
         # Restore buildings
         for b in data.get("buildings", []):
@@ -553,6 +635,8 @@ class SimulationState:
                 hair_style=res_data.get("hair_style"),
                 hair_color=res_data.get("hair_color"),
                 outfit_color=res_data.get("outfit_color"),
+                appearance=Appearance(**res_data.get("appearance", {})) if res_data.get("appearance") else Appearance(),
+                wardrobe=[ClothingItem(**item) for item in res_data.get("wardrobe", [])],
                 current_goal=res_data.get("current_goal"),
                 coins=res_data.get("coins", 100),
                 occupation=res_data.get("occupation", "unemployed"),
@@ -566,6 +650,10 @@ class SimulationState:
                 mood_history=[MoodEntry(**entry) for entry in res_data.get("mood_history", [])],
                 mental_state=res_data.get("mental_state", "stable"),
                 low_mood_ticks=int(res_data.get("low_mood_ticks", 0)),
+                party=res_data.get("party", Party.neutral),
+                religion=Religion(res_data.get("religion", "none")),
+                piety=float(res_data.get("piety", 0.0)),
+                morality_score=float(res_data.get("morality_score", 0.5)),
                 health=Health(
                     hp=float(res_data.get("health", {}).get("hp", 1.0)),
                     illness=Illness(**res_data["health"]["illness"]) if res_data.get("health", {}).get("illness") else None,
@@ -606,9 +694,13 @@ class SimulationState:
         world.stray_pets = [Pet(**pet) for pet in data.get("stray_pets", [])]
         world.cultural_events = [CulturalEvent(**event) for event in data.get("cultural_events", [])]
         world.culture_prosperity_history = list(data.get("culture_prosperity_history", []))
+        world.religious_events = [ReligiousEvent(**event) for event in data.get("religious_events", [])]
+        world.morality_history = list(data.get("morality_history", []))
         world._rebuild_pet_registry()
         world.economic_output = float(data.get("economic_output", 0.0))
         world.gdp_history = list(data.get("gdp_history", []))
+        world.external_towns = [ExternalTown(**town) for town in data.get("external_towns", [])]
+        world.trade_routes = [TradeRoute(**route) for route in data.get("trade_routes", [])]
 
         # Restore relationships
         for rel_data in data.get("relationships", []):
@@ -646,13 +738,26 @@ class SimulationState:
         self._world_timeline = list(data.get("world_timeline", []))
         self._population_history = list(data.get("population_history", []))
         self._trade_history = list(data.get("trade_history", []))
+        self._diplomacy_ledger = list(data.get("diplomacy_ledger", []))
+        self._diplomacy_last_route_tick = {
+            key: int(value) for key, value in data.get("diplomacy_last_route_tick", {}).items()
+        }
+        self._diplomacy_event_log = list(data.get("diplomacy_event_log", []))
         self._bulletin_posts = list(data.get("bulletin_posts", []))
         self._bulletin_hot_topics = list(data.get("bulletin_hot_topics", []))
         self._bulletin_last_post_tick = {k: int(v) for k, v in data.get("bulletin_last_post_tick", {}).items()}
         self._active_votes = list(data.get("active_votes", []))
         self._vote_history = list(data.get("vote_history", []))
+        self._current_mayor = data.get("current_mayor")
+        self._political_satisfaction = float(data.get("political_satisfaction", 0.5))
+        self._political_satisfaction_history = list(data.get("political_satisfaction_history", []))
+        self._low_satisfaction_ticks = int(data.get("low_satisfaction_ticks", 0))
+        self._last_policy_tick = int(data.get("last_policy_tick", 0))
         self._active_festivals = list(data.get("active_festivals", []))
         self._festival_history = list(data.get("festival_history", []))
+        self._active_disasters = list(data.get("active_disasters", []))
+        self._disaster_history = list(data.get("disaster_history", []))
+        self._consecutive_rainy_ticks = int(data.get("consecutive_rainy_ticks", 0))
         self._timeline_id_counter = data.get("timeline_id_counter", 0)
         self._rel_events_fired = {tuple(x) for x in data.get("rel_events_fired", [])}
         self._buildings_visited = {k: set(v) for k, v in data.get("buildings_visited", {}).items()}
@@ -816,8 +921,11 @@ class SimulationState:
             ],
             "active_votes": list(getattr(self, "_active_votes", [])),
             "vote_history": list(getattr(self, "_vote_history", []))[-20:],
+            "politics": self.get_politics_overview(),
             "active_festivals": list(getattr(self, "_active_festivals", [])),
             "festival_history": list(getattr(self, "_festival_history", []))[-20:],
+            "active_disasters": list(getattr(self, "_active_disasters", [])),
+            "disaster_history": list(getattr(self, "_disaster_history", []))[-20:],
         }
 
     def _build_replay_snapshot(self) -> dict[str, Any]:
@@ -870,6 +978,387 @@ class SimulationState:
             self._active_votes = []
         if not hasattr(self, "_vote_history"):
             self._vote_history = []
+
+    def _ensure_politics_state(self) -> None:
+        if not hasattr(self, "_current_mayor"):
+            self._current_mayor = None
+        if not hasattr(self, "_political_satisfaction"):
+            self._political_satisfaction = 0.5
+        if not hasattr(self, "_political_satisfaction_history"):
+            self._political_satisfaction_history = []
+        if not hasattr(self, "_low_satisfaction_ticks"):
+            self._low_satisfaction_ticks = 0
+        if not hasattr(self, "_last_policy_tick"):
+            self._last_policy_tick = 0
+
+        for agent in self.world.agents:
+            self.world._ensure_resident_party(agent.resident)
+
+        if (
+            self._current_mayor is None
+            and self.world.agents
+            and not self._political_satisfaction_history
+            and self._active_political_vote() is None
+            and not any(
+                vote.get("category") in {"mayor_election", "impeachment"}
+                for vote in getattr(self, "_vote_history", [])
+            )
+            and int(self.world.current_tick) < 500
+        ):
+            current_tick = int(self.world.current_tick)
+            cycle_start = current_tick - (current_tick % 500)
+            candidates = self._rank_political_candidates(limit=1)
+            if candidates:
+                self._appoint_mayor(candidates[0]["resident_id"], start_tick=cycle_start, term_length=500)
+
+    def _rank_political_candidates(self, *, limit: int = 3) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for agent in self.world.agents:
+            resident = agent.resident
+            self.world._ensure_resident_party(resident)
+            social_trust = sum(
+                float(rel.intensity) + float(rel.familiarity)
+                for rel in self.world.relationships.values()
+                if rel.to_id == resident.id and rel.type in {RelationType.friendship, RelationType.trust, RelationType.love}
+            )
+            score = (
+                float(getattr(resident, "reputation", 0.0)) * 0.6
+                + max(0.0, _mood_score(getattr(resident, "mood", "neutral"))) * 0.12
+                + float(getattr(getattr(resident, "job", None), "satisfaction", 0.5)) * 0.18
+                + min(0.25, social_trust * 0.05)
+            )
+            rows.append(
+                {
+                    "resident_id": resident.id,
+                    "resident_name": resident.name,
+                    "party": resident.party.value if hasattr(resident.party, "value") else str(resident.party),
+                    "reputation": round(float(getattr(resident, "reputation", 0.0)), 3),
+                    "score": round(score, 4),
+                }
+            )
+        rows.sort(key=lambda item: (-item["score"], -item["reputation"], item["resident_name"], item["resident_id"]))
+        return rows[:limit]
+
+    def _serialize_policy(self, policy: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "type": str(policy.get("type", "")),
+            "effect": {
+                str(key): round(float(value), 3)
+                for key, value in dict(policy.get("effect", {})).items()
+            },
+            "duration": max(0, int(policy.get("duration", 0))),
+            "issued_tick": int(policy.get("issued_tick", 0)),
+        }
+
+    def _serialize_mayor(self) -> dict[str, Any] | None:
+        self._ensure_politics_state()
+        mayor = self._current_mayor
+        if mayor is None:
+            return None
+        agent = self.world.get_agent(str(mayor.get("resident_id", "")))
+        if agent is None:
+            return None
+        self.world._ensure_resident_party(agent.resident)
+        return {
+            "resident_id": agent.resident.id,
+            "resident_name": agent.resident.name,
+            "party": str(mayor.get("party") or agent.resident.party.value),
+            "term_start": int(mayor.get("term_start", 0)),
+            "term_end": int(mayor.get("term_end", 0)),
+            "approval": round(float(self._political_satisfaction), 3),
+        }
+
+    def _appoint_mayor(self, resident_id: str, *, start_tick: int | None = None, term_length: int = 500) -> dict[str, Any] | None:
+        agent = self.world.get_agent(resident_id)
+        if agent is None:
+            return None
+        self.world._ensure_resident_party(agent.resident)
+        start = int(self.world.current_tick if start_tick is None else start_tick)
+        self._current_mayor = {
+            "resident_id": resident_id,
+            "term_start": start,
+            "term_end": start + term_length,
+            "party": agent.resident.party.value,
+            "policies": [],
+        }
+        self._add_timeline_event(
+            "mayor_appointed",
+            f"{agent.resident.name} 成为新一任镇长。",
+            {"resident_id": resident_id, "party": agent.resident.party.value},
+        )
+        return self._current_mayor
+
+    def _active_political_vote(self) -> dict[str, Any] | None:
+        for vote in getattr(self, "_active_votes", []):
+            if vote.get("category") in {"mayor_election", "impeachment"}:
+                return vote
+        return None
+
+    def _compute_public_satisfaction(self) -> float:
+        residents = [agent.resident for agent in self.world.agents]
+        if not residents:
+            return 0.5
+        avg_mood = sum(_mood_score(getattr(resident, "mood", "neutral")) for resident in residents) / len(residents)
+        avg_safety = sum(float(getattr(resident, "safety_feeling", 1.0)) for resident in residents) / len(residents)
+        economic_buffer = min(1.0, float(getattr(self.world, "economic_output", 0.0)) / 200.0)
+        unresolved_crimes = sum(1 for event in self.world.get_crime_log() if not event.resolved)
+        policy_delta = 0.0
+        if self._current_mayor is not None:
+            for policy in self._current_mayor.get("policies", []):
+                policy_delta += float(policy.get("effect", {}).get("satisfaction_delta", 0.0))
+        raw = 0.45 + avg_mood * 0.18 + avg_safety * 0.22 + economic_buffer * 0.08 + policy_delta - min(0.22, unresolved_crimes * 0.03)
+        return round(max(0.0, min(1.0, raw)), 3)
+
+    def _stabilize_public_satisfaction(self) -> float:
+        target = self._compute_public_satisfaction()
+        current = max(0.0, min(1.0, float(getattr(self, "_political_satisfaction", target))))
+        delta = max(-0.08, min(0.08, target - current))
+        self._political_satisfaction = round(max(0.0, min(1.0, current + delta)), 3)
+        return self._political_satisfaction
+
+    def _schedule_political_vote(
+        self,
+        *,
+        issue: str,
+        options: list[str],
+        category: str,
+        duration_ticks: int,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        self._ensure_vote_state()
+        start_tick = self.world.current_tick
+        vote = {
+            "id": f"{category}-{start_tick}-{len(self._active_votes) + len(self._vote_history) + 1}",
+            "issue": issue,
+            "options": list(options),
+            "counts": {option: 0 for option in options},
+            "status": "active",
+            "start_tick": start_tick,
+            "end_tick": start_tick + duration_ticks,
+            "winning_option": None,
+            "result_announced": False,
+            "total_votes": 0,
+            "votes_by_resident": {},
+            "effects": [],
+            "category": category,
+            "metadata": metadata or {},
+        }
+        self._active_votes.append(vote)
+        self._add_timeline_event(
+            category,
+            issue,
+            {"options": list(options), **(metadata or {})},
+        )
+        return vote
+
+    def _maybe_start_mayor_election(self, *, reason: str = "term_end", duration_ticks: int = 12) -> dict[str, Any] | None:
+        self._ensure_politics_state()
+        if self._active_political_vote() is not None:
+            return None
+        candidates = self._rank_political_candidates(limit=min(3, len(self.world.agents)))
+        if len(candidates) < 2:
+            return None
+        options = [candidate["resident_name"] for candidate in candidates]
+        candidate_map = {candidate["resident_name"]: candidate["resident_id"] for candidate in candidates}
+        candidate_parties = {candidate["resident_id"]: candidate["party"] for candidate in candidates}
+        issue = "镇长选举" if reason != "impeachment" else "镇长补选"
+        return self._schedule_political_vote(
+            issue=issue,
+            options=options,
+            category="mayor_election",
+            duration_ticks=duration_ticks,
+            metadata={
+                "candidate_map": candidate_map,
+                "candidate_parties": candidate_parties,
+                "trigger": reason,
+            },
+        )
+
+    def _maybe_start_impeachment_vote(self, *, duration_ticks: int = 8) -> dict[str, Any] | None:
+        self._ensure_politics_state()
+        if self._current_mayor is None or self._active_political_vote() is not None:
+            return None
+        mayor_id = str(self._current_mayor.get("resident_id", ""))
+        mayor = self.world.get_agent(mayor_id)
+        mayor_name = mayor.resident.name if mayor is not None else mayor_id
+        return self._schedule_political_vote(
+            issue=f"是否弹劾现任镇长 {mayor_name}",
+            options=["支持弹劾", "维持现任"],
+            category="impeachment",
+            duration_ticks=duration_ticks,
+            metadata={
+                "mayor_id": mayor_id,
+                "mayor_name": mayor_name,
+                "party": str(self._current_mayor.get("party", "neutral")),
+            },
+        )
+
+    def _issue_policy(self) -> dict[str, Any] | None:
+        self._ensure_politics_state()
+        mayor = self._current_mayor
+        if mayor is None:
+            return None
+
+        unresolved_crimes = sum(1 for event in self.world.get_crime_log() if not event.resolved)
+        if unresolved_crimes >= 2:
+            policy_type = "security"
+        elif self._political_satisfaction < 0.45:
+            policy_type = "welfare"
+        elif float(getattr(self.world, "economic_output", 0.0)) < 80:
+            policy_type = "tax"
+        else:
+            party = str(mayor.get("party", "neutral"))
+            policy_type = "welfare" if party == Party.progressive.value else "tax" if party == Party.conservative.value else "security"
+
+        effect_map: dict[str, dict[str, float]] = {
+            "tax": {"reserve_delta": 22.0, "satisfaction_delta": -0.08},
+            "welfare": {"reserve_delta": -18.0, "mood_delta": 0.12, "satisfaction_delta": 0.06},
+            "security": {"safety_delta": 0.16, "crime_delta": -0.2, "satisfaction_delta": 0.03},
+        }
+        policy = {
+            "type": policy_type,
+            "effect": effect_map[policy_type],
+            "duration": 100,
+            "issued_tick": int(self.world.current_tick),
+        }
+        mayor.setdefault("policies", []).insert(0, policy)
+        mayor["policies"] = mayor["policies"][:6]
+        self._last_policy_tick = int(self.world.current_tick)
+
+        if policy_type == "tax":
+            self.world.economic_output = round(float(getattr(self.world, "economic_output", 0.0)) + 22.0, 2)
+        elif policy_type == "welfare":
+            self.world.economic_output = round(max(0.0, float(getattr(self.world, "economic_output", 0.0)) - 18.0), 2)
+            for agent in self.world.agents:
+                if _mood_score(agent.resident.mood) < 0.8:
+                    self.world.shift_resident_mood(agent, 1, "policy:welfare")
+        elif policy_type == "security":
+            for agent in self.world.agents:
+                agent.resident.safety_feeling = min(1.0, float(getattr(agent.resident, "safety_feeling", 1.0)) + 0.08)
+            unresolved = [event for event in self.world.crime_log if not event.resolved]
+            if unresolved:
+                unresolved[0].resolved = True
+
+        self._add_timeline_event(
+            "policy_issued",
+            f"镇长发布新政策：{policy_type}",
+            {"policy_type": policy_type, "effect": dict(policy["effect"])},
+        )
+        return policy
+
+    def _tick_political_policies(self) -> None:
+        mayor = self._current_mayor
+        if mayor is None:
+            return
+        next_policies: list[dict[str, Any]] = []
+        for policy in mayor.get("policies", []):
+            next_policy = dict(policy)
+            next_policy["duration"] = max(0, int(next_policy.get("duration", 0)) - 1)
+            policy_type = str(next_policy.get("type", ""))
+            if policy_type == "tax" and self.world.current_tick % 20 == 0:
+                self.world.economic_output = round(float(getattr(self.world, "economic_output", 0.0)) + 2.0, 2)
+            elif policy_type == "welfare" and self.world.current_tick % 20 == 0:
+                for agent in self.world.agents:
+                    if _mood_score(agent.resident.mood) < 0.3:
+                        self.world.shift_resident_mood(agent, 1, "policy:welfare")
+            elif policy_type == "security" and self.world.current_tick % 25 == 0:
+                unresolved = [event for event in self.world.crime_log if not event.resolved]
+                if unresolved:
+                    unresolved[0].resolved = True
+            if next_policy["duration"] > 0:
+                next_policies.append(next_policy)
+        mayor["policies"] = next_policies
+
+    def _update_politics_for_tick(self, tick_state: Any) -> None:
+        self._ensure_politics_state()
+        self._tick_political_policies()
+
+        satisfaction = self._stabilize_public_satisfaction()
+        self._political_satisfaction_history.append(
+            {"tick": int(self.world.current_tick), "satisfaction": satisfaction}
+        )
+        self._political_satisfaction_history = self._political_satisfaction_history[-120:]
+
+        if satisfaction < 0.3:
+            self._low_satisfaction_ticks += 1
+        else:
+            self._low_satisfaction_ticks = 0
+
+        if (
+            self._current_mayor is None
+            and self.world.current_tick > 0
+            and self._active_political_vote() is None
+            and not self._active_votes
+        ):
+            election = self._maybe_start_mayor_election(reason="impeachment", duration_ticks=10)
+            if election is not None:
+                tick_state.events.append(EventUpdate(description="镇长席位空缺，补选已经启动。"))
+
+        if (
+            self._current_mayor is not None
+            and self.world.current_tick > 0
+            and self.world.current_tick % 100 == 0
+            and self.world.current_tick - self._last_policy_tick >= 100
+            and self._active_political_vote() is None
+        ):
+            policy = self._issue_policy()
+            if policy is not None:
+                tick_state.events.append(EventUpdate(description=f"新政策发布：{policy['type']}"))
+
+        if (
+            self._current_mayor is not None
+            and int(self._current_mayor.get("term_end", 0)) <= int(self.world.current_tick)
+            and self._active_political_vote() is None
+        ):
+            election = self._maybe_start_mayor_election()
+            if election is not None:
+                tick_state.events.append(EventUpdate(description="新一轮镇长选举已经启动。"))
+
+        if self._low_satisfaction_ticks >= 120 and self._active_political_vote() is None:
+            impeachment = self._maybe_start_impeachment_vote()
+            if impeachment is not None:
+                self._low_satisfaction_ticks = 0
+                tick_state.events.append(EventUpdate(description="居民因长期不满发起了弹劾投票。"))
+
+        if self.world.current_tick % 50 == 0:
+            if self._active_political_vote() is not None:
+                tick_state.events.append(EventUpdate(description="镇上居民围绕选举和政策争论不休。"))
+            elif self._current_mayor is not None and self._current_mayor.get("policies"):
+                current_policy = self._current_mayor["policies"][0]
+                tick_state.events.append(EventUpdate(description=f"居民们正在讨论最新的 {current_policy['type']} 政策。"))
+
+    def get_politics_overview(self) -> dict[str, Any]:
+        self._ensure_politics_state()
+        active_election = self._active_political_vote()
+        party_distribution = Counter(
+            agent.resident.party.value if hasattr(agent.resident.party, "value") else str(agent.resident.party)
+            for agent in self.world.agents
+        )
+        mayor = self._serialize_mayor()
+        election_countdown = 500 - (self.world.current_tick % 500)
+        if mayor is not None:
+            election_countdown = max(0, int(mayor["term_end"]) - int(self.world.current_tick))
+        if active_election is not None:
+            election_countdown = max(0, int(active_election.get("end_tick", self.world.current_tick)) - int(self.world.current_tick))
+        return {
+            "mayor": mayor,
+            "active_policies": [] if self._current_mayor is None else [self._serialize_policy(policy) for policy in self._current_mayor.get("policies", [])],
+            "election_countdown": election_countdown,
+            "public_satisfaction": round(float(self._political_satisfaction), 3),
+            "party_distribution": {
+                Party.progressive.value: int(party_distribution.get(Party.progressive.value, 0)),
+                Party.conservative.value: int(party_distribution.get(Party.conservative.value, 0)),
+                Party.neutral.value: int(party_distribution.get(Party.neutral.value, 0)),
+            },
+            "active_election": None if active_election is None else {
+                "issue": str(active_election.get("issue", "")),
+                "total_votes": int(active_election.get("total_votes", 0)),
+                "status": str(active_election.get("status", "active")),
+            },
+            "impeachment_risk": self._political_satisfaction < 0.3 or any(
+                vote.get("category") == "impeachment" for vote in getattr(self, "_active_votes", [])
+            ),
+        }
 
     def create_vote(self, issue: str, options: list[str], duration_ticks: int) -> dict[str, Any]:
         self._ensure_vote_state()
@@ -925,6 +1414,50 @@ class SimulationState:
         option_text = option.lower()
         personality = (resident.personality or "").lower()
         mood = (resident.mood or "").lower()
+        category = str(vote.get("category", "community"))
+
+        if category == "mayor_election":
+            candidate_map = dict(vote.get("metadata", {}).get("candidate_map", {}))
+            candidate_id = candidate_map.get(option)
+            if candidate_id is None:
+                return 0.0
+            candidate_agent = self.world.get_agent(candidate_id)
+            if candidate_agent is None:
+                return 0.0
+            self.world._ensure_resident_party(resident)
+            self.world._ensure_resident_party(candidate_agent.resident)
+            score = float(getattr(candidate_agent.resident, "reputation", 0.0)) * 1.4
+            if resident.party == candidate_agent.resident.party:
+                score += 0.7
+            relationship = self.world.get_relationship(resident.id, candidate_id)
+            reverse = self.world.get_relationship(candidate_id, resident.id)
+            for current in (relationship, reverse):
+                if current is not None:
+                    score += float(current.intensity) * 0.55 + float(current.familiarity) * 0.18
+            if candidate_agent.resident.party == Party.progressive and any(keyword in personality for keyword in ("外向", "热心", "开放", "开朗")):
+                score += 0.25
+            if candidate_agent.resident.party == Party.conservative and any(keyword in personality for keyword in ("保守", "谨慎", "秩序", "稳定")):
+                score += 0.25
+            if mood in {"happy", "excited", "ecstatic", "content"}:
+                score += 0.1
+            elif mood in {"sad", "tired", "angry", "fearful"}:
+                score -= 0.08
+            return score
+
+        if category == "impeachment":
+            mayor_id = str(vote.get("metadata", {}).get("mayor_id", ""))
+            support_impeachment = "弹劾" in option
+            score = (0.45 - float(self._political_satisfaction)) * 1.8 if support_impeachment else float(self._political_satisfaction) * 1.4
+            if mayor_id:
+                relationship = self.world.get_relationship(resident.id, mayor_id)
+                reverse = self.world.get_relationship(mayor_id, resident.id)
+                affinity = 0.0
+                for current in (relationship, reverse):
+                    if current is not None:
+                        affinity += float(current.intensity) + float(current.familiarity) * 0.5
+                score += -affinity * 0.35 if support_impeachment else affinity * 0.3
+            return score
+
         score = 0.0
 
         proactive_keywords = ("建", "扩建", "举办", "开放", "增加", "改善", "支持", "公园", "park")
@@ -969,6 +1502,7 @@ class SimulationState:
     def _vote_participation_probability(self, agent: Any, vote: dict[str, Any]) -> float:
         personality = (agent.resident.personality or "").lower()
         mood = (agent.resident.mood or "").lower()
+        category = str(vote.get("category", "community"))
         probability = 0.45
         if any(keyword in personality for keyword in ("外向", "热心", "开朗", "社牛")):
             probability += 0.25
@@ -980,6 +1514,8 @@ class SimulationState:
             probability -= 0.05
 
         ticks_remaining = max(0, vote["end_tick"] - self.world.current_tick)
+        if category in {"mayor_election", "impeachment"}:
+            probability += 0.2
         if ticks_remaining <= 1:
             probability = 1.0
         return max(0.1, min(1.0, probability))
@@ -1003,9 +1539,33 @@ class SimulationState:
         effects: list[str] = []
         winning_option = vote.get("winning_option") or ""
         issue = vote.get("issue", "")
+        category = str(vote.get("category", "community"))
         combined = f"{issue}{winning_option}"
         combined_lower = combined.lower()
         support_markers = ("同意", "通过", "批准", "支持", "升级", "扩建", "豪华", "approve", "upgrade", "expand", "luxury")
+
+        if category == "mayor_election":
+            candidate_map = dict(vote.get("metadata", {}).get("candidate_map", {}))
+            winner_id = candidate_map.get(str(winning_option))
+            if winner_id:
+                mayor = self._appoint_mayor(winner_id, start_tick=int(self.world.current_tick), term_length=500)
+                if mayor is not None:
+                    winner = self.world.get_agent(winner_id)
+                    winner_name = winner.resident.name if winner is not None else str(winning_option)
+                    effects.append(f"{winner_name} 当选镇长")
+                    self._political_satisfaction = min(0.85, max(0.35, self._political_satisfaction + 0.05))
+            return effects
+
+        if category == "impeachment":
+            if "弹劾" in str(winning_option):
+                mayor_name = str(vote.get("metadata", {}).get("mayor_name", "现任镇长"))
+                self._current_mayor = None
+                self._last_policy_tick = int(self.world.current_tick)
+                effects.append(f"{mayor_name} 被弹劾下台")
+            else:
+                effects.append("现任镇长暂时保住职位")
+                self._political_satisfaction = max(0.2, self._political_satisfaction - 0.02)
+            return effects
 
         if "公园" in combined or "park" in combined_lower:
             park_count = sum(1 for building in self.world.buildings if building.type == "park")
@@ -1087,7 +1647,7 @@ class SimulationState:
                 vote["total_votes"] = len(votes_by_resident)
                 self.world.adjust_resident_reputation(resident_id, 0.02, "vote_participation")
 
-            should_finalize = self.world.current_tick >= vote["end_tick"] or len(votes_by_resident) >= len(self.world.agents)
+            should_finalize = self.world.current_tick >= vote["end_tick"]
             if should_finalize:
                 winning_option = max(
                     vote["options"],
@@ -1219,6 +1779,20 @@ class SimulationState:
             self._active_festivals = []
         if not hasattr(self, "_festival_history"):
             self._festival_history = []
+        if not hasattr(self, "_active_disasters"):
+            self._active_disasters = []
+        if not hasattr(self, "_disaster_history"):
+            self._disaster_history = []
+        if not hasattr(self, "_consecutive_rainy_ticks"):
+            self._consecutive_rainy_ticks = 0
+
+    def _ensure_disaster_state(self) -> None:
+        if not hasattr(self, "_active_disasters"):
+            self._active_disasters = []
+        if not hasattr(self, "_disaster_history"):
+            self._disaster_history = []
+        if not hasattr(self, "_consecutive_rainy_ticks"):
+            self._consecutive_rainy_ticks = 0
 
     def _ensure_bulletin_state(self) -> None:
         if not hasattr(self, "_bulletin_posts"):
@@ -1281,6 +1855,236 @@ class SimulationState:
             "hot_topics": list(self._bulletin_hot_topics),
         }
 
+    def _ensure_diplomacy_state(self) -> None:
+        from engine.diplomacy import generate_external_towns
+
+        if not hasattr(self, "_diplomacy_ledger"):
+            self._diplomacy_ledger = []
+        if not hasattr(self, "_diplomacy_last_route_tick"):
+            self._diplomacy_last_route_tick = {}
+        if not hasattr(self, "_diplomacy_event_log"):
+            self._diplomacy_event_log = []
+        if not hasattr(self.world, "external_towns"):
+            self.world.external_towns = []
+        if not hasattr(self.world, "trade_routes"):
+            self.world.trade_routes = []
+        if not self.world.external_towns:
+            seed = getattr(self.world.config, "seed", None)
+            self.world.external_towns = generate_external_towns(seed=seed)
+
+    def _assign_diplomatic_roles(self) -> None:
+        from engine.diplomacy import clamp
+
+        self._ensure_diplomacy_state()
+        residents = [agent.resident for agent in self.world.agents]
+        if not residents:
+            return
+
+        resident_ids = {resident.id for resident in residents}
+        ambassador_pool = sorted(
+            residents,
+            key=lambda resident: (
+                resident.skills.get("social", 0.0) + resident.reputation * 0.6,
+                resident.name,
+            ),
+            reverse=True,
+        )
+        assigned: set[str] = set()
+        for town in self.world.external_towns:
+            if town.ambassador_id in resident_ids and town.ambassador_id is not None:
+                assigned.add(town.ambassador_id)
+                continue
+            ambassador = next(
+                (resident for resident in ambassador_pool if resident.id not in assigned),
+                ambassador_pool[0],
+            )
+            town.ambassador_id = ambassador.id
+            assigned.add(ambassador.id)
+
+        for town in self.world.external_towns:
+            ambassador = next((resident for resident in residents if resident.id == town.ambassador_id), None)
+            if ambassador is None:
+                continue
+            relation_gain = ambassador.skills.get("social", 0.0) * 0.018 + ambassador.reputation * 0.012
+            town.relation_score = round(clamp(town.relation_score + relation_gain), 3)
+
+    def _open_trade_routes_if_needed(self) -> None:
+        from engine.diplomacy import select_rare_goods, select_trade_goods
+        from engine.types import TradeRoute
+
+        self._ensure_diplomacy_state()
+        if not self.world.external_towns:
+            return
+
+        routed_towns = {route.to_town for route in self.world.trade_routes}
+        available_towns = [town for town in self.world.external_towns if town.name not in routed_towns]
+        if not available_towns:
+            return
+
+        merchant_pool = [
+            agent.resident
+            for agent in self.world.agents
+            if getattr(agent.resident, "occupation", "") in {"merchant", "shopkeeper", "trader"}
+            or getattr(agent.resident.job, "title", "") in {"merchant", "shopkeeper", "trader"}
+            or agent.resident.skills.get("trading", 0.0) >= 0.45
+        ]
+        if not merchant_pool:
+            return
+
+        merchant = max(
+            merchant_pool,
+            key=lambda resident: (resident.skills.get("trading", 0.0), resident.reputation, resident.name),
+        )
+        town = max(
+            available_towns,
+            key=lambda candidate: (candidate.relation_score, len(candidate.specialties), candidate.name),
+        )
+        goods = select_trade_goods(town)
+        rare_goods = select_rare_goods(town, goods)
+        base_profit = round(10.0 + len(goods) * 1.2 + max(0.0, town.relation_score) * 4.5, 2)
+        self.world.trade_routes.append(
+            TradeRoute(
+                from_town="Populace",
+                to_town=town.name,
+                goods=goods,
+                profit_per_tick=base_profit,
+                merchant_id=merchant.id,
+                rare_goods=rare_goods,
+            )
+        )
+
+    def _update_diplomacy(self, tick_state: Any | None = None) -> None:
+        from engine.diplomacy import calculate_trade_profit, clamp, relation_status, route_id
+
+        self._ensure_diplomacy_state()
+        self._assign_diplomatic_roles()
+        self._open_trade_routes_if_needed()
+
+        if not self.world.trade_routes:
+            return
+
+        current_tick = int(self.world.current_tick)
+        safety_stats = self.world.get_safety_stats() if hasattr(self.world, "get_safety_stats") else {"safety_index": 0.8}
+        safety_index = float(safety_stats.get("safety_index", 0.8))
+        town_map = {town.name: town for town in self.world.external_towns}
+        resident_map = {agent.resident.id: agent.resident for agent in self.world.agents}
+        rng = getattr(self.world, "rng", random)
+
+        for route in self.world.trade_routes:
+            current_route_id = route_id(route)
+            last_tick = self._diplomacy_last_route_tick.get(current_route_id)
+            if last_tick is not None and current_tick - last_tick < 6:
+                continue
+
+            town = town_map.get(route.to_town)
+            if town is None:
+                continue
+            merchant = resident_map.get(route.merchant_id or "")
+            trading_skill = merchant.skills.get("trading", 0.3) if merchant is not None else 0.3
+            amount = calculate_trade_profit(route, town, trading_skill=trading_skill, safety_index=safety_index)
+            event_type = "profit"
+            description = f"{town.name} 本轮送来了稳定货运，路线盈利 {amount:.1f}。"
+
+            roll = rng.random()
+            relation_label = relation_status(town.relation_score)
+            if safety_index < 0.5 and roll < 0.18:
+                amount = round(amount * 0.58, 2)
+                event_type = "raided"
+                description = f"{town.name} 路线遭遇劫掠，本轮利润降至 {amount:.1f}。"
+                town.relation_score = round(clamp(town.relation_score - 0.03), 3)
+            elif relation_label == "friendly" and roll < 0.3:
+                amount = round(amount * 1.2, 2)
+                event_type = "harvest_bonus"
+                featured = town.specialties[0] if town.specialties else route.goods[-1]
+                description = f"{town.name} 本轮送来了高利润{featured}订单。"
+            elif relation_label != "tense" and roll < 0.22:
+                amount = round(amount * 1.08, 2)
+                event_type = "delegation"
+                description = f"{town.name} 派出访问代表团，推动了新一轮贸易合作。"
+                town.relation_score = round(clamp(town.relation_score + 0.02), 3)
+
+            town.trade_balance = round(town.trade_balance + amount, 2)
+            self.world._register_gdp(amount)
+            if merchant is not None:
+                merchant.wallet = round(merchant.wallet + amount * 0.35, 2)
+                if route.rare_goods:
+                    self.world.add_inventory_item(
+                        merchant,
+                        item_name=route.rare_goods[0],
+                        quantity=1,
+                        value=max(6, int(round(amount / 2))),
+                    )
+
+            ledger_entry = {
+                "tick": current_tick,
+                "type": event_type,
+                "town_name": town.name,
+                "route_id": current_route_id,
+                "amount": amount,
+                "description": description,
+            }
+            self._diplomacy_ledger.insert(0, ledger_entry)
+            self._diplomacy_ledger = self._diplomacy_ledger[:120]
+            self._diplomacy_event_log.insert(0, ledger_entry)
+            self._diplomacy_event_log = self._diplomacy_event_log[:120]
+            self._diplomacy_last_route_tick[current_route_id] = current_tick
+            if tick_state is not None:
+                tick_state.events.append(EventUpdate(description=description))
+
+    def get_diplomacy_overview(self) -> dict[str, Any]:
+        from engine.diplomacy import relation_status, route_id
+
+        self._ensure_diplomacy_state()
+        resident_map = {agent.resident.id: agent.resident.name for agent in self.world.agents}
+
+        towns = [
+            {
+                "name": town.name,
+                "relation_score": round(float(town.relation_score), 3),
+                "relation_status": relation_status(float(town.relation_score)),
+                "trade_balance": round(float(town.trade_balance), 2),
+                "ambassador_id": town.ambassador_id,
+                "ambassador_name": resident_map.get(town.ambassador_id or ""),
+                "specialties": list(town.specialties),
+            }
+            for town in sorted(self.world.external_towns, key=lambda item: item.name)
+        ]
+        trade_routes = [
+            {
+                "id": route_id(route),
+                "from_town": route.from_town,
+                "to_town": route.to_town,
+                "goods": list(route.goods),
+                "profit_per_tick": round(float(route.profit_per_tick), 2),
+                "merchant_id": route.merchant_id,
+                "merchant_name": resident_map.get(route.merchant_id or ""),
+                "relation_status": relation_status(float(next((town.relation_score for town in self.world.external_towns if town.name == route.to_town), 0.0))),
+                "rare_goods": list(route.rare_goods),
+            }
+            for route in self.world.trade_routes
+        ]
+        ledger = [
+            {
+                "tick": int(entry.get("tick", 0)),
+                "type": str(entry.get("type", "profit")),
+                "town_name": str(entry.get("town_name", "")),
+                "route_id": str(entry.get("route_id", "")),
+                "amount": round(float(entry.get("amount", 0.0)), 2),
+                "description": str(entry.get("description", "")),
+            }
+            for entry in list(self._diplomacy_ledger)[:20]
+        ]
+        return {
+            "towns": towns,
+            "trade_routes": trade_routes,
+            "summary": {
+                "active_routes": len(trade_routes),
+                "total_profit": round(sum(entry["amount"] for entry in ledger), 2),
+                "total_trade_balance": round(sum(town["trade_balance"] for town in towns), 2),
+            },
+            "ledger": ledger,
+        }
+
     def get_festivals(self) -> dict[str, list[dict[str, Any]]]:
         self._ensure_festival_state()
         current = sorted(
@@ -1294,6 +2098,231 @@ class SimulationState:
             reverse=True,
         )
         return {"current": current, "history": history}
+
+    def get_disasters(self) -> dict[str, Any]:
+        self._ensure_disaster_state()
+        current = sorted(
+            [dict(item) for item in self._active_disasters],
+            key=lambda item: item.get("tick_start", 0),
+            reverse=True,
+        )
+        history = sorted(
+            [dict(item) for item in self._disaster_history],
+            key=lambda item: item.get("tick_start", 0),
+            reverse=True,
+        )
+        combined = [*current, *history]
+        affected_buildings = {
+            building_id
+            for entry in combined
+            for building_id in entry.get("affected_buildings", [])
+        }
+        reserve_spent = round(sum(float(entry.get("reserve_spent", 0.0)) for entry in combined), 2)
+        by_type = Counter(str(entry.get("type", "unknown")) for entry in combined)
+        return {
+            "current": current,
+            "history": history,
+            "summary": {
+                "active_count": len(current),
+                "history_count": len(history),
+                "affected_buildings": len(affected_buildings),
+                "total_casualties": sum(int(entry.get("casualties", 0)) for entry in combined),
+                "reserve_spent": reserve_spent,
+                "by_type": dict(by_type),
+            },
+        }
+
+    def _disaster_candidate_buildings(self, disaster_type: str) -> list[str]:
+        preferred = {
+            "flood": {"home", "house", "residence", "shop", "school", "cafe"},
+            "fire": {"home", "house", "residence", "cafe", "shop", "clinic"},
+            "earthquake": {"home", "house", "residence", "school", "clinic", "hospital", "shop"},
+            "drought": {"home", "house", "residence", "school", "shop", "cafe"},
+        }.get(disaster_type, set())
+        candidates = [
+            building
+            for building in self.world.buildings
+            if not preferred or building.type in preferred
+        ]
+        candidates.sort(key=lambda building: (-getattr(building, "level", 1), building.id))
+        return [building.id for building in candidates]
+
+    def _has_overlapping_disaster(self, disaster_type: str, start_tick: int) -> bool:
+        self._ensure_disaster_state()
+        for disaster in [*self._active_disasters, *self._disaster_history]:
+            if disaster.get("type") != disaster_type:
+                continue
+            duration = max(1, int(disaster.get("duration", 1)))
+            if abs(int(disaster.get("tick_start", 0)) - start_tick) <= duration:
+                return True
+        return False
+
+    def _start_disaster(
+        self,
+        disaster_type: str,
+        *,
+        start_tick: int,
+        severity: float | None = None,
+    ) -> dict[str, Any] | None:
+        blueprint = _DISASTER_BLUEPRINTS.get(disaster_type)
+        if blueprint is None or self._has_overlapping_disaster(disaster_type, start_tick):
+            return None
+        self._ensure_disaster_state()
+
+        rng = getattr(self.world, "rng", random)
+        severity_value = round(max(0.35, min(1.0, severity if severity is not None else 0.45 + rng.random() * 0.45)), 2)
+        candidate_ids = self._disaster_candidate_buildings(disaster_type)
+        if not candidate_ids:
+            return None
+        affected_count = min(len(candidate_ids), 1 if severity_value < 0.6 else 2 if severity_value < 0.82 else 3)
+        affected_buildings = candidate_ids[:affected_count]
+
+        damage_reports = [
+            self.world.apply_disaster_damage(building_id, severity_value)
+            for building_id in affected_buildings
+        ]
+        evacuations = self.world.evacuate_residents_from_buildings(affected_buildings, severity_value)
+        casualty_threshold = 0.38 if severity_value >= 0.75 else 0.28
+        casualties = 0
+        evacuated_ids = {str(evacuation.get("resident_id")) for evacuation in evacuations}
+        for resident_id in evacuated_ids:
+            agent = self.world.get_agent(resident_id)
+            if agent is not None and agent.resident.health.hp <= casualty_threshold:
+                casualties += 1
+
+        reserve_spent = round(min(float(self.world.economic_output), max(8.0, len(affected_buildings) * severity_value * 18.0)), 2)
+        self.world.economic_output = round(max(0.0, float(self.world.economic_output) - reserve_spent), 2)
+
+        for agent in self.world.agents:
+            agent.resident.safety_feeling = max(0.0, float(getattr(agent.resident, "safety_feeling", 1.0)) - min(0.45, severity_value * 0.18))
+            if agent.resident.id in evacuated_ids:
+                self.world.shift_resident_mood(agent, -2, "disaster")
+            elif severity_value >= 0.65:
+                self.world.shift_resident_mood(agent, -1, "disaster")
+
+        disaster = Disaster(
+            type=disaster_type,
+            severity=severity_value,
+            affected_buildings=affected_buildings,
+            tick_start=start_tick,
+            duration=int(blueprint["duration"]),
+            casualties=casualties,
+        )
+        payload = asdict(disaster)
+        payload["status"] = "active"
+        payload["end_tick"] = start_tick + disaster.duration
+        payload["reserve_spent"] = reserve_spent
+        payload["evacuations"] = len(evacuations)
+        payload["damage_reports"] = damage_reports
+        payload["goal"] = blueprint["goal"]
+        payload["description"] = blueprint["description"]
+        self._active_disasters.append(payload)
+
+        self._add_timeline_event(
+            f"disaster_{disaster_type}",
+            str(blueprint["description"]),
+            {
+                "type": disaster_type,
+                "severity": severity_value,
+                "affected_buildings": list(affected_buildings),
+                "casualties": casualties,
+            },
+        )
+        return payload
+
+    def _close_finished_disasters(self, tick_state: Any) -> None:
+        self._ensure_disaster_state()
+        remaining: list[dict[str, Any]] = []
+        for disaster in self._active_disasters:
+            if self.world.current_tick < int(disaster.get("end_tick", 0)):
+                remaining.append(disaster)
+                continue
+
+            rebuild_spent = 0.0
+            for damage_report in disaster.get("damage_reports", []):
+                spent = self.world.rebuild_disaster_damage(
+                    str(damage_report.get("building_id", "")),
+                    damage_report,
+                    reserve_budget=float(self.world.economic_output),
+                )
+                rebuild_spent += spent
+                self.world.economic_output = round(max(0.0, float(self.world.economic_output) - spent), 2)
+
+            memorial = f"{disaster.get('type', 'disaster')} 已结束，居民们开始统计损失并重建受灾区域。"
+            completed = dict(disaster)
+            completed["status"] = "completed"
+            completed["end_tick"] = self.world.current_tick
+            completed["reserve_spent"] = round(float(disaster.get("reserve_spent", 0.0)) + rebuild_spent, 2)
+            completed["memorial"] = memorial
+            self._disaster_history.append(completed)
+            self._disaster_history = self._disaster_history[-100:]
+            tick_state.events.append(EventUpdate(description=memorial))
+            tick_state.disaster_updates.append(
+                DisasterUpdate(
+                    disaster=Disaster(
+                        type=str(completed["type"]),
+                        severity=float(completed["severity"]),
+                        affected_buildings=list(completed.get("affected_buildings", [])),
+                        tick_start=int(completed["tick_start"]),
+                        duration=int(completed["duration"]),
+                        casualties=int(completed.get("casualties", 0)),
+                    ),
+                    status="ended",
+                    memorial=memorial,
+                )
+            )
+
+        self._active_disasters = remaining
+
+    def _maybe_start_disaster_for_tick(self, tick_state: Any) -> None:
+        self._ensure_disaster_state()
+        weather_value = self.world.weather.value if hasattr(self.world.weather, "value") else str(self.world.weather)
+        if weather_value in {"rainy", "stormy"}:
+            self._consecutive_rainy_ticks += 1
+        else:
+            self._consecutive_rainy_ticks = 0
+
+        rng = getattr(self.world, "rng", random)
+        day_gate = self.world.current_tick % max(6, self.world.config.tick_per_day // 2) == 0
+        season_value = self.world.season.value if hasattr(self.world.season, "value") else str(self.world.season)
+        started: list[dict[str, Any]] = []
+
+        if self._consecutive_rainy_ticks >= self.world.config.tick_per_day * 5 and rng.random() < 0.4:
+            flood = self._start_disaster("flood", start_tick=self.world.current_tick, severity=0.62 + rng.random() * 0.22)
+            if flood is not None:
+                started.append(flood)
+                self._consecutive_rainy_ticks = 0
+
+        if day_gate and rng.random() < 0.05:
+            fire = self._start_disaster("fire", start_tick=self.world.current_tick)
+            if fire is not None:
+                started.append(fire)
+
+        if day_gate and season_value in {"spring", "autumn"} and rng.random() < 0.03:
+            quake = self._start_disaster("earthquake", start_tick=self.world.current_tick, severity=0.58 + rng.random() * 0.18)
+            if quake is not None:
+                started.append(quake)
+
+        if day_gate and season_value in {"summer", "autumn"} and rng.random() < 0.04:
+            drought = self._start_disaster("drought", start_tick=self.world.current_tick, severity=0.48 + rng.random() * 0.2)
+            if drought is not None:
+                started.append(drought)
+
+        for disaster in started:
+            tick_state.events.append(EventUpdate(description=str(disaster.get("description", disaster.get("type", "灾害进行中")))))
+            tick_state.disaster_updates.append(
+                DisasterUpdate(
+                    disaster=Disaster(
+                        type=str(disaster["type"]),
+                        severity=float(disaster["severity"]),
+                        affected_buildings=list(disaster.get("affected_buildings", [])),
+                        tick_start=int(disaster["tick_start"]),
+                        duration=int(disaster["duration"]),
+                        casualties=int(disaster.get("casualties", 0)),
+                    ),
+                    status="started",
+                )
+            )
 
     def _festival_location_id(self, festival_type: str) -> str:
         preferred_building_types = {
@@ -1474,6 +2503,12 @@ class SimulationState:
             self._population_history = []
         if not hasattr(self, "_trade_history"):
             self._trade_history = []
+        if not hasattr(self, "_diplomacy_ledger"):
+            self._diplomacy_ledger = []
+        if not hasattr(self, "_diplomacy_last_route_tick"):
+            self._diplomacy_last_route_tick = {}
+        if not hasattr(self, "_diplomacy_event_log"):
+            self._diplomacy_event_log = []
         if not hasattr(self, "_bulletin_posts"):
             self._bulletin_posts = []
         if not hasattr(self, "_bulletin_hot_topics"):
@@ -1492,6 +2527,16 @@ class SimulationState:
             self._active_votes = []
         if not hasattr(self, "_vote_history"):
             self._vote_history = []
+        if not hasattr(self, "_current_mayor"):
+            self._current_mayor = None
+        if not hasattr(self, "_political_satisfaction"):
+            self._political_satisfaction = 0.5
+        if not hasattr(self, "_political_satisfaction_history"):
+            self._political_satisfaction_history = []
+        if not hasattr(self, "_low_satisfaction_ticks"):
+            self._low_satisfaction_ticks = 0
+        if not hasattr(self, "_last_policy_tick"):
+            self._last_policy_tick = 0
         if not hasattr(self, "_achievement_unlock_meta"):
             self._achievement_unlock_meta = {}
         if not hasattr(self, "_buildings_visited"):
@@ -1562,6 +2607,24 @@ class SimulationState:
                 agent = self.world.get_agent(resident_id)
                 if agent is not None:
                     agent.resident.current_goal = str(active_festival.get("goal", f"参加{active_festival.get('name', '庆典')}"))
+
+        active_disasters = list(getattr(self, "_active_disasters", []))
+        for disaster in active_disasters:
+            self.world.pending_events.append(
+                EngineEvent(
+                    id=str(uuid.uuid4()),
+                    description=str(disaster.get("description", f"{disaster.get('type', '灾害')} 正在持续")),
+                    timestamp=tick_time,
+                    source="system",
+                )
+            )
+            affected_buildings = set(disaster.get("affected_buildings", []))
+            for agent in self.world.agents:
+                occupation = getattr(agent.resident, "occupation", "")
+                if agent.resident.location in affected_buildings:
+                    agent.resident.current_goal = "撤离到安全区域"
+                elif occupation in {"doctor", "emergency"}:
+                    agent.resident.current_goal = f"前往{disaster.get('type', '灾害')}现场救援"
 
         cfg = self.world.config
 
@@ -1811,6 +2874,7 @@ class SimulationState:
 
         # Advance tick counter and collect movements
         tick_state = self.world.tick()
+        self._update_politics_for_tick(tick_state)
         vote_announcements = self._process_votes_for_tick()
         tick_state.vote_updates.extend(VoteUpdate(**vote) for vote in self.get_active_votes())
         tick_state.vote_announcements.extend(VoteUpdate(**vote) for vote in vote_announcements)
@@ -1892,6 +2956,7 @@ class SimulationState:
                     status="started",
                 )
             )
+        self._maybe_start_disaster_for_tick(tick_state)
         tick_state.dialogues.extend(dialogue_updates)
         tick_state.relationships.extend(relationship_deltas)
         tick_state.gossips.extend(gossip_updates)
@@ -2044,6 +3109,8 @@ class SimulationState:
 
         tick_state.events.extend(EventUpdate(description=description) for description in family_event_descriptions)
         self._close_finished_festivals(tick_state)
+        self._close_finished_disasters(tick_state)
+        self._update_diplomacy(tick_state)
         self._update_bulletin_board()
 
         # --- Relationship milestone events ---
@@ -2681,24 +3748,31 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
     from engine.memory import MemoryStream
     from engine.types import (
         Achievement,
+        Appearance,
         Building,
+        ClothingItem,
         Course,
         CourseHistoryEntry,
         CulturalEvent,
         DiaryEntry,
         Education,
         Event as EngineEvent,
+        ExternalTown,
         Health,
         Illness,
         Item,
         Job,
         Memory,
         MoodEntry,
+        Party,
         Pet,
         Reflection,
+        Religion,
         Relationship,
         RelationType,
+        ReligiousEvent,
         Resident,
+        TradeRoute,
         WeatherType,
         WorldConfig,
     )
@@ -2719,6 +3793,10 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
 
     branch_world = World(config=config)
     branch_world.current_tick = saved.get("tick", 0)
+    branch_world.fashion_trend = dict(saved.get("fashion_trend", getattr(branch_world, "fashion_trend", {})))
+    branch_world.fashion_trend_history = list(saved.get("fashion_trend_history", getattr(branch_world, "fashion_trend_history", [])))
+    branch_world.fashion_purchase_history = list(saved.get("fashion_purchase_history", []))
+    branch_world.fashion_design_history = list(saved.get("fashion_design_history", []))
 
     for b in saved.get("buildings", []):
         branch_world.add_building(Building(
@@ -2745,6 +3823,8 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
             hair_style=res_data.get("hair_style"),
             hair_color=res_data.get("hair_color"),
             outfit_color=res_data.get("outfit_color"),
+            appearance=Appearance(**res_data.get("appearance", {})) if res_data.get("appearance") else Appearance(),
+            wardrobe=[ClothingItem(**item) for item in res_data.get("wardrobe", [])],
             current_goal=res_data.get("current_goal"),
             coins=res_data.get("coins", 100),
             occupation=res_data.get("occupation", "unemployed"),
@@ -2758,6 +3838,10 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
             mood_history=[MoodEntry(**entry) for entry in res_data.get("mood_history", [])],
             mental_state=res_data.get("mental_state", "stable"),
             low_mood_ticks=int(res_data.get("low_mood_ticks", 0)),
+            party=res_data.get("party", Party.neutral),
+            religion=Religion(res_data.get("religion", "none")),
+            piety=float(res_data.get("piety", 0.0)),
+            morality_score=float(res_data.get("morality_score", 0.5)),
             health=Health(
                 hp=float(res_data.get("health", {}).get("hp", 1.0)),
                 illness=Illness(**res_data["health"]["illness"]) if res_data.get("health", {}).get("illness") else None,
@@ -2793,6 +3877,10 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
     branch_world.stray_pets = [Pet(**pet) for pet in saved.get("stray_pets", [])]
     branch_world.cultural_events = [CulturalEvent(**event) for event in saved.get("cultural_events", [])]
     branch_world.culture_prosperity_history = list(saved.get("culture_prosperity_history", []))
+    branch_world.religious_events = [ReligiousEvent(**event) for event in saved.get("religious_events", [])]
+    branch_world.morality_history = list(saved.get("morality_history", []))
+    branch_world.external_towns = [ExternalTown(**town) for town in saved.get("external_towns", [])]
+    branch_world.trade_routes = [TradeRoute(**route) for route in saved.get("trade_routes", [])]
     branch_world._rebuild_pet_registry()
 
     for rel_data in saved.get("relationships", []):

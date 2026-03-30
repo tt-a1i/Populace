@@ -53,7 +53,7 @@ def act(agent: "Agent", plan: dict, world: "World") -> None:
 
     action = plan.get("action", "idle")
 
-    if action in {"move", "attend_class", "walk_pet"}:
+    if action in {"move", "attend_class", "attend_worship", "walk_pet"}:
         target = plan.get("target")
         if target is not None:
             _step_astar(agent, tuple(target), world)

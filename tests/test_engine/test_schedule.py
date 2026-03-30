@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from engine.schedule import DailySchedule, SchedulePhase
-from engine.types import Building, Pet, WorldConfig
+from engine.types import Building, Pet, Religion, WorldConfig
 from engine.world import World
 
 from tests.conftest import make_agent
@@ -159,6 +159,21 @@ def test_rule_plan_inserts_walk_pet_for_dog_owner(world_with_buildings):
 
     assert plan["action"] == "walk_pet"
     assert plan.get("target") == [12, 12]
+
+
+def test_rule_plan_inserts_attend_worship_when_holy_site_exists(world_with_buildings):
+    sched = DailySchedule("沉静、虔诚")
+    world_with_buildings.add_building(Building(id="shrine1", type="shrine", name="林间祭坛", capacity=8, position=(9, 4)))
+    agent = make_agent("a5", "阿枝", x=0, y=0)
+    agent.resident.home_building_id = "home1"
+    agent.resident.religion = Religion.naturalism
+    world_with_buildings.add_agent(agent)
+    world_with_buildings.current_tick = 14  # 07:00 morning
+
+    plan = sched.rule_plan(agent, world_with_buildings)
+
+    assert plan["action"] == "attend_worship"
+    assert plan.get("target") == [9, 4]
 
 
 def test_rule_plan_prefers_nearer_building_when_travel_time_is_limited(world_with_buildings):

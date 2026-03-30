@@ -4,6 +4,8 @@ import i18n from '../i18n/config'
 import type { SimulationReplaySnapshot } from '../services/api'
 import type {
   Building,
+  Disaster,
+  DisasterUpdate,
   DialogueUpdate,
   EnergyUpdate,
   Festival,
@@ -49,6 +51,8 @@ export interface ResidentPosition {
   hairStyle?: string | null
   hairColor?: string | null
   outfitColor?: string | null
+  appearance?: Resident['appearance']
+  wardrobe?: Resident['wardrobe']
   personality?: string
   mood?: string
   goals?: string[]
@@ -125,6 +129,8 @@ export interface SimulationSnapshot {
     hair_style?: string | null
     hair_color?: string | null
     outfit_color?: string | null
+    appearance?: Resident['appearance']
+    wardrobe?: Resident['wardrobe']
     coins?: number
     occupation?: string
     skills?: Record<string, number>
@@ -140,6 +146,8 @@ export interface SimulationSnapshot {
   vote_history?: VoteRecord[]
   active_festivals?: Festival[]
   festival_history?: Festival[]
+  active_disasters?: Disaster[]
+  disaster_history?: Disaster[]
 }
 
 interface SimulationState {
@@ -161,6 +169,8 @@ interface SimulationState {
   voteHistory: VoteRecord[]
   currentFestival: Festival | null
   festivalHistory: Festival[]
+  currentDisasters: Disaster[]
+  disasterHistory: Disaster[]
   selectedResidentId: string | null
   hoveredPairIds: [string, string] | null
   setRunning: (running: boolean) => void
@@ -172,6 +182,7 @@ interface SimulationState {
   setVoteHistory: (votes: VoteRecord[]) => void
   applyVoteTick: (votes: VoteRecord[], announcements: VoteRecord[]) => void
   applyFestivalTick: (updates: FestivalUpdate[]) => void
+  applyDisasterTick: (updates: DisasterUpdate[]) => void
   applyResidentOperation: (
     resident: Partial<ResidentPosition> & { id: string; name?: string },
     operation: 'resident_updated' | 'resident_teleported',
@@ -286,6 +297,8 @@ function residentPositionFromPopulationSnapshot(
     hairStyle: resident.hair_style ?? previous?.hairStyle ?? null,
     hairColor: resident.hair_color ?? previous?.hairColor ?? null,
     outfitColor: resident.outfit_color ?? previous?.outfitColor ?? null,
+    appearance: resident.appearance ?? previous?.appearance,
+    wardrobe: resident.wardrobe ?? previous?.wardrobe ?? [],
     personality: resident.personality ?? previous?.personality,
     mood: resident.mood ?? previous?.mood ?? 'neutral',
     goals: resident.goals ?? previous?.goals ?? [],
@@ -323,6 +336,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   voteHistory: [],
   currentFestival: null,
   festivalHistory: [],
+  currentDisasters: [],
+  disasterHistory: [],
   selectedResidentId: null,
   hoveredPairIds: null,
   setRunning: (running) => set({ running }),
@@ -358,6 +373,43 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       }
       return { currentFestival, festivalHistory }
     }),
+  applyDisasterTick: (updates) =>
+    set((state) => {
+      if (updates.length === 0) {
+        return state
+      }
+      let currentDisasters = [...state.currentDisasters]
+      let disasterHistory = [...state.disasterHistory]
+      for (const update of updates) {
+        if (update.status === 'started') {
+          currentDisasters = [
+            { ...update.disaster, status: 'active' },
+            ...currentDisasters.filter(
+              (disaster) =>
+                !(disaster.type === update.disaster.type && disaster.tick_start === update.disaster.tick_start),
+            ),
+          ].slice(0, 10)
+        } else if (update.status === 'ended') {
+          currentDisasters = currentDisasters.filter(
+            (disaster) =>
+              !(disaster.type === update.disaster.type && disaster.tick_start === update.disaster.tick_start),
+          )
+          disasterHistory = [
+            { ...update.disaster, status: 'completed', memorial: update.memorial ?? update.disaster.memorial ?? null },
+            ...disasterHistory,
+          ]
+            .filter(
+              (disaster, index, items) =>
+                index ===
+                items.findIndex(
+                  (item) => item.type === disaster.type && item.tick_start === disaster.tick_start,
+                ),
+            )
+            .slice(0, 20)
+        }
+      }
+      return { currentDisasters, disasterHistory }
+    }),
   applyResidentOperation: (resident, operation) =>
     set((state) => {
       const nextResidents = state.residents.map((currentResident) => {
@@ -379,6 +431,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           mood: resident.mood ?? currentResident.mood,
           goals: resident.goals ?? currentResident.goals,
           occupation: resident.occupation ?? currentResident.occupation,
+          appearance: (resident as { appearance?: Resident['appearance'] }).appearance ?? currentResident.appearance,
+          wardrobe: (resident as { wardrobe?: Resident['wardrobe'] }).wardrobe ?? currentResident.wardrobe,
           inventory: resident.inventory ?? currentResident.inventory,
           energy: resident.energy ?? currentResident.energy,
           ageDays: resident.ageDays ?? currentResident.ageDays,
@@ -478,7 +532,9 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           skinColor: existingResident?.skinColor ?? null,
           hairStyle: existingResident?.hairStyle ?? null,
           hairColor: existingResident?.hairColor ?? null,
-          outfitColor: existingResident?.outfitColor ?? null,
+          outfitColor: movement.outfit_color ?? existingResident?.outfitColor ?? null,
+          appearance: movement.appearance ?? existingResident?.appearance,
+          wardrobe: existingResident?.wardrobe ?? [],
           personality: existingResident?.personality,
           mood: existingResident?.mood,
           goals: existingResident?.goals,
@@ -577,6 +633,48 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
                 ...state.festivalHistory,
               ].slice(0, 20)
             : state.festivalHistory,
+        currentDisasters:
+          tickState.disaster_updates && tickState.disaster_updates.length > 0
+            ? tickState.disaster_updates.reduce<Array<Disaster>>((current, entry) => {
+                if (entry.status === 'started') {
+                  return [
+                    { ...entry.disaster, status: 'active' },
+                    ...current.filter(
+                      (disaster) =>
+                        !(disaster.type === entry.disaster.type && disaster.tick_start === entry.disaster.tick_start),
+                    ),
+                  ].slice(0, 10)
+                }
+                if (entry.status === 'ended') {
+                  return current.filter(
+                    (disaster) =>
+                      !(disaster.type === entry.disaster.type && disaster.tick_start === entry.disaster.tick_start),
+                  )
+                }
+                return current
+              }, state.currentDisasters)
+            : state.currentDisasters,
+        disasterHistory:
+          tickState.disaster_updates && tickState.disaster_updates.some((entry) => entry.status === 'ended')
+            ? [
+                ...tickState.disaster_updates
+                  .filter((entry) => entry.status === 'ended')
+                  .map((entry) => ({
+                    ...entry.disaster,
+                    status: 'completed',
+                    memorial: entry.memorial ?? entry.disaster.memorial ?? null,
+                  })),
+                ...state.disasterHistory,
+              ]
+                .filter(
+                  (disaster, index, items) =>
+                    index ===
+                    items.findIndex(
+                      (item) => item.type === disaster.type && item.tick_start === disaster.tick_start,
+                    ),
+                )
+                .slice(0, 20)
+            : state.disasterHistory,
         buildings: recomputeBuildingOccupancy(state.buildings, nextResidents),
         messageFeed: appendRecentMessages(state.messageFeed, freshMessages),
         residents: nextResidents,
@@ -604,6 +702,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
           hairStyle: r.hair_style ?? prev?.hairStyle ?? null,
           hairColor: r.hair_color ?? prev?.hairColor ?? null,
           outfitColor: r.outfit_color ?? prev?.outfitColor ?? null,
+          appearance: (r as { appearance?: Resident['appearance'] }).appearance ?? prev?.appearance,
+          wardrobe: (r as { wardrobe?: Resident['wardrobe'] }).wardrobe ?? prev?.wardrobe ?? [],
           personality: r.personality ?? prev?.personality,
           mood: r.mood ?? prev?.mood ?? 'neutral',
           goals: r.goals ?? prev?.goals ?? [],
@@ -651,6 +751,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         voteHistory: snapshot.vote_history ?? state.voteHistory,
         currentFestival: snapshot.active_festivals?.[0] ?? state.currentFestival,
         festivalHistory: snapshot.festival_history ?? state.festivalHistory,
+        currentDisasters: snapshot.active_disasters ?? state.currentDisasters,
+        disasterHistory: snapshot.disaster_history ?? state.disasterHistory,
         replayFrozenFrame: state.replayFrozenFrame,
         messageFeed:
           residents.length > 0

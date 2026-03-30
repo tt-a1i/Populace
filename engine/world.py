@@ -11,6 +11,16 @@ import random
 from typing import Dict, List, Optional, Tuple
 
 from engine.agent import Agent
+from engine.fashion import (
+    apply_outfit_for_occasion,
+    ensure_resident_fashion,
+    ensure_world_fashion_state,
+    fashion_social_bonus as calculate_fashion_social_bonus,
+    get_world_fashion_overview,
+    maybe_purchase_clothing,
+    maybe_tailor_design,
+    sync_fashion_for_tick,
+)
 from engine.pathfinding import PathCache
 from engine.types import (
     Building,
@@ -29,7 +39,11 @@ from engine.types import (
     Memory,
     MoodEntry,
     MovementUpdate,
+    Party,
     Pet,
+    Religion,
+    RelationType,
+    ReligiousEvent,
     Road,
     ReputationEntry,
     Relationship,
@@ -46,6 +60,8 @@ from engine.types import (
 
 _EXTROVERT_KEYWORDS = ("外向", "开朗", "活泼", "健谈", "社牛", "extrovert", "outgoing")
 _INTROVERT_KEYWORDS = ("内向", "安静", "害羞", "社恐", "introvert", "shy")
+_PROGRESSIVE_KEYWORDS = ("外向", "热心", "开放", "创新", "理想", "关怀", "community", "kind", "creative")
+_CONSERVATIVE_KEYWORDS = ("保守", "谨慎", "秩序", "传统", "纪律", "稳定", "careful", "order")
 _MOOD_SCORE = {
     "ecstatic": 1.0,
     "excited": 0.8,
@@ -100,6 +116,32 @@ _CULTURAL_EVENT_NAMES = {
     "theater": "街角戏剧夜",
     "workshop": "手作工坊体验",
 }
+_RELIGION_LABELS = {
+    Religion.naturalism.value: "自然信仰",
+    Religion.ancestor_worship.value: "祖灵敬拜",
+    Religion.solarsm.value: "日耀信仰",
+    Religion.none.value: "无信仰",
+}
+_RELIGION_SITE_TYPES = {
+    Religion.naturalism.value: "shrine",
+    Religion.ancestor_worship.value: "temple",
+    Religion.solarsm.value: "chapel",
+}
+_RELIGIOUS_EVENT_NAMES = {
+    Religion.naturalism.value: {
+        "festival": "林风感恩节",
+        "ritual": "静枝祈祷礼",
+    },
+    Religion.ancestor_worship.value: {
+        "festival": "先祖灯火祭",
+        "ritual": "祠堂追思礼",
+    },
+    Religion.solarsm.value: {
+        "festival": "晨辉赞歌节",
+        "ritual": "日轮颂光礼",
+    },
+}
+_HOLY_SITE_TYPES = frozenset(_RELIGION_SITE_TYPES.values())
 _PET_EMOJI_NAME = {
     "cat": "小咪",
     "dog": "旺财",
@@ -164,8 +206,18 @@ class World:
         self.stray_pets: List[Pet] = []
         self.cultural_events: List[CulturalEvent] = []
         self.culture_prosperity_history: List[dict] = []
+        self.religious_events: List[ReligiousEvent] = []
+        self.morality_history: List[dict] = []
+        self.generational_history: List[dict] = []
         self.gdp_history: List[dict] = []
         self.economic_output: float = 0.0
+        self.fashion_trend: dict = {}
+        self.fashion_trend_history: List[dict] = []
+        self.fashion_purchase_history: List[dict] = []
+        self.fashion_design_history: List[dict] = []
+        self.town_reserve: float = 200.0
+        self.external_towns: List[object] = []
+        self.trade_routes: List[object] = []
         self.path_cache: PathCache = PathCache()
         self.roads: List[Road] = []
         self.road_usage: Dict[tuple[str, str], int] = {}
@@ -178,6 +230,7 @@ class World:
         self.grid_chunk_size: int = max(1, self.config.interaction_distance)
         self.grid_index: Dict[Tuple[int, int], List[Agent]] = {}
         self._grid_index_dirty = True
+        ensure_world_fashion_state(self)
 
     def _default_zones(self) -> List[Zone]:
         width = self.config.map_width_tiles
@@ -240,15 +293,163 @@ class World:
             )
         self.ensure_resident_education(agent.resident)
         self._ensure_resident_artistic_talent(agent.resident)
+        self._ensure_resident_ageing(agent.resident)
         self._ensure_resident_safety(agent.resident)
         self._ensure_resident_reputation(agent.resident)
+        self._ensure_resident_party(agent.resident)
+        self._ensure_resident_religion(agent.resident)
         self._ensure_resident_transport(agent.resident)
         self._ensure_resident_memories(agent.resident)
         self._ensure_resident_job(agent.resident)
         self._ensure_resident_health(agent.resident)
+        self._ensure_resident_fashion(agent.resident)
         self.agents.append(agent)
+        self._apply_religious_relationship_bias(agent)
         self._rebuild_pet_registry()
         self.mark_grid_index_dirty()
+
+    def _age_stage_for_days(self, age_days: int) -> str:
+        if age_days < 200:
+            return "child"
+        if age_days < 800:
+            return "adult"
+        return "elder"
+
+    def _ensure_resident_ageing(self, resident: Resident) -> None:
+        resident.age_days = max(0, int(getattr(resident, "age_days", 0)))
+        resident.age_stage = self._age_stage_for_days(resident.age_days)
+        retirement_tick = getattr(resident, "retirement_tick", None)
+        resident.retirement_tick = int(retirement_tick) if retirement_tick is not None else None
+        inheritance = getattr(resident, "inheritance", {})
+        resident.inheritance = dict(inheritance) if isinstance(inheritance, dict) else {}
+
+    def can_resident_work(self, resident: Resident) -> bool:
+        self._ensure_resident_ageing(resident)
+        return resident.age_stage == "adult"
+
+    def retire_resident(self, resident: Resident, *, tick: int | None = None) -> None:
+        self._ensure_resident_ageing(resident)
+        if resident.age_stage != "elder":
+            return
+        resident.occupation = "retired"
+        resident.job.title = "retired"
+        resident.job.workplace_id = None
+        resident.job.salary = 0.0
+        resident.job.satisfaction = max(0.6, resident.job.satisfaction)
+        if resident.retirement_tick is None:
+            resident.retirement_tick = self.current_tick if tick is None else tick
+
+    def grant_pension(self, resident: Resident, amount: float = 8.0) -> float:
+        payout = round(max(0.0, min(float(amount), float(getattr(self, "town_reserve", 0.0)))), 2)
+        if payout <= 0:
+            return 0.0
+        self.town_reserve = round(max(0.0, self.town_reserve - payout), 2)
+        resident.wallet = round(float(getattr(resident, "wallet", 0.0)) + payout, 2)
+        return payout
+
+    def record_generational_event(
+        self,
+        event_type: str,
+        resident_name: str,
+        summary: str,
+        *,
+        resident_id: str | None = None,
+        tick: int | None = None,
+    ) -> None:
+        self.generational_history.append(
+            {
+                "tick": self.current_tick if tick is None else tick,
+                "type": event_type,
+                "resident_id": resident_id,
+                "resident_name": resident_name,
+                "summary": summary,
+            }
+        )
+        self.generational_history = self.generational_history[-120:]
+
+    def _ensure_resident_religion(self, resident: Resident) -> None:
+        religion = getattr(resident, "religion", Religion.none)
+        if isinstance(religion, Religion):
+            normalized = religion
+        else:
+            try:
+                normalized = Religion(str(religion))
+            except ValueError:
+                normalized = Religion.none
+
+        if normalized is Religion.none:
+            checksum = sum(ord(char) for char in f"{resident.id}:{resident.name}")
+            options = (
+                Religion.naturalism,
+                Religion.ancestor_worship,
+                Religion.solarsm,
+                Religion.none,
+            )
+            normalized = options[checksum % len(options)]
+
+        resident.religion = normalized
+        if normalized is Religion.none:
+            resident.piety = 0.0
+        else:
+            try:
+                piety = float(getattr(resident, "piety", 0.2))
+            except (TypeError, ValueError):
+                piety = 0.2
+            resident.piety = round(max(0.0, min(1.0, piety)), 4)
+        try:
+            morality = float(getattr(resident, "morality_score", 0.5))
+        except (TypeError, ValueError):
+            morality = 0.5
+        resident.morality_score = round(
+            max(0.0, min(1.0, morality)),
+            4,
+        )
+
+    def _apply_religious_relationship_bias(self, agent: Agent) -> None:
+        resident = agent.resident
+        self._ensure_resident_religion(resident)
+
+        for other in self.agents:
+            if other is agent:
+                continue
+            self._ensure_resident_religion(other.resident)
+            if resident.religion is Religion.none or other.resident.religion is Religion.none:
+                continue
+
+            same_faith = resident.religion == other.resident.religion
+            relation_type = RelationType.friendship if same_faith else RelationType.dislike
+            reason = "shared_religion" if same_faith else "religious_difference"
+
+            for from_id, to_id in (
+                (resident.id, other.resident.id),
+                (other.resident.id, resident.id),
+            ):
+                existing = self.get_relationship(from_id, to_id)
+                if existing is None:
+                    self.set_relationship(
+                        Relationship(
+                            from_id=from_id,
+                            to_id=to_id,
+                            type=relation_type,
+                            intensity=0.1,
+                            since=self.simulation_time(),
+                            familiarity=0.05,
+                            reason=reason,
+                        )
+                    )
+                    continue
+
+                if same_faith:
+                    if existing.type in {RelationType.knows, RelationType.friendship}:
+                        existing.type = RelationType.friendship
+                    existing.intensity = round(max(existing.intensity, 0.1), 4)
+                    existing.familiarity = round(max(existing.familiarity, 0.05), 4)
+                elif existing.type in {RelationType.knows, RelationType.dislike}:
+                    existing.type = RelationType.dislike
+                    existing.intensity = round(max(existing.intensity, 0.1), 4)
+                if not existing.reason:
+                    existing.reason = reason
+                self.set_relationship(existing)
 
     def _rebuild_pet_registry(self) -> None:
         owned_pets: List[Pet] = []
@@ -471,6 +672,27 @@ class World:
         resident.reputation = max(-1.0, min(1.0, float(getattr(resident, "reputation", 0.0))))
         resident.reputation_history = list(getattr(resident, "reputation_history", []))
 
+    def _ensure_resident_party(self, resident: Resident) -> None:
+        party = getattr(resident, "party", Party.neutral)
+        if isinstance(party, Party):
+            resident.party = party
+            return
+        try:
+            resident.party = Party(str(party))
+            return
+        except ValueError:
+            pass
+
+        personality = (resident.personality or "").lower()
+        progressive_score = sum(1 for keyword in _PROGRESSIVE_KEYWORDS if keyword in personality)
+        conservative_score = sum(1 for keyword in _CONSERVATIVE_KEYWORDS if keyword in personality)
+        if progressive_score > conservative_score:
+            resident.party = Party.progressive
+        elif conservative_score > progressive_score:
+            resident.party = Party.conservative
+        else:
+            resident.party = Party.neutral
+
     def _ensure_resident_transport(self, resident: Resident) -> None:
         mode = getattr(resident, "transport_mode", TransportMode.walk)
         if isinstance(mode, TransportMode):
@@ -516,7 +738,10 @@ class World:
         return 0.4 if self.has_illness(resident) else 0.0
 
     def health_work_efficiency(self, resident: Resident) -> float:
-        return 0.4 if self.has_illness(resident) else 1.0
+        self._ensure_resident_ageing(resident)
+        age_factor = 0.0 if resident.age_stage == "child" else 0.2 if resident.age_stage == "elder" else 1.0
+        illness_factor = 0.4 if self.has_illness(resident) else 1.0
+        return round(age_factor * illness_factor, 3)
 
     def infect_resident(self, resident: Resident, illness_type: str, *, severity: float | None = None, recovery_ticks: int | None = None) -> bool:
         self._ensure_resident_health(resident)
@@ -607,6 +832,41 @@ class World:
             "outbreak_hotspots": outbreak_hotspots,
         }
 
+    def get_demographics_overview(self) -> dict:
+        distribution = {"child": 0, "adult": 0, "elder": 0}
+        total_age = 0
+        retired_count = 0
+        recent_deaths = 0
+
+        for agent in self.agents:
+            resident = agent.resident
+            self._ensure_resident_ageing(resident)
+            distribution[resident.age_stage] += 1
+            total_age += resident.age_days
+            if resident.retirement_tick is not None:
+                retired_count += 1
+
+        for event in self.generational_history[-20:]:
+            if event.get("type") == "death":
+                recent_deaths += 1
+
+        child_count = distribution["child"]
+        elder_count = distribution["elder"]
+        aging_index = round(elder_count / child_count, 3) if child_count else float(elder_count > 0)
+        timeline = sorted(
+            self.generational_history[-12:],
+            key=lambda item: (-int(item.get("tick", 0)), str(item.get("resident_name", ""))),
+        )
+
+        return {
+            "age_distribution": distribution,
+            "aging_index": aging_index,
+            "average_age": round(total_age / len(self.agents), 3) if self.agents else 0.0,
+            "retired_count": retired_count,
+            "recent_deaths": recent_deaths,
+            "generational_timeline": timeline,
+        }
+
     def get_resident_health_profile(self, resident_id: str) -> dict | None:
         agent = self.get_agent(resident_id)
         if agent is None:
@@ -644,6 +904,18 @@ class World:
         if not resident.job.title:
             resident.job.title = current_occupation
         resident.occupation = resident.job.title or current_occupation
+
+    def _ensure_resident_fashion(self, resident: Resident) -> None:
+        ensure_world_fashion_state(self)
+        ensure_resident_fashion(self, resident)
+
+    def fashion_social_bonus(self, resident: Resident, *, first_impression: bool = False) -> float:
+        self._ensure_resident_fashion(resident)
+        return calculate_fashion_social_bonus(self, resident, first_impression=first_impression)
+
+    def get_fashion_overview(self) -> dict:
+        ensure_world_fashion_state(self)
+        return get_world_fashion_overview(self)
 
     def _ensure_resident_memories(self, resident: Resident) -> None:
         resident.memories = list(getattr(resident, "memories", []))
@@ -825,9 +1097,22 @@ class World:
         profile = self._job_profile_for_building(building)
         if profile is None:
             return
-        resident.job.title = str(profile["occupation"])
+        occupation = str(profile["occupation"])
+        salary = float(profile["base_income"])
+        if building.type == "shop":
+            art_skill = float(resident.skills.get("art", 0.0))
+            crafting_skill = float(resident.skills.get("crafting", 0.0))
+            if (
+                resident.job.title == "tailor"
+                or resident.occupation == "tailor"
+                or max(art_skill, crafting_skill) >= 0.8
+                or art_skill + crafting_skill >= 1.35
+            ):
+                occupation = "tailor"
+                salary += 4.0
+        resident.job.title = occupation
         resident.job.workplace_id = building.id
-        resident.job.salary = float(profile["base_income"])
+        resident.job.salary = salary
         resident.job.work_hours = [8, 12, 13, 17]
         resident.occupation = resident.job.title
 
@@ -864,11 +1149,16 @@ class World:
 
     def _purchase_for_resident(self, resident: Resident) -> None:
         self._ensure_resident_job(resident)
+        self._ensure_resident_fashion(resident)
         if resident.location is None:
             return
         building = self.get_building(resident.location)
         if building is None or building.type not in {"shop", "cafe"}:
             return
+        if building.type == "shop":
+            clothing_purchase = maybe_purchase_clothing(self, resident)
+            if clothing_purchase is not None:
+                return
         price = 6.0 if building.type == "shop" else 4.0
         item_name = "meal" if building.type == "cafe" else "supplies"
         if resident.wallet < price:
@@ -968,6 +1258,151 @@ class World:
         elif building.type in {"cafe", "park", "shop"}:
             base += 0.08
         return max(0.0, min(1.0, round(base, 3)))
+
+    def get_safe_shelter(self, resident: Resident, blocked_buildings: List[str] | set[str]) -> Building | None:
+        blocked = set(blocked_buildings)
+        home_id = getattr(resident, "home_building_id", None)
+        if home_id and home_id not in blocked:
+            home = self.get_building(home_id)
+            if home is not None and len(self.get_occupants(home.id)) < home.capacity:
+                return home
+
+        priority = {
+            "hospital": 0,
+            "clinic": 1,
+            "school": 2,
+            "plaza": 3,
+            "park": 4,
+            "home": 5,
+            "house": 5,
+            "residence": 5,
+            "cafe": 6,
+        }
+        candidates = sorted(
+            (
+                building
+                for building in self.buildings
+                if building.id not in blocked and len(self.get_occupants(building.id)) < max(1, building.capacity)
+            ),
+            key=lambda building: (
+                priority.get(building.type, 10),
+                math.dist((resident.x, resident.y), building.position),
+                building.id,
+            ),
+        )
+        return candidates[0] if candidates else None
+
+    def apply_disaster_damage(self, building_id: str, severity: float) -> dict[str, object]:
+        building = self.get_building(building_id)
+        if building is None:
+            return {}
+
+        severity = max(0.0, min(1.0, float(severity)))
+        previous_level = int(getattr(building, "level", 1))
+        previous_capacity = int(getattr(building, "capacity", 1))
+        previous_decoration = float(getattr(building, "decoration_score", 0.0))
+        destroyed = severity >= 0.92
+        level_loss = 2 if severity >= 0.9 and previous_level >= 3 else 1 if severity >= 0.45 and previous_level > 1 else 0
+
+        if level_loss > 0:
+            building.level = max(1, previous_level - level_loss)
+        capacity_factor = 0.35 if destroyed else max(0.45, 1.0 - severity * 0.45)
+        building.capacity = max(1, int(math.floor(previous_capacity * capacity_factor)))
+        building.decoration_score = round(max(0.0, previous_decoration - severity * 0.55), 3)
+
+        if "damaged" not in building.upgrades:
+            building.upgrades.append("damaged")
+        if destroyed and "ruined" not in building.upgrades:
+            building.upgrades.append("ruined")
+
+        return {
+            "building_id": building.id,
+            "previous_level": previous_level,
+            "new_level": building.level,
+            "previous_capacity": previous_capacity,
+            "new_capacity": building.capacity,
+            "previous_decoration_score": round(previous_decoration, 3),
+            "new_decoration_score": round(building.decoration_score, 3),
+            "destroyed": destroyed,
+            "rebuild_cost": round(max(8.0, previous_capacity * (12.0 if destroyed else 7.5) * max(0.35, severity)), 2),
+        }
+
+    def evacuate_residents_from_buildings(self, building_ids: List[str], severity: float) -> List[dict[str, object]]:
+        blocked = set(building_ids)
+        rescue_workers = [
+            agent
+            for agent in self.agents
+            if getattr(agent.resident, "occupation", "") in {"doctor", "emergency"}
+            and agent.resident.location not in blocked
+        ]
+        rescue_modifier = max(0.5, 1.0 - min(0.35, len(rescue_workers) * 0.08))
+        for worker in rescue_workers:
+            worker.resident.current_goal = "参与应急救援"
+
+        evacuations: List[dict[str, object]] = []
+        for agent in self.agents:
+            resident = agent.resident
+            if resident.location not in blocked:
+                continue
+
+            shelter = self.get_safe_shelter(resident, blocked)
+            previous_location = resident.location
+            if shelter is not None:
+                self.enter_building(agent, shelter)
+            else:
+                resident.location = None
+                resident.x = max(0, resident.x - 1)
+                resident.y = max(0, resident.y - 1)
+
+            health_penalty = round((0.08 + severity * 0.22) * rescue_modifier, 3)
+            self._ensure_resident_health(resident)
+            resident.health.hp = round(max(0.1, resident.health.hp - health_penalty), 3)
+            if severity >= 0.4:
+                self.infect_resident(
+                    resident,
+                    "injury",
+                    severity=min(0.85, 0.2 + severity * 0.5),
+                    recovery_ticks=max(8, int(6 + severity * 12)),
+                )
+            self.shift_resident_mood(resident, -2 if severity >= 0.65 else -1, "disaster")
+            resident.current_goal = "撤离到安全区域"
+
+            evacuations.append(
+                {
+                    "resident_id": resident.id,
+                    "from_building": previous_location,
+                    "to_building": None if shelter is None else shelter.id,
+                    "rescued_by": [worker.resident.id for worker in rescue_workers[:2]],
+                }
+            )
+
+        return evacuations
+
+    def rebuild_disaster_damage(self, building_id: str, damage_report: dict[str, object], reserve_budget: float) -> float:
+        building = self.get_building(building_id)
+        if building is None or not damage_report:
+            return 0.0
+
+        available = max(0.0, float(reserve_budget))
+        required = float(damage_report.get("rebuild_cost", 0.0))
+        spent = min(available, required)
+        if spent <= 0:
+            return 0.0
+
+        recovery_ratio = min(1.0, spent / max(required, 1.0))
+        previous_level = int(damage_report.get("previous_level", building.level))
+        previous_capacity = int(damage_report.get("previous_capacity", building.capacity))
+        previous_decoration = float(damage_report.get("previous_decoration_score", building.decoration_score))
+
+        if recovery_ratio >= 0.6:
+            building.level = max(building.level, previous_level)
+            building.capacity = max(building.capacity, previous_capacity)
+        else:
+            building.capacity = max(building.capacity, int(math.ceil(previous_capacity * (0.6 + recovery_ratio * 0.3))))
+
+        building.decoration_score = round(max(building.decoration_score, previous_decoration * recovery_ratio * 0.7), 3)
+        building.upgrades = [upgrade for upgrade in building.upgrades if upgrade not in {"damaged", "ruined"}]
+        return round(spent, 2)
 
     def mark_grid_index_dirty(self) -> None:
         """Mark the nearby-agent spatial index for rebuild before next query."""
@@ -1511,6 +1946,195 @@ class World:
             "talent_rankings": self.culture_talent_rankings(),
         }
 
+    def holy_site_buildings(self) -> List[Building]:
+        return [building for building in self.buildings if building.type in _HOLY_SITE_TYPES]
+
+    def holy_site_for_resident(self, resident: Resident) -> Building | None:
+        self._ensure_resident_religion(resident)
+        holy_sites = self.holy_site_buildings()
+        if not holy_sites:
+            return None
+        preferred_type = _RELIGION_SITE_TYPES.get(resident.religion.value if isinstance(resident.religion, Religion) else str(resident.religion))
+        preferred = next((building for building in holy_sites if building.type == preferred_type), None)
+        return preferred or holy_sites[0]
+
+    def religious_leaders(self) -> List[Agent]:
+        leaders: List[Agent] = []
+        for agent in self.agents:
+            self._ensure_resident_religion(agent.resident)
+            self._ensure_resident_reputation(agent.resident)
+            if agent.resident.religion is Religion.none:
+                continue
+            if agent.resident.piety >= 0.75 and agent.resident.reputation >= 0.35:
+                leaders.append(agent)
+        leaders.sort(
+            key=lambda agent: (agent.resident.piety * 0.65 + agent.resident.reputation * 0.35),
+            reverse=True,
+        )
+        return leaders
+
+    def morality_index(self) -> float:
+        if not self.agents:
+            return 0.0
+        return round(
+            sum(float(agent.resident.morality_score) for agent in self.agents) / len(self.agents),
+            4,
+        )
+
+    def religion_distribution(self) -> List[dict]:
+        counts = {religion.value: 0 for religion in Religion}
+        for agent in self.agents:
+            self._ensure_resident_religion(agent.resident)
+            counts[agent.resident.religion.value] = counts.get(agent.resident.religion.value, 0) + 1
+        total = max(1, len(self.agents))
+        rows = [
+            {
+                "religion": religion,
+                "label": _RELIGION_LABELS.get(religion, religion),
+                "count": count,
+                "share": round(count / total, 4),
+            }
+            for religion, count in counts.items()
+            if count > 0
+        ]
+        return sorted(rows, key=lambda item: (-item["count"], item["religion"]))
+
+    def _religious_participant_score(self, leader: Agent, candidate: Agent) -> float:
+        relationship = self.get_relationship(leader.resident.id, candidate.resident.id)
+        inverse = self.get_relationship(candidate.resident.id, leader.resident.id)
+        affinity = max(
+            relationship.intensity if relationship is not None else 0.0,
+            inverse.intensity if inverse is not None else 0.0,
+        )
+        same_faith = candidate.resident.religion == leader.resident.religion
+        return (
+            (1.0 if same_faith else 0.2)
+            + float(candidate.resident.piety) * 0.5
+            + float(candidate.resident.reputation) * 0.25
+            + affinity * 0.35
+        )
+
+    def maybe_create_religious_event(self) -> ReligiousEvent | None:
+        holy_sites = self.holy_site_buildings()
+        if not holy_sites or not self.agents:
+            return None
+
+        leaders = self.religious_leaders()
+        leader = leaders[0] if leaders else None
+        if leader is None:
+            believers = [
+                agent
+                for agent in self.agents
+                if agent.resident.religion is not Religion.none
+            ]
+            if not believers:
+                return None
+            leader = max(believers, key=lambda agent: (agent.resident.piety, agent.resident.reputation))
+
+        venue = self.holy_site_for_resident(leader.resident)
+        if venue is None:
+            return None
+
+        religion_key = leader.resident.religion.value
+        event_type = "festival" if self.current_tick % max(self.config.tick_per_day * 2, 2) == 0 else "ritual"
+        event_name = _RELIGIOUS_EVENT_NAMES.get(religion_key, {}).get(event_type, "信仰仪式")
+        faith_members = [
+            agent for agent in self.agents
+            if agent.resident.religion == leader.resident.religion
+        ]
+        reach = min(1.0, leader.resident.piety * 0.6 + max(0.0, leader.resident.reputation) * 0.4)
+        participant_target = max(2, min(len(faith_members), 2 + int(round(reach * max(1, len(faith_members) - 1)))))
+        participants = [
+            agent.resident.id
+            for agent in sorted(
+                faith_members,
+                key=lambda candidate: self._religious_participant_score(leader, candidate),
+                reverse=True,
+            )[:participant_target]
+        ]
+        if leader.resident.id not in participants:
+            participants.insert(0, leader.resident.id)
+
+        town_mood_boost = 0.12 if event_type == "festival" else 0.08
+        morality_boost = 0.04 if event_type == "festival" else 0.025
+        event = ReligiousEvent(
+            religion=religion_key,
+            event_type=event_type,
+            name=event_name,
+            venue_id=venue.id,
+            leader_id=leader.resident.id,
+            participants=participants,
+            tick_start=self.current_tick,
+            duration=max(4, self.config.tick_per_day // 6),
+            town_mood_boost=town_mood_boost,
+            morality_boost=morality_boost,
+        )
+        self.religious_events.append(event)
+        self.religious_events = self.religious_events[-40:]
+
+        for agent in self.agents:
+            agent.resident.morality_score = round(
+                min(1.0, float(agent.resident.morality_score) + morality_boost * 0.5),
+                4,
+            )
+            self.shift_resident_mood(agent, 1, "religion")
+            if agent.resident.id in participants:
+                agent.resident.piety = round(min(1.0, float(agent.resident.piety) + 0.06), 4)
+                agent.resident.morality_score = round(min(1.0, float(agent.resident.morality_score) + 0.02), 4)
+
+        self.morality_history.append({"tick": self.current_tick, "morality_index": self.morality_index()})
+        self.morality_history = self.morality_history[-60:]
+        return event
+
+    def update_religious_events(self) -> List[EventUpdate]:
+        updates: List[EventUpdate] = []
+        if self.current_tick % max(self.config.tick_per_day, 1) == 0:
+            event = self.maybe_create_religious_event()
+            if event is not None:
+                updates.append(EventUpdate(description=f"{event.name} 在 {event.venue_id} 举行。"))
+        if self.current_tick % max(8, self.config.tick_per_day // 2) == 0:
+            self.morality_history.append({"tick": self.current_tick, "morality_index": self.morality_index()})
+            self.morality_history = self.morality_history[-60:]
+        active_cutoff = self.current_tick - self.config.tick_per_day * 10
+        self.religious_events = [
+            event for event in self.religious_events
+            if event.tick_start + event.duration >= active_cutoff
+        ]
+        return updates
+
+    def get_religion_overview(self) -> dict:
+        leaders = [
+            {
+                "resident_id": agent.resident.id,
+                "resident_name": agent.resident.name,
+                "religion": agent.resident.religion.value,
+                "piety": round(float(agent.resident.piety), 4),
+                "reputation": round(float(agent.resident.reputation), 4),
+            }
+            for agent in self.religious_leaders()[:8]
+        ]
+        return {
+            "distribution": self.religion_distribution(),
+            "morality_index": self.morality_index(),
+            "morality_history": list(self.morality_history[-30:]),
+            "events": [
+                {
+                    "religion": event.religion,
+                    "event_type": event.event_type,
+                    "name": event.name,
+                    "venue_id": event.venue_id,
+                    "leader_id": event.leader_id,
+                    "participants": list(event.participants),
+                    "tick_start": event.tick_start,
+                    "duration": event.duration,
+                    "town_mood_boost": round(float(event.town_mood_boost), 4),
+                    "morality_boost": round(float(event.morality_boost), 4),
+                }
+                for event in sorted(self.religious_events, key=lambda item: item.tick_start, reverse=True)[:20]
+            ],
+            "leaders": leaders,
+        }
+
     def set_zones(self, zones: List[Zone]) -> None:
         self.zones = zones or self._default_zones()
 
@@ -1682,6 +2306,8 @@ class World:
 
     def get_social_probability(self, agent_a: Agent, agent_b: Agent) -> float:
         """Return the combined base + building social probability."""
+        self._ensure_resident_ageing(agent_a.resident)
+        self._ensure_resident_ageing(agent_b.resident)
         ext_a = self._extroversion(agent_a.resident.personality)
         ext_b = self._extroversion(agent_b.resident.personality)
         relationship = self.get_relationship(agent_a.resident.id, agent_b.resident.id)
@@ -1695,6 +2321,11 @@ class World:
             float(agent_a.resident.education.knowledge_level.get("social", 0.0))
             + float(agent_b.resident.education.knowledge_level.get("social", 0.0))
         ) / 2
+        elder_bonus = 0.0
+        if agent_a.resident.age_stage == "elder":
+            elder_bonus += 0.05
+        if agent_b.resident.age_stage == "elder":
+            elder_bonus += 0.05
 
         extroversion_bonus = ((ext_a + ext_b) / 2) * 0.30
         target_reputation = float(getattr(agent_b.resident, "reputation", 0.0))
@@ -1704,6 +2335,11 @@ class World:
             reputation_bonus += target_reputation * 0.18
         if self_reputation < -0.4:
             reputation_bonus += self_reputation * 0.08
+        first_impression = relationship is None or relationship.familiarity < 0.15
+        fashion_bonus = (
+            self.fashion_social_bonus(agent_a.resident, first_impression=first_impression) * 0.55
+            + self.fashion_social_bonus(agent_b.resident, first_impression=first_impression) * 0.45
+        )
         probability = (
             0.15
             + extroversion_bonus
@@ -1711,7 +2347,9 @@ class World:
             + family_bonus
             + self.get_social_probability_bonus(agent_a, agent_b)
             + social_knowledge * 0.18
+            + elder_bonus
             + reputation_bonus
+            + fashion_bonus
         )
         if agent_a.resident.mental_state == "depressed":
             probability *= 0.35
@@ -1770,6 +2408,7 @@ class World:
             # Agent left all buildings — reset pay flag for next stay
             agent._paid_this_stay = False  # type: ignore[attr-defined]
             agent._class_applied_this_stay = False  # type: ignore[attr-defined]
+            agent._worship_applied_this_stay = False  # type: ignore[attr-defined]
             return
 
         building = self.get_building(building_id)
@@ -1782,8 +2421,11 @@ class World:
         tick_per_day = self.config.tick_per_day
         hour = (self.current_tick % tick_per_day) * 24.0 / tick_per_day
         is_work_hour = self._is_work_hour(hour)
+        self._ensure_resident_ageing(agent.resident)
         self._ensure_resident_job(agent.resident)
         self._ensure_resident_health(agent.resident)
+        self._ensure_resident_fashion(agent.resident)
+        apply_outfit_for_occasion(self, agent.resident)
         illness = agent.resident.health.illness
 
         if building.type == "home":
@@ -1806,6 +2448,12 @@ class World:
             ):
                 if self.decorate_home(agent.resident, effort=0.05):
                     agent.resident.coins = max(0, agent.resident.coins - 5)
+        elif building.type == "nursing_home":
+            self.retire_resident(agent.resident)
+            self.recover_resident_health(agent.resident, 0.08, treatment=True)
+            agent.resident.energy = min(1.0, agent.resident.energy + 0.06)
+            if agent.resident.mood in {"sad", "tired", "fearful"}:
+                self.shift_resident_mood(agent, 1, "nursing_home")
         elif building.type == "hospital":
             if agent.resident.job.title == "doctor" or agent.resident.occupation == "doctor":
                 self._assign_job_for_building(agent.resident, building)
@@ -1823,7 +2471,12 @@ class World:
                 self.shift_resident_mood(agent, 2, "surgery")
                 agent.resident.mental_state = "stable"
         elif building.type == "school":
-            if is_work_hour:
+            if not self.can_resident_work(agent.resident):
+                agent.resident.occupation = "student" if agent.resident.age_stage == "child" else agent.resident.occupation
+                agent.resident.job.title = agent.resident.occupation
+                self.teach_course(agent)
+                agent.resident.energy = max(0.0, agent.resident.energy - 0.01)
+            elif is_work_hour:
                 work_profile = _BUILDING_WORK_MAP[building.type]
                 skill_name = work_profile["skill"]
                 current_skill = float(agent.resident.skills.get(skill_name, 0.0))
@@ -1859,7 +2512,33 @@ class World:
                 self.teach_course(agent)
             else:
                 agent.resident.health.work_streak = 0
+        elif building.type in _HOLY_SITE_TYPES:
+            self._ensure_resident_religion(agent.resident)
+            preferred_site = self.holy_site_for_resident(agent.resident)
+            if agent.resident.religion is not Religion.none and preferred_site is not None and preferred_site.id == building.id:
+                already_worshipped: bool = getattr(agent, "_worship_applied_this_stay", False)
+                if not already_worshipped:
+                    self.shift_resident_mood(agent, 1, "worship")
+                    agent.resident.piety = round(min(1.0, float(agent.resident.piety) + 0.08), 4)
+                    agent.resident.morality_score = round(min(1.0, float(agent.resident.morality_score) + 0.03), 4)
+                    if agent in self.religious_leaders():
+                        agent.resident.occupation = "clergy"
+                        if agent.resident.job.title == "unemployed":
+                            agent.resident.job.title = "clergy"
+                    agent._worship_applied_this_stay = True  # type: ignore[attr-defined]
+                agent.resident.energy = max(0.0, agent.resident.energy - 0.01)
+            agent.resident.health.work_streak = 0
         elif building.type in _BUILDING_WORK_MAP:
+            if not self.can_resident_work(agent.resident):
+                if agent.resident.age_stage == "child":
+                    agent.resident.occupation = "student"
+                    agent.resident.job.title = "student"
+                else:
+                    self.retire_resident(agent.resident)
+                agent.resident.health.work_streak = 0
+                agent.resident.energy = max(0.0, agent.resident.energy - 0.005)
+                self._purchase_for_resident(agent.resident)
+                return
             work_profile = _BUILDING_WORK_MAP[building.type]
             skill_name = work_profile["skill"]
             current_skill = float(agent.resident.skills.get(skill_name, 0.0))
@@ -1888,6 +2567,8 @@ class World:
                             value=item_value,
                         )
                     agent._paid_this_stay = True  # type: ignore[attr-defined]
+            if building.type == "shop" and is_work_hour and agent.resident.job.title == "tailor":
+                maybe_tailor_design(self, agent)
             growth = 0.015 if current_skill < 0.6 else 0.008 if current_skill < 0.85 else 0.003
             if building.type == "cafe" and building.level >= 3 and len(self.get_occupants(building.id)) >= 3:
                 growth += 0.005
@@ -1943,6 +2624,7 @@ class World:
     def _crime_pressure(self, agent: Agent) -> float:
         resident = agent.resident
         self._ensure_resident_safety(resident)
+        self._ensure_resident_religion(resident)
         pressure = 0.0
         if self.mood_score(resident.mood) < -0.3:
             pressure += 0.18
@@ -1954,6 +2636,11 @@ class World:
             pressure += 0.04
         if resident.mental_state == "depressed":
             pressure += 0.08
+        morality = float(getattr(resident, "morality_score", 0.5))
+        pressure -= morality * 0.22
+        if morality < 0.35:
+            pressure += (0.35 - morality) * 0.4
+        pressure -= float(getattr(resident, "piety", 0.0)) * 0.08
         nearby = self.get_social_candidates(agent)
         for other in nearby:
             rel = self.get_relationship(resident.id, other.resident.id)
@@ -1967,6 +2654,7 @@ class World:
         for agent in self.agents:
             resident = agent.resident
             self._ensure_resident_safety(resident)
+            self._ensure_resident_religion(resident)
             if not (
                 self.mood_score(resident.mood) < -0.3
                 or resident.energy < 0.2
@@ -1989,6 +2677,8 @@ class World:
             crime_type = "vandalism"
             if victim is not None:
                 crime_type = "conflict" if self.rng.random() < 0.5 else "theft"
+            elif float(resident.morality_score) < 0.2:
+                crime_type = "fraud"
             event = CrimeEvent(
                 type=crime_type,
                 perpetrator=agent.resident.id,
@@ -2089,6 +2779,7 @@ class World:
 
         previous_weather = normalize_weather(self.weather)
         weather_events = sync_weather_cycle(self)
+        fashion_events = sync_fashion_for_tick(self)
         active_season = normalize_season(self.season)
         active_weather = normalize_weather(self.weather)
         if active_weather is WeatherType.stormy:
@@ -2113,6 +2804,7 @@ class World:
         for agent in self.agents:
             self._ensure_resident_job(agent.resident)
             self._ensure_resident_health(agent.resident)
+            self._ensure_resident_fashion(agent.resident)
             if active_weather is WeatherType.sunny and self.rng.random() < 0.1:
                 self.shift_resident_mood(agent, 1, "weather")
             if active_weather is WeatherType.stormy and agent.resident.location is None:
@@ -2146,6 +2838,7 @@ class World:
         crime_events = self.process_crime_tick()
         pet_events = self.update_pets()
         culture_events = self.update_cultural_events()
+        religion_events = self.update_religious_events()
 
         # ── Mood contagion: co-occupants influence each other's mood ──────
         from engine.act import apply_mood_contagion
@@ -2175,6 +2868,8 @@ class World:
                 x=a.resident.x,
                 y=a.resident.y,
                 action="walking" if a.current_path else "standing",
+                outfit_color=a.resident.outfit_color,
+                appearance=a.resident.appearance,
             )
             for a in self.agents
             if a.resident.id in movement_candidates
@@ -2195,8 +2890,10 @@ class World:
             movements=movements,
             events=[
                 *[EventUpdate(description=description) for description in weather_events],
+                *[EventUpdate(description=description) for description in fashion_events],
                 *pet_events,
                 *culture_events,
+                *religion_events,
                 *[
                     EventUpdate(description=f"{event.location}发生{event.type}事件")
                     for event in crime_events

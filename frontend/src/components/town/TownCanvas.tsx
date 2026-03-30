@@ -21,7 +21,7 @@ import {
 } from '../../services/api'
 import { useToast } from '../ui/ToastProvider'
 import { useRelationshipsStore } from '../../stores/relationships'
-import type { Festival, Zone } from '../../types'
+import type { Disaster, Festival, Zone } from '../../types'
 import {
   useSimulationStore,
   type ResidentPosition,
@@ -42,6 +42,8 @@ function toReplayResident(
     hair_style?: string | null
     hair_color?: string | null
     outfit_color?: string | null
+    appearance?: ResidentPosition['appearance']
+    wardrobe?: ResidentPosition['wardrobe']
     personality?: string
     mood?: string
     goals?: string[]
@@ -65,6 +67,8 @@ function toReplayResident(
     hairStyle: resident.hair_style ?? null,
     hairColor: resident.hair_color ?? null,
     outfitColor: resident.outfit_color ?? null,
+    appearance: resident.appearance,
+    wardrobe: resident.wardrobe ?? [],
     personality: resident.personality,
     mood: resident.mood,
     goals: resident.goals,
@@ -92,6 +96,7 @@ export function TownCanvas() {
   const weather = useSimulationStore((state) => state.weather)
   const season = useSimulationStore((state) => state.season)
   const currentFestival = useSimulationStore((state) => state.currentFestival)
+  const currentDisasters = useSimulationStore((state) => state.currentDisasters)
   const messageFeed = useSimulationStore((state) => state.messageFeed)
   const replayFrozenFrame = useSimulationStore((state) => state.replayFrozenFrame)
   const getFrameByTick = useSimulationStore((state) => state.getFrameByTick)
@@ -404,6 +409,7 @@ export function TownCanvas() {
         time: state.time,
       })
       renderer.setActiveFestival((state as typeof state & { currentFestival?: Festival | null }).currentFestival ?? null)
+      renderer.setActiveDisasters((state as typeof state & { currentDisasters?: Disaster[] }).currentDisasters ?? [])
       renderer.setFollowTarget(state.selectedResidentId)
       renderer.setHighlightedResidents(state.hoveredPairIds)
       renderer.resize(initialWidth, initialHeight)
@@ -464,6 +470,10 @@ export function TownCanvas() {
   useEffect(() => {
     rendererRef.current?.setActiveFestival(currentFestival)
   }, [currentFestival])
+
+  useEffect(() => {
+    rendererRef.current?.setActiveDisasters(currentDisasters)
+  }, [currentDisasters])
 
   useEffect(() => {
     rendererRef.current?.setFollowTarget(selectedResidentId)
@@ -644,6 +654,13 @@ export function TownCanvas() {
         onCancelFollow={() => {
           rendererRef.current?.setFollowTarget(null)
           selectResident(null)
+        }}
+        onFollowResident={(id) => {
+          setFollowedResidentId(id)
+          rendererRef.current?.setFollowTarget(id)
+        }}
+        onGiftResident={(id) => {
+          window.dispatchEvent(new CustomEvent('populace:open-tool', { detail: { tool: 'persona', residentId: id, section: 'trade' } }))
         }}
       />
       {/* Heatmap toggle */}

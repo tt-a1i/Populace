@@ -1,11 +1,12 @@
 """Tests for /api/world endpoints."""
 import asyncio
+import copy
 
 import pytest
 from fastapi.testclient import TestClient
 
 from backend.main import app
-from engine.types import CrimeEvent
+from engine.types import CrimeEvent, ExternalTown, Party, TradeRoute
 
 
 @pytest.fixture(scope="module")
@@ -208,6 +209,136 @@ def test_get_world_health_returns_epidemic_stats(client):
     assert "treatment_rate" in payload
 
 
+def test_world_politics_returns_mayor_policies_and_party_distribution(client):
+    state = client.app.state.simulation_state
+    world = state.world
+    original_mayor = copy.deepcopy(getattr(state, "_current_mayor", None))
+    original_satisfaction = getattr(state, "_political_satisfaction", 0.5)
+    original_low_satisfaction = getattr(state, "_low_satisfaction_ticks", 0)
+    original_last_policy_tick = getattr(state, "_last_policy_tick", 0)
+    original_votes = copy.deepcopy(getattr(state, "_active_votes", []))
+    original_parties = [getattr(agent.resident, "party", Party.neutral) for agent in world.agents]
+
+    try:
+        world.agents[0].resident.party = Party.progressive
+        world.agents[1].resident.party = Party.progressive
+        world.agents[2].resident.party = Party.conservative
+        state._current_mayor = {
+            "resident_id": world.agents[0].resident.id,
+            "term_start": 120,
+            "term_end": 620,
+            "party": "progressive",
+            "policies": [
+                {
+                    "type": "welfare",
+                    "effect": {"mood_delta": 0.15, "reserve_delta": -20.0},
+                    "duration": 72,
+                    "issued_tick": 200,
+                }
+            ],
+        }
+        state._political_satisfaction = 0.58
+        state._low_satisfaction_ticks = 0
+        state._last_policy_tick = 200
+        state._active_votes = []
+
+        response = client.get("/api/world/politics")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["mayor"]["resident_id"] == world.agents[0].resident.id
+        assert payload["mayor"]["resident_name"] == world.agents[0].resident.name
+        assert payload["mayor"]["party"] == "progressive"
+        assert payload["active_policies"][0]["type"] == "welfare"
+        assert payload["party_distribution"]["progressive"] >= 2
+        assert payload["party_distribution"]["conservative"] >= 1
+        assert payload["public_satisfaction"] == pytest.approx(0.58)
+        assert "election_countdown" in payload
+    finally:
+        for agent, party in zip(world.agents, original_parties):
+            agent.resident.party = party
+        state._current_mayor = original_mayor
+        state._political_satisfaction = original_satisfaction
+        state._low_satisfaction_ticks = original_low_satisfaction
+        state._last_policy_tick = original_last_policy_tick
+        state._active_votes = original_votes
+
+
+def test_politics_tick_can_start_election_issue_policy_and_trigger_impeachment(client):
+    state = client.app.state.simulation_state
+    world = state.world
+    original_tick = world.current_tick
+    original_probability = world.config.llm_call_probability
+    original_votes = copy.deepcopy(getattr(state, "_active_votes", []))
+    original_history = copy.deepcopy(getattr(state, "_vote_history", []))
+    original_mayor = copy.deepcopy(getattr(state, "_current_mayor", None))
+    original_satisfaction = getattr(state, "_political_satisfaction", 0.5)
+    original_low_satisfaction = getattr(state, "_low_satisfaction_ticks", 0)
+    original_last_policy_tick = getattr(state, "_last_policy_tick", 0)
+    original_output = world.economic_output
+
+    try:
+        world.config.llm_call_probability = 0.0
+        state._active_votes = []
+        state._vote_history = []
+        state._current_mayor = {
+            "resident_id": world.agents[0].resident.id,
+            "term_start": 0,
+            "term_end": 500,
+            "party": "progressive",
+            "policies": [],
+        }
+        state._last_policy_tick = 0
+        state._political_satisfaction = 0.62
+        state._low_satisfaction_ticks = 0
+
+        world.current_tick = 499
+        asyncio.run(state._tick())
+        assert any("镇长选举" in vote["issue"] for vote in state._active_votes)
+
+        state._active_votes = []
+        state._current_mayor = {
+            "resident_id": world.agents[1].resident.id,
+            "term_start": 200,
+            "term_end": 900,
+            "party": "conservative",
+            "policies": [],
+        }
+        state._last_policy_tick = 400
+        state._political_satisfaction = 0.61
+        world.economic_output = 10.0
+
+        world.current_tick = 599
+        asyncio.run(state._tick())
+        assert state._current_mayor is not None
+        assert state._current_mayor["policies"]
+        assert state._last_policy_tick >= 600
+
+        state._active_votes = []
+        state._current_mayor = {
+            "resident_id": world.agents[2].resident.id,
+            "term_start": 100,
+            "term_end": 900,
+            "party": "neutral",
+            "policies": [],
+        }
+        state._political_satisfaction = 0.2
+        state._low_satisfaction_ticks = 119
+
+        world.current_tick = 719
+        asyncio.run(state._tick())
+        assert any("弹劾" in vote["issue"] for vote in state._active_votes)
+    finally:
+        world.current_tick = original_tick
+        world.config.llm_call_probability = original_probability
+        state._active_votes = original_votes
+        state._vote_history = original_history
+        state._current_mayor = original_mayor
+        state._political_satisfaction = original_satisfaction
+        state._low_satisfaction_ticks = original_low_satisfaction
+        state._last_policy_tick = original_last_policy_tick
+        world.economic_output = original_output
+
+
 def test_transport_endpoint_returns_road_network_and_stats(client):
     response = client.get("/api/world/transport")
 
@@ -218,6 +349,50 @@ def test_transport_endpoint_returns_road_network_and_stats(client):
     assert "stats" in payload
     assert "mode_share" in payload["stats"]
     assert "congestion_hotspots" in payload["stats"]
+
+
+def test_demographics_endpoint_returns_age_distribution_and_timeline(client):
+    state = client.app.state.simulation_state
+    original_history = list(getattr(state.world, "generational_history", []))
+    original_ages = [
+        (agent.resident.age_days, getattr(agent.resident, "age_stage", "child"), getattr(agent.resident, "retirement_tick", None))
+        for agent in state.world.agents
+    ]
+
+    try:
+        for agent in state.world.agents:
+            agent.resident.age_days = 360
+            agent.resident.age_stage = "adult"
+            agent.resident.retirement_tick = None
+
+        state.world.agents[0].resident.age_days = 80
+        state.world.agents[0].resident.age_stage = "child"
+        state.world.agents[1].resident.age_days = 340
+        state.world.agents[1].resident.age_stage = "adult"
+        state.world.agents[2].resident.age_days = 860
+        state.world.agents[2].resident.age_stage = "elder"
+        state.world.agents[2].resident.retirement_tick = 222
+        state.world.generational_history = [
+            {"tick": 128, "type": "birth", "resident_name": "新芽", "summary": "新芽出生"},
+            {"tick": 222, "type": "retirement", "resident_name": "大强", "summary": "大强退休"},
+        ]
+
+        response = client.get("/api/world/demographics")
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["age_distribution"]["child"] >= 1
+        assert payload["age_distribution"]["adult"] >= 1
+        assert payload["age_distribution"]["elder"] >= 1
+        assert payload["retired_count"] >= 1
+        assert payload["aging_index"] >= 0
+        assert payload["generational_timeline"][0]["type"] == "retirement"
+    finally:
+        for agent, (age_days, age_stage, retirement_tick) in zip(state.world.agents, original_ages):
+            agent.resident.age_days = age_days
+            agent.resident.age_stage = age_stage
+            agent.resident.retirement_tick = retirement_tick
+        state.world.generational_history = original_history
 
 
 def test_list_families(client):
@@ -317,6 +492,59 @@ def test_world_bulletin_returns_posts_and_hot_topics(client):
     finally:
         state._bulletin_posts = original_posts
         state._bulletin_hot_topics = original_topics
+
+
+def test_world_diplomacy_returns_towns_routes_and_balance(client):
+    state = client.app.state.simulation_state
+    original_towns = list(getattr(state.world, "external_towns", []))
+    original_routes = list(getattr(state.world, "trade_routes", []))
+    original_ledger = list(getattr(state, "_diplomacy_ledger", []))
+
+    try:
+        state.world.external_towns = [
+            ExternalTown(
+                name="海雾港",
+                relation_score=0.62,
+                trade_balance=41.5,
+                ambassador_id=state.world.agents[0].resident.id,
+                specialties=["海盐", "珍珠"],
+            )
+        ]
+        state.world.trade_routes = [
+            TradeRoute(
+                from_town="Populace",
+                to_town="海雾港",
+                goods=["coffee", "silk"],
+                profit_per_tick=13.5,
+                merchant_id=state.world.agents[1].resident.id,
+                rare_goods=["珍珠"],
+            )
+        ]
+        state._diplomacy_ledger = [
+            {
+                "tick": 24,
+                "type": "profit",
+                "town_name": "海雾港",
+                "route_id": "Populace->海雾港",
+                "amount": 16.2,
+                "description": "海雾港 本轮送来了高利润海盐订单。",
+            }
+        ]
+
+        response = client.get("/api/world/diplomacy")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["towns"][0]["name"] == "海雾港"
+        assert payload["towns"][0]["relation_status"] == "friendly"
+        assert payload["trade_routes"][0]["to_town"] == "海雾港"
+        assert payload["trade_routes"][0]["goods"] == ["coffee", "silk"]
+        assert payload["summary"]["active_routes"] == 1
+        assert payload["summary"]["total_profit"] == pytest.approx(16.2)
+        assert payload["ledger"][0]["town_name"] == "海雾港"
+    finally:
+        state.world.external_towns = original_towns
+        state.world.trade_routes = original_routes
+        state._diplomacy_ledger = original_ledger
 
 
 def test_family_dinner_event_triggers_every_50_ticks(client):

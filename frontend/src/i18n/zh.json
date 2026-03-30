@@ -81,6 +81,8 @@
     "stats": "数据统计",
     "dialogue_history": "对话记录",
     "saves": "存档管理",
+    "population": "人口面板",
+    "emergency": "应急面板",
     "export": "数据导出",
     "heatmap": "关系热力图",
     "compare": "居民对比",
@@ -89,6 +91,9 @@
     "current_tool": "当前工具：",
     "whatif": "假设分析",
     "culture": "文化面板",
+    "politics": "政治面板",
+    "diplomacy": "外交面板",
+    "religion": "信仰面板",
     "knowledge": "知识图谱"
   },
   "knowledge": {
@@ -901,5 +906,37 @@
     "phase_home": "归家",
     "ptype_extrovert": "外向",
     "ptype_introvert": "内向"
+  },
+  "fashion": {
+    "title": "时尚面板",
+    "badge": "Fashion",
+    "loading_title": "时尚风向加载中…",
+    "loading_message": "正在整理潮流、穿搭排行与消费记录。",
+    "error": "时尚数据加载失败",
+    "current_trend": "当前潮流",
+    "total_spent": "总消费",
+    "avg_spend": "人均客单",
+    "trend_section": "潮流趋势",
+    "trend_desc": "主打 {{category}}，推荐 {{color}} 色系。",
+    "trend_history_empty": "暂无潮流历史",
+    "trend_history_hint": "等待更多 tick 推进后，这里会展示风向切换轨迹。",
+    "consumption_section": "消费概况",
+    "purchase_count": "成交次数",
+    "top_category": "最热品类",
+    "top_color": "热门颜色",
+    "none": "暂无",
+    "ranking_section": "穿搭排行",
+    "ranking_empty": "暂无排行",
+    "ranking_hint": "居民开始购衣、换装后，这里会展示镇上最会穿的人。",
+    "recent_section": "最近成交",
+    "recent_empty": "还没人买新衣服",
+    "recent_hint": "居民去市场消费后，这里会出现最新服装订单。"
+  },
+  "quick_actions": {
+    "view": "查看详情",
+    "follow": "跟踪",
+    "unfollow": "取消跟踪",
+    "chat": "对话",
+    "gift": "送礼"
   }
 }

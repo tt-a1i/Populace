@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from engine.generative_agent import GenerativeAgent
 from engine.types import (
+    Item,
     PopulationEvent,
     PopulationResidentSnapshot,
     RelationType,
@@ -21,11 +22,13 @@ if TYPE_CHECKING:
     from engine.world import World
 
 
-ELDERLY_AGE_DAYS = 365
-DEATH_AGE_DAYS = 500
+CHILD_AGE_DAYS = 200
+ELDERLY_AGE_DAYS = 800
+DEATH_AGE_DAYS = 1000
 DAILY_DEATH_PROBABILITY = 0.05
 DAILY_BIRTH_PROBABILITY = 0.02
 NEWBORN_PARENT_BOND = 0.7
+DAILY_PENSION_AMOUNT = 8.0
 MUTATION_TRAITS = (
     "好奇",
     "坚韧",
@@ -76,7 +79,15 @@ OUTFIT_COLORS = (
 
 
 def is_elderly(resident: Resident) -> bool:
-    return resident.age_days > ELDERLY_AGE_DAYS
+    return age_stage_for_days(resident.age_days) == "elder"
+
+
+def age_stage_for_days(age_days: int) -> str:
+    if age_days < CHILD_AGE_DAYS:
+        return "child"
+    if age_days < ELDERLY_AGE_DAYS:
+        return "adult"
+    return "elder"
 
 
 def snapshot_resident(resident: Resident) -> PopulationResidentSnapshot:
@@ -93,8 +104,11 @@ def snapshot_resident(resident: Resident) -> PopulationResidentSnapshot:
         hair_style=resident.hair_style,
         hair_color=resident.hair_color,
         outfit_color=resident.outfit_color,
+        appearance=resident.appearance,
+        wardrobe=list(resident.wardrobe),
         coins=resident.coins,
         occupation=resident.occupation,
+        skills=dict(resident.skills),
         inventory=list(resident.inventory),
         energy=resident.energy,
         age_days=resident.age_days,
@@ -143,6 +157,76 @@ def _generate_child_name(parent_a: Resident, parent_b: Resident, rng: random.Ran
     if parent_a.name and parent_b.name and parent_a.name[0] == parent_b.name[0]:
         shared_prefix = parent_a.name[0]
     return f"{shared_prefix}{rng.choice(NAME_POOL)}"
+
+
+def _inherit_skills(parent_a: Resident, parent_b: Resident, rng: random.Random | None = None) -> dict[str, float]:
+    rng = rng or random
+    combined: dict[str, float] = {}
+    for parent in (parent_a, parent_b):
+        for skill, value in parent.skills.items():
+            combined[skill] = max(combined.get(skill, 0.0), float(value))
+
+    if not combined:
+        return {}
+
+    selected = sorted(combined)
+    sample_size = min(2, len(selected))
+    inherited: dict[str, float] = {}
+    for skill in rng.sample(selected, k=sample_size):
+        weight = 0.35 + rng.random() * 0.3
+        inherited[skill] = round(max(0.05, min(0.95, combined[skill] * weight)), 4)
+    return inherited
+
+
+def _pick_inheritance_heir(world: "World", resident: Resident):
+    child_ids = list(getattr(getattr(resident, "family", None), "children_ids", []) or [])
+    for child_id in child_ids:
+        heir = world.get_agent(child_id)
+        if heir is not None:
+            return heir
+
+    best_score = -1.0
+    best_heir = None
+    for other in world.agents:
+        if other.resident.id == resident.id:
+            continue
+        relationship = world.get_relationship(resident.id, other.resident.id) or world.get_relationship(other.resident.id, resident.id)
+        if relationship is None:
+            continue
+        if relationship.type.value not in {"friendship", "love", "trust"}:
+            continue
+        score = float(relationship.intensity) + float(relationship.familiarity)
+        if score > best_score:
+            best_score = score
+            best_heir = other
+    return best_heir
+
+
+def _transfer_inheritance(world: "World", deceased: Resident, tick: int) -> dict[str, object]:
+    heir_agent = _pick_inheritance_heir(world, deceased)
+    if heir_agent is None:
+        return {}
+
+    heir = heir_agent.resident
+    inherited_items = [
+        Item(name=item.name, quantity=item.quantity, value=item.value)
+        for item in deceased.inventory
+    ]
+    heir.coins += deceased.coins
+    heir.wallet = round(float(getattr(heir, "wallet", 0.0)) + float(deceased.wallet), 2)
+    heir.inventory.extend(inherited_items)
+    heir.inheritance = {
+        "from_resident_id": deceased.id,
+        "from_resident_name": deceased.name,
+        "tick": tick,
+        "coins": deceased.coins,
+        "wallet": round(float(deceased.wallet), 2),
+        "items": [item.name for item in inherited_items],
+    }
+    deceased.coins = 0
+    deceased.wallet = 0.0
+    deceased.inventory = []
+    return heir.inheritance
 
 
 def generate_resident_appearance(resident_id: str) -> dict[str, str]:
@@ -198,6 +282,25 @@ def process_daily_population(
 
     for agent in world.agents:
         agent.resident.age_days += 1
+        world._ensure_resident_ageing(agent.resident)
+        if agent.resident.age_stage == "elder":
+            just_retired = agent.resident.retirement_tick is None
+            world.retire_resident(agent.resident, tick=world.current_tick)
+            pension = world.grant_pension(agent.resident, DAILY_PENSION_AMOUNT)
+            if just_retired:
+                world.record_generational_event(
+                    "retirement",
+                    agent.resident.name,
+                    f"{agent.resident.name} 进入退休阶段。",
+                    resident_id=agent.resident.id,
+                    tick=world.current_tick,
+                )
+            if pension > 0:
+                agent.resident.inheritance.setdefault("pension_history", [])
+                agent.resident.inheritance["pension_history"] = [
+                    *list(agent.resident.inheritance["pension_history"][-4:]),
+                    {"tick": world.current_tick, "amount": pension},
+                ]
 
     deceased_ids: list[str] = []
     for agent in list(world.agents):
@@ -206,15 +309,26 @@ def process_daily_population(
             continue
         if rng.random() >= DAILY_DEATH_PROBABILITY:
             continue
+        inheritance = _transfer_inheritance(world, resident, world.current_tick)
         deceased_ids.append(resident.id)
+        death_summary = f"{resident.name} 在 {resident.age_days} 天后离世。"
+        if inheritance:
+            death_summary = f"{death_summary} 遗产已转交。"
         population_events.append(
             PopulationEvent(
                 event_type="death",
                 resident_id=resident.id,
                 resident_name=resident.name,
                 resident=snapshot_resident(resident),
-                summary=f"{resident.name} 在 {resident.age_days} 天后离世。",
+                summary=death_summary,
             )
+        )
+        world.record_generational_event(
+            "death",
+            resident.name,
+            death_summary,
+            resident_id=resident.id,
+            tick=world.current_tick,
         )
 
     for resident_id in deceased_ids:
@@ -248,6 +362,7 @@ def process_daily_population(
         child_id = f"resident-{uuid.uuid4().hex[:8]}"
         child_name = _generate_child_name(parent_a.resident, parent_b.resident, rng)
         child_personality = inherit_personality(parent_a.resident, parent_b.resident, rng)
+        child_skills = _inherit_skills(parent_a.resident, parent_b.resident, rng)
         x, y, home_id = _pick_birth_position(world, parent_a.resident, parent_b.resident)
         appearance = generate_resident_appearance(child_id)
         child = Resident(
@@ -267,6 +382,8 @@ def process_daily_population(
             occupation="infant",
             energy=1.0,
             age_days=0,
+            age_stage="child",
+            skills=child_skills,
         )
         child_agent = GenerativeAgent(child)
         world.add_agent(child_agent)
@@ -274,6 +391,11 @@ def process_daily_population(
             home = world.get_building(home_id)
             if home is not None:
                 world.enter_building(child_agent, home)
+        child.family.parent_ids = [pair[0], pair[1]]
+        child.family.family_name = parent_a.resident.family.family_name or parent_b.resident.family.family_name
+        for parent in (parent_a.resident, parent_b.resident):
+            if child_id not in parent.family.children_ids:
+                parent.family.children_ids.append(child_id)
 
         relationship_deltas.extend(
             _create_parent_child_relationships(world, [pair[0], pair[1]], child_id, current_time)
@@ -288,6 +410,13 @@ def process_daily_population(
                 parent_names=[parent_a.resident.name, parent_b.resident.name],
                 summary=f"{parent_a.resident.name} 与 {parent_b.resident.name} 迎来了新居民 {child.name}。",
             )
+        )
+        world.record_generational_event(
+            "birth",
+            child.name,
+            f"{parent_a.resident.name} 与 {parent_b.resident.name} 迎来了新居民 {child.name}。",
+            resident_id=child.id,
+            tick=world.current_tick,
         )
         summary["births"] += 1
 

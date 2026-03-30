@@ -19,6 +19,7 @@ from backend.api.schemas import (
     BuildingUpgradeResponse,
     BuildingVisitRecord,
     CrimeEventResponse,
+    DisasterListResponse,
     FestivalListResponse,
     PetResponse,
     PresetEventResponse,
@@ -29,10 +30,15 @@ from backend.api.schemas import (
     WeatherResponse,
     WorldBulletinResponse,
     WorldCultureResponse,
+    WorldDiplomacyResponse,
+    WorldDemographicsResponse,
     WorldHealthResponse,
     WorldEconomyResponse,
+    WorldFashionResponse,
     WorldEducationCourseResponse,
     WorldEventResponse,
+    WorldPoliticsResponse,
+    WorldReligionResponse,
     WorldTransportResponse,
     ZoneResponse,
     api_error,
@@ -330,6 +336,16 @@ async def get_world_economy(request: Request) -> WorldEconomyResponse:
 
 
 @router.get(
+    "/fashion",
+    response_model=WorldFashionResponse,
+    responses=error_responses(503),
+)
+async def get_world_fashion(request: Request) -> WorldFashionResponse:
+    state = get_simulation_state(request)
+    return WorldFashionResponse(**state.world.get_fashion_overview())
+
+
+@router.get(
     "/health",
     response_model=WorldHealthResponse,
     responses=error_responses(503),
@@ -337,6 +353,26 @@ async def get_world_economy(request: Request) -> WorldEconomyResponse:
 async def get_world_health(request: Request) -> WorldHealthResponse:
     state = get_simulation_state(request)
     return WorldHealthResponse(**state.world.get_health_stats())
+
+
+@router.get(
+    "/demographics",
+    response_model=WorldDemographicsResponse,
+    responses=error_responses(503),
+)
+async def get_world_demographics(request: Request) -> WorldDemographicsResponse:
+    state = get_simulation_state(request)
+    return WorldDemographicsResponse(**state.world.get_demographics_overview())
+
+
+@router.get(
+    "/politics",
+    response_model=WorldPoliticsResponse,
+    responses=error_responses(503),
+)
+async def get_world_politics(request: Request) -> WorldPoliticsResponse:
+    state = get_simulation_state(request)
+    return WorldPoliticsResponse(**state.get_politics_overview())
 
 
 @router.get(
@@ -517,6 +553,16 @@ async def get_world_culture(request: Request) -> WorldCultureResponse:
 
 
 @router.get(
+    "/religion",
+    response_model=WorldReligionResponse,
+    responses=error_responses(503),
+)
+async def get_world_religion(request: Request) -> WorldReligionResponse:
+    state = get_simulation_state(request)
+    return WorldReligionResponse(**state.world.get_religion_overview())
+
+
+@router.get(
     "/zones",
     response_model=list[ZoneResponse],
     responses=error_responses(503),
@@ -547,6 +593,16 @@ async def list_festivals(request: Request) -> FestivalListResponse:
 
 
 @router.get(
+    "/disasters",
+    response_model=DisasterListResponse,
+    responses=error_responses(503),
+)
+async def list_disasters(request: Request) -> DisasterListResponse:
+    state = get_simulation_state(request)
+    return DisasterListResponse(**state.get_disasters())
+
+
+@router.get(
     "/bulletin",
     response_model=WorldBulletinResponse,
     responses=error_responses(503),
@@ -554,6 +610,16 @@ async def list_festivals(request: Request) -> FestivalListResponse:
 async def get_world_bulletin(request: Request) -> WorldBulletinResponse:
     state = get_simulation_state(request)
     return WorldBulletinResponse(**state.get_bulletin_board())
+
+
+@router.get(
+    "/diplomacy",
+    response_model=WorldDiplomacyResponse,
+    responses=error_responses(503),
+)
+async def get_world_diplomacy(request: Request) -> WorldDiplomacyResponse:
+    state = get_simulation_state(request)
+    return WorldDiplomacyResponse(**state.get_diplomacy_overview())
 
 
 @router.get(
@@ -628,7 +694,7 @@ async def get_building_details_alias(building_id: str, request: Request) -> Buil
     return _build_building_detail(building_id, state)
 
 
-_VALID_BUILDING_TYPES = {"home", "cafe", "park", "shop", "school", "gym", "library", "hospital"}
+_VALID_BUILDING_TYPES = {"home", "cafe", "park", "shop", "school", "gym", "library", "hospital", "temple", "shrine", "chapel"}
 
 
 class AddBuildingRequest(BaseModel):

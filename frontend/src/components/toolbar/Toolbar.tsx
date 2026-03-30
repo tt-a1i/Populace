@@ -22,14 +22,26 @@ const ComparePanel = lazy(() =>
 const CulturePanel = lazy(() =>
   import('./CulturePanel').then((module) => ({ default: module.CulturePanel })),
 )
+const ReligionPanel = lazy(() =>
+  import('./ReligionPanel').then((module) => ({ default: module.ReligionPanel })),
+)
 const DialogueHistory = lazy(() =>
   import('./DialogueHistory').then((module) => ({ default: module.DialogueHistory })),
 )
 const BulletinPanel = lazy(() =>
   import('./BulletinPanel').then((module) => ({ default: module.BulletinPanel })),
 )
+const DiplomacyPanel = lazy(() =>
+  import('./DiplomacyPanel').then((module) => ({ default: module.DiplomacyPanel })),
+)
 const EconomyPanel = lazy(() =>
   import('./EconomyPanel').then((module) => ({ default: module.EconomyPanel })),
+)
+const PoliticsPanel = lazy(() =>
+  import('./PoliticsPanel').then((module) => ({ default: module.PoliticsPanel })),
+)
+const FashionPanel = lazy(() =>
+  import('./FashionPanel').then((module) => ({ default: module.FashionPanel })),
 )
 const ExportPanel = lazy(() =>
   import('./ExportPanel').then((module) => ({ default: module.ExportPanel })),
@@ -51,6 +63,12 @@ const SecurityPanel = lazy(() =>
 )
 const HealthPanel = lazy(() =>
   import('./HealthPanel').then((module) => ({ default: module.HealthPanel })),
+)
+const EmergencyPanel = lazy(() =>
+  import('./EmergencyPanel').then((module) => ({ default: module.EmergencyPanel })),
+)
+const PopulationPanel = lazy(() =>
+  import('./PopulationPanel').then((module) => ({ default: module.PopulationPanel })),
 )
 const TimelinePanel = lazy(() =>
   import('./TimelinePanel').then((module) => ({ default: module.TimelinePanel })),
@@ -91,7 +109,7 @@ const KnowledgeGraphPanel = lazy(() =>
 
 const OPEN_SETTINGS_EVENT = 'populace:open-settings'
 
-type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'votes' | 'security' | 'health' | 'family' | 'economy' | 'culture' | 'reputation' | 'bulletin' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard' | 'leaderboard' | 'achievements' | 'newspaper' | 'fullreport' | 'whatif' | 'mapeditor' | 'rules' | 'knowledge'
+type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'votes' | 'security' | 'health' | 'emergency' | 'population' | 'family' | 'economy' | 'fashion' | 'culture' | 'politics' | 'religion' | 'reputation' | 'bulletin' | 'diplomacy' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard' | 'leaderboard' | 'achievements' | 'newspaper' | 'fullreport' | 'whatif' | 'mapeditor' | 'rules' | 'knowledge'
 
 interface ToolDef {
   key: ToolKey
@@ -115,7 +133,7 @@ function toneClass(_tone: string, active: boolean): string {
 
 const SECONDARY_KEYS: ReadonlySet<ToolKey> = new Set([
   'create', 'build', 'stats', 'dialogue', 'activity', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings', 'dashboard', 'leaderboard', 'achievements', 'newspaper', 'fullreport', 'whatif', 'mapeditor', 'rules', 'knowledge',
-  'votes', 'security', 'health', 'family', 'economy', 'culture', 'reputation', 'bulletin',
+  'votes', 'security', 'health', 'emergency', 'population', 'family', 'economy', 'fashion', 'culture', 'politics', 'religion', 'reputation', 'bulletin', 'diplomacy',
 ])
 
 export function Toolbar() {
@@ -183,11 +201,17 @@ export function Toolbar() {
     { key: 'votes', label: t('toolbar.votes', { defaultValue: '社区投票' }), icon: '\uD83D\uDDD3\uFE0F', tone: 'amber' },
     { key: 'security', label: t('toolbar.security', { defaultValue: '治安面板' }), icon: '\uD83D\uDEE1\uFE0F', tone: 'rose' },
     { key: 'health', label: t('toolbar.health', { defaultValue: '健康面板' }), icon: '\uD83E\uDE7A', tone: 'emerald' },
+    { key: 'emergency', label: t('toolbar.emergency', { defaultValue: '应急面板' }), icon: '\uD83D\uDEA8', tone: 'rose' },
+    { key: 'population', label: t('toolbar.population', { defaultValue: '人口面板' }), icon: '\uD83E\uDDD3', tone: 'amber' },
     { key: 'family', label: t('toolbar.family', { defaultValue: '家族谱系' }), icon: '\uD83C\uDF33', tone: 'emerald' },
     { key: 'economy', label: t('toolbar.economy', { defaultValue: '经济面板' }), icon: '\uD83D\uDCB0', tone: 'emerald' },
+    { key: 'fashion', label: t('toolbar.fashion', { defaultValue: '时尚面板' }), icon: '\uD83D\uDC57', tone: 'rose' },
     { key: 'culture', label: t('toolbar.culture', { defaultValue: '文化面板' }), icon: '\uD83C\uDFA8', tone: 'rose' },
+    { key: 'politics', label: t('toolbar.politics', { defaultValue: '政治面板' }), icon: '\uD83C\uDFDB\uFE0F', tone: 'amber' },
+    { key: 'religion', label: t('toolbar.religion', { defaultValue: '信仰面板' }), icon: '\uD83D\uDD6F\uFE0F', tone: 'amber' },
     { key: 'reputation', label: t('toolbar.reputation', { defaultValue: '声望排行榜' }), icon: '\u2B50', tone: 'amber' },
     { key: 'bulletin', label: t('toolbar.bulletin', { defaultValue: '公告板' }), icon: '\uD83D\uDCCC', tone: 'rose' },
+    { key: 'diplomacy', label: t('toolbar.diplomacy', { defaultValue: '外交面板' }), icon: '\uD83E\uDDED', tone: 'cyan' },
     { key: 'stats', label: t('toolbar.stats'), icon: '\uD83D\uDCCA', tone: 'cyan' },
     { key: 'dialogue', label: t('toolbar.dialogue_history'), icon: '\uD83D\uDCAC', tone: 'amber' },
     { key: 'activity', label: t('toolbar.activity_log', '\u6D3B\u52A8\u65E5\u5FD7'), icon: '\uD83D\uDCDC', tone: 'cyan' },
@@ -235,11 +259,17 @@ export function Toolbar() {
     if (activeTool === 'votes') return <LazyPanel label={t('toolbar.votes', { defaultValue: '社区投票' })}><VotePanel /></LazyPanel>
     if (activeTool === 'security') return <LazyPanel label={t('toolbar.security', { defaultValue: '治安面板' })}><SecurityPanel /></LazyPanel>
     if (activeTool === 'health') return <LazyPanel label={t('toolbar.health', { defaultValue: '健康面板' })}><HealthPanel /></LazyPanel>
+    if (activeTool === 'emergency') return <LazyPanel label={t('toolbar.emergency', { defaultValue: '应急面板' })}><EmergencyPanel /></LazyPanel>
+    if (activeTool === 'population') return <LazyPanel label={t('toolbar.population', { defaultValue: '人口面板' })}><PopulationPanel /></LazyPanel>
     if (activeTool === 'family') return <LazyPanel label={t('toolbar.family', { defaultValue: '家族谱系' })}><FamilyPanel /></LazyPanel>
     if (activeTool === 'economy') return <LazyPanel label={t('toolbar.economy', { defaultValue: '经济面板' })}><EconomyPanel /></LazyPanel>
+    if (activeTool === 'fashion') return <LazyPanel label={t('toolbar.fashion', { defaultValue: '时尚面板' })}><FashionPanel /></LazyPanel>
     if (activeTool === 'culture') return <LazyPanel label={t('toolbar.culture', { defaultValue: '文化面板' })}><CulturePanel /></LazyPanel>
+    if (activeTool === 'politics') return <LazyPanel label={t('toolbar.politics', { defaultValue: '政治面板' })}><PoliticsPanel /></LazyPanel>
+    if (activeTool === 'religion') return <LazyPanel label={t('toolbar.religion', { defaultValue: '信仰面板' })}><ReligionPanel /></LazyPanel>
     if (activeTool === 'reputation') return <LazyPanel label={t('toolbar.reputation', { defaultValue: '声望排行榜' })}><ReputationPanel /></LazyPanel>
     if (activeTool === 'bulletin') return <LazyPanel label={t('toolbar.bulletin', { defaultValue: '公告板' })}><BulletinPanel /></LazyPanel>
+    if (activeTool === 'diplomacy') return <LazyPanel label={t('toolbar.diplomacy', { defaultValue: '外交面板' })}><DiplomacyPanel /></LazyPanel>
     if (activeTool === 'create') return <LazyPanel label={t('toolbar.create')}><ResidentCreationWizard /></LazyPanel>
     if (activeTool === 'export') return <LazyPanel label={t('toolbar.export')}><ExportPanel /></LazyPanel>
     if (activeTool === 'saves') return <LazyPanel label={t('toolbar.saves')}><SavesPanel /></LazyPanel>

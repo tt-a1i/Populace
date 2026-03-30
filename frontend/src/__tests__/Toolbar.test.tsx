@@ -27,11 +27,26 @@ vi.mock('../components/toolbar/ReputationPanel', () => ({
 vi.mock('../components/toolbar/BulletinPanel', () => ({
   BulletinPanel: () => <div data-testid="bulletin-panel">BulletinPanel</div>,
 }))
+vi.mock('../components/toolbar/DiplomacyPanel', () => ({
+  DiplomacyPanel: () => <div data-testid="diplomacy-panel">DiplomacyPanel</div>,
+}))
 vi.mock('../components/toolbar/SecurityPanel', () => ({
   SecurityPanel: () => <div data-testid="security-panel">SecurityPanel</div>,
 }))
+vi.mock('../components/toolbar/HealthPanel', () => ({
+  HealthPanel: () => <div data-testid="health-panel">HealthPanel</div>,
+}))
+vi.mock('../components/toolbar/PopulationPanel', () => ({
+  PopulationPanel: () => <div data-testid="population-panel">PopulationPanel</div>,
+}))
 vi.mock('../components/toolbar/EconomyPanel', () => ({
   EconomyPanel: () => <div data-testid="economy-panel">EconomyPanel</div>,
+}))
+vi.mock('../components/toolbar/CulturePanel', () => ({
+  CulturePanel: () => <div data-testid="culture-panel">CulturePanel</div>,
+}))
+vi.mock('../components/toolbar/ReligionPanel', () => ({
+  ReligionPanel: () => <div data-testid="religion-panel">ReligionPanel</div>,
 }))
 vi.mock('../components/report', () => ({
   ReportsPanel: () => <div data-testid="reports-panel">ReportsPanel</div>,
@@ -126,9 +141,14 @@ describe('Toolbar', () => {
     expect(screen.getByTestId('secondary-row')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /建造模式/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /治安面板|治安/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /健康面板|健康/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /人口面板|人口/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /经济面板|经济/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /文化面板|文化/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /信仰面板|信仰/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /声望排行榜|声望/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /公告板|Bulletin/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /外交面板|外交|Diplomacy/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /数据统计/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /对话记录/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /创建居民/ })).toBeInTheDocument()
@@ -215,11 +235,39 @@ describe('Toolbar', () => {
     expect(await screen.findByTestId('security-panel')).toBeInTheDocument()
   })
 
+  it('switches to PopulationPanel when 人口面板 is clicked', async () => {
+    render(<Toolbar />)
+    await userEvent.click(screen.getByTestId('more-toggle'))
+    await userEvent.click(screen.getByRole('button', { name: /人口面板|人口/ }))
+    expect(await screen.findByTestId('population-panel')).toBeInTheDocument()
+  })
+
+  it('switches to HealthPanel when 健康面板 is clicked', async () => {
+    render(<Toolbar />)
+    await userEvent.click(screen.getByTestId('more-toggle'))
+    await userEvent.click(screen.getByRole('button', { name: /健康面板|健康/ }))
+    expect(await screen.findByTestId('health-panel')).toBeInTheDocument()
+  })
+
   it('switches to EconomyPanel when 经济面板 is clicked', async () => {
     render(<Toolbar />)
     await userEvent.click(screen.getByTestId('more-toggle'))
     await userEvent.click(screen.getByRole('button', { name: /经济面板|经济/ }))
     expect(await screen.findByTestId('economy-panel')).toBeInTheDocument()
+  })
+
+  it('switches to CulturePanel when 文化面板 is clicked', async () => {
+    render(<Toolbar />)
+    await userEvent.click(screen.getByTestId('more-toggle'))
+    await userEvent.click(screen.getByRole('button', { name: /文化面板|文化/ }))
+    expect(await screen.findByTestId('culture-panel')).toBeInTheDocument()
+  })
+
+  it('switches to ReligionPanel when 信仰面板 is clicked', async () => {
+    render(<Toolbar />)
+    await userEvent.click(screen.getByTestId('more-toggle'))
+    await userEvent.click(screen.getByRole('button', { name: /信仰面板|信仰/ }))
+    expect(await screen.findByTestId('religion-panel')).toBeInTheDocument()
   })
 
   it('switches to ReputationPanel when 声望排行榜 is clicked', async () => {
@@ -234,6 +282,13 @@ describe('Toolbar', () => {
     await userEvent.click(screen.getByTestId('more-toggle'))
     await userEvent.click(screen.getByRole('button', { name: /公告板|Bulletin/ }))
     expect(await screen.findByTestId('bulletin-panel')).toBeInTheDocument()
+  })
+
+  it('switches to DiplomacyPanel when 外交面板 is clicked', async () => {
+    render(<Toolbar />)
+    await userEvent.click(screen.getByTestId('more-toggle'))
+    await userEvent.click(screen.getByRole('button', { name: /外交面板|外交|Diplomacy/ }))
+    expect(await screen.findByTestId('diplomacy-panel')).toBeInTheDocument()
   })
 
   // Sound toggle is now in App.tsx HUD, not in Toolbar
