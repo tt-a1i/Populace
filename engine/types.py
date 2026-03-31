@@ -436,6 +436,7 @@ else:
         dream: str = ""
         dream_progress: float = 0.0
         personality_traits: Dict[str, float] = field(default_factory=dict)
+        badges: List[str] = field(default_factory=list)  # List of badge_ids awarded to this resident
 
 
     @dataclass
@@ -768,15 +769,32 @@ else:
     @dataclass
     class Gang:
         """A criminal gang that operates in the town."""
-        name: str
-        leader_id: str
-        member_ids: List[str] = field(default_factory=list)
+        id: str = ""
+        name: str = ""
+        leader_id: str = ""
+        members: List[str] = field(default_factory=list)
         territory: str = ""
-        influence: float = 0.5
-        activity: str = "贩私"
-        color: str = "#8B5CF6"
-        created_tick: int = 0
-        last_action_tick: int = 0
+        influence: float = 0.0
+
+    # ---------------------------------------------------------------------------
+    # Leaderboards & Badges (§106)
+    # ---------------------------------------------------------------------------
+
+    @dataclass
+    class LeaderboardEntry:
+        """A single entry in a leaderboard ranking."""
+        resident_id: str
+        name: str
+        value: float
+        rank: int
+
+    @dataclass
+    class Badge:
+        """A荣誉勋章 that can be awarded to residents."""
+        badge_id: str
+        name: str
+        emoji: str
+        condition_desc: str
 
     # ---------------------------------------------------------------------------
     # Town level / milestones (§96)

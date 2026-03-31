@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../services/api', () => ({
+vi.mock('../services/api', () => ({
   getWorldGangs: vi.fn().mockResolvedValue({
     gangs: [
       {
@@ -118,7 +118,7 @@ describe('GangPanel', () => {
   })
 
   it('displays empty state when no gangs exist', async () => {
-    vi.mocked(await import('../../services/api')).getWorldGangs.mockResolvedValueOnce({
+    vi.mocked(await import('../services/api')).getWorldGangs.mockResolvedValueOnce({
       gangs: [],
       recent_events: [],
     })
@@ -131,7 +131,7 @@ describe('GangPanel', () => {
   })
 
   it('shows error message when API fails', async () => {
-    vi.mocked(await import('../../services/api')).getWorldGangs.mockRejectedValueOnce(new Error('Network error'))
+    vi.mocked(await import('../services/api')).getWorldGangs.mockRejectedValueOnce(new Error('Network error'))
 
     render(<GangPanel />)
 
