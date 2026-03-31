@@ -2057,7 +2057,7 @@ class World:
             price = self.market.goods.get(gid, 5.0)
             supply = self.market.supply.get(gid, 0)
             if supply > 0 and getattr(resident, "coins", 0.0) >= price:
-                resident.coins = round(resident.coins - price, 2)
+                resident.coins = int(round(resident.coins - price))
                 self.market.supply[gid] = max(0, supply - 1)
                 self.market.demand_trend[gid] = min(1.0, self.market.demand_trend.get(gid, 0.0) + 0.05)
             else:

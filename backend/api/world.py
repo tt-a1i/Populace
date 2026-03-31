@@ -1138,3 +1138,109 @@ async def get_personality_stats(request: Request) -> WorldPersonalityStatsRespon
     state = get_simulation_state(request)
     stats = get_personality_stats(state)
     return WorldPersonalityStatsResponse(**stats)
+
+
+# ---------------------------------------------------------------------------
+# Leaderboards & Badges System (Task 106)
+# ---------------------------------------------------------------------------
+
+class LeaderboardEntryResponse(BaseModel):
+    resident_id: str
+    name: str
+    value: float
+    rank: int
+
+
+class LeaderboardsResponse(BaseModel):
+    richest: list[LeaderboardEntryResponse]
+    happiest: list[LeaderboardEntryResponse]
+    most_social: list[LeaderboardEntryResponse]
+    most_traveled: list[LeaderboardEntryResponse]
+    most_influential: list[LeaderboardEntryResponse]
+
+
+class BadgeResponse(BaseModel):
+    badge_id: str
+    name: str
+    emoji: str
+    condition_desc: str
+
+
+class BadgesStatsResponse(BaseModel):
+    total_awarded: int
+    rarest_badge: dict | None = None
+    badge_distribution: dict[str, int]
+
+
+@router.get(
+    "/leaderboards",
+    response_model=LeaderboardsResponse,
+    responses=error_responses(503),
+)
+async def get_leaderboards(request: Request) -> LeaderboardsResponse:
+    """Return 5 leaderboards with top 5 residents each."""
+    state = get_simulation_state(request)
+    leaderboards = state.world.get_leaderboards()
+
+    def convert(entries):
+        return [
+            LeaderboardEntryResponse(
+                resident_id=e.resident_id,
+                name=e.name,
+                value=e.value,
+                rank=e.rank,
+            )
+            for e in entries
+        ]
+
+    return LeaderboardsResponse(
+        richest=convert(leaderboards["richest"]),
+        happiest=convert(leaderboards["happiest"]),
+        most_social=convert(leaderboards["most_social"]),
+        most_traveled=convert(leaderboards["most_traveled"]),
+        most_influential=convert(leaderboards["most_influential"]),
+    )
+
+
+@router.get(
+    "/badges",
+    response_model=list[BadgeResponse],
+    responses=error_responses(503),
+)
+async def get_badges(request: Request) -> list[BadgeResponse]:
+    """Return all badge definitions."""
+    state = get_simulation_state(request)
+    badges = state.world.get_badge_definitions()
+    return [
+        BadgeResponse(
+            badge_id=b.badge_id,
+            name=b.name,
+            emoji=b.emoji,
+            condition_desc=b.condition_desc,
+        )
+        for b in badges
+    ]
+
+
+@router.get(
+    "/badges_stats",
+    response_model=BadgesStatsResponse,
+    responses=error_responses(503),
+)
+async def get_badges_stats(request: Request) -> BadgesStatsResponse:
+    """Return badge statistics."""
+    state = get_simulation_state(request)
+    stats = state.world.get_badges_stats()
+    return BadgesStatsResponse(**stats)
+
+
+@router.post(
+    "/badges/award",
+    response_model=list[tuple],
+    responses=error_responses(503),
+)
+async def award_badges(request: Request) -> list[tuple]:
+    """Check and award badges to eligible residents."""
+    state = get_simulation_state(request)
+    awarded = state.world.award_badges()
+    return awarded
