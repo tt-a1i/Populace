@@ -95,6 +95,8 @@ type TabKey =
   | 'achievements'
   | 'travels'
   | 'schedule'
+  | 'life_goal'
+  | 'wishes'
 
 interface ResidentStoryPanelProps {
   residentId: string
@@ -981,7 +983,7 @@ export function ResidentStoryPanel({
         <div className={activeTab === 'travels' ? '' : 'hidden'}>
           {travels.length > 0 ? (
             <div className="grid gap-2">
-              {travels.map((trip, i) => (
+              {travels.map((trip) => (
                 <div key={`${trip.tick_departed}-${trip.destination}`} className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">

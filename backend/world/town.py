@@ -181,6 +181,7 @@ def load_scenario(
     _generate_families(world)
     world.assign_initial_pets()
     _assign_life_goals(world)
+    _init_personality_traits(world)
 
     return world
 
@@ -322,6 +323,7 @@ def load_scenario_from_dict(
     _generate_families(world)
     world.assign_initial_pets()
     _assign_life_goals(world)
+    _init_personality_traits(world)
 
     return world
 
@@ -334,6 +336,18 @@ def _assign_life_goals(world: World) -> None:
         if resident.life_goal is None:
             seed = hash(resident.id) + i
             resident.life_goal = assign_life_goal(resident.personality, seed=seed)
+
+
+def _init_personality_traits(world: World) -> None:
+    from engine.personality import generate_personality_traits
+    import random
+
+    for agent in world.agents:
+        resident = agent.resident
+        traits = getattr(resident, "personality_traits", None)
+        if not traits:
+            rng = random.Random(hash(resident.id))
+            resident.personality_traits = generate_personality_traits(rng)
 
 
 def _generate_families(world: World) -> None:

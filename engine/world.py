@@ -28,14 +28,18 @@ from engine.types import (
     Course,
     CourseHistoryEntry,
     CulturalEvent,
+    DisasterEffect,
     Education,
     EnergyUpdate,
     Event,
     EventUpdate,
+    FestivalEffect,
+    Gang,
     Health,
     Illness,
     Item,
     Job,
+    Market,
     Memory,
     MoodEntry,
     MovementUpdate,
@@ -46,6 +50,7 @@ from engine.types import (
     Newspaper,
     Party,
     Pet,
+    PlayerIntervention,
     Religion,
     RelationType,
     ReligiousEvent,
@@ -164,6 +169,16 @@ _BUILDING_UPGRADE_COSTS = {
     1: 120.0,
     2: 260.0,
 }
+_GOODS_CATALOG = [
+    {"id": "food",    "name": "食物",   "emoji": "🌾", "base_price": 5.0,  "initial_supply": 100},
+    {"id": "cloth",   "name": "布料",   "emoji": "🧵", "base_price": 8.0,  "initial_supply": 80},
+    {"id": "wood",    "name": "木材",   "emoji": "🪵", "base_price": 6.0,  "initial_supply": 120},
+    {"id": "stone",   "name": "石料",   "emoji": "🪨", "base_price": 7.0,  "initial_supply": 90},
+    {"id": "herbs",   "name": "药草",   "emoji": "🌿", "base_price": 12.0, "initial_supply": 50},
+    {"id": "jewelry", "name": "饰品",   "emoji": "💎", "base_price": 30.0, "initial_supply": 20},
+    {"id": "books",   "name": "书籍",   "emoji": "📚", "base_price": 15.0, "initial_supply": 40},
+    {"id": "luxury",  "name": "奢侈品", "emoji": "🏺", "base_price": 50.0, "initial_supply": 10},
+]
 _ILLNESS_PROFILES = {
     "cold": {"contagious": True, "severity": 0.28, "recovery": 12},
     "flu": {"contagious": True, "severity": 0.55, "recovery": 18},
@@ -241,6 +256,14 @@ class World:
         self.milestones: List[Milestone] = self._default_milestones()
         self.unlocks: List[str] = []
         self.rumor_log: List[dict] = []
+        # Gang system
+        self.gangs: List[Gang] = []
+        self.gang_event_log: List[dict] = []
+        # Player intervention system
+        self.player_interventions: List["PlayerIntervention"] = []
+        self.active_festival_effect: Optional["FestivalEffect"] = None
+        self.active_disaster_effect: Optional["DisasterEffect"] = None
+        self.market: Market = self._init_market()
         ensure_world_fashion_state(self)
 
     def _default_zones(self) -> List[Zone]:
@@ -508,6 +531,203 @@ class World:
             )
         self._rebuild_pet_registry()
 
+    # ------------------------------------------------------------------
+    # Gang system
+    # ------------------------------------------------------------------
+
+    _GANG_NAMES = ("影刃帮", "夜枭会", "赤蛇党", "灰狼帮", "黑鸦盟")
+    _GANG_ACTIVITIES = ("贩私", "保护费", "走私", "赌场")
+    _GANG_COLORS = ("#8B5CF6", "#EF4444", "#10B981", "#F59E0B", "#3B82F6")
+
+    def initialize_gangs(self) -> None:
+        """Initialize 2-3 gangs with different territories when world starts."""
+        if self.gangs:
+            return  # Already initialized
+
+        num_gangs = self.rng.randint(2, 3)
+        zone_names = [zone.name for zone in self.zones]
+        self.rng.shuffle(zone_names)
+
+        for i in range(num_gangs):
+            gang = Gang(
+                name=self._GANG_NAMES[i % len(self._GANG_NAMES)],
+                leader_id="",
+                member_ids=[],
+                territory=zone_names[i % len(zone_names)],
+                influence=round(self.rng.uniform(0.3, 0.6), 2),
+                activity=self._GANG_ACTIVITIES[i % len(self._GANG_ACTIVITIES)],
+                color=self._GANG_COLORS[i % len(self._GANG_COLORS)],
+                created_tick=self.current_tick,
+                last_action_tick=self.current_tick,
+            )
+            self.gangs.append(gang)
+
+        self._assign_gang_leaders()
+
+    def _assign_gang_leaders(self) -> None:
+        """Assign initial leaders to gangs based on resident dissatisfaction."""
+        if not self.agents:
+            return
+
+        dissatisfied = sorted(
+            [a for a in self.agents if self.mood_score(a.resident.mood) < 0],
+            key=lambda a: self.mood_score(a.resident.mood),
+        )
+
+        for gang in self.gangs:
+            if not gang.leader_id and dissatisfied:
+                leader = dissatisfied.pop(0)
+                gang.leader_id = leader.resident.id
+                gang.member_ids.append(leader.resident.id)
+                self._log_gang_event("成立", gang, f"{leader.resident.name}成为{gang.name}的首领")
+
+    def _log_gang_event(self, event_type: str, gang: Gang, description: str) -> None:
+        """Log a gang-related event."""
+        self.gang_event_log.append({
+            "tick": self.current_tick,
+            "type": event_type,
+            "gang_name": gang.name,
+            "gang_color": gang.color,
+            "description": description,
+        })
+        self.gang_event_log = self.gang_event_log[-50:]
+
+    def recruit_for_gangs(self) -> List[str]:
+        """Every 15 ticks, residents have a small chance to be recruited into gangs.
+
+        Residents with low mood (dissatisfaction) are more likely to join.
+        Returns list of event descriptions.
+        """
+        events: List[str] = []
+        for agent in self.agents:
+            resident = agent.resident
+            if any(resident.id in gang.member_ids for gang in self.gangs):
+                continue  # Already in a gang
+
+            mood_score = self.mood_score(resident.mood)
+            if mood_score >= 0:
+                recruit_chance = 0.02  # 2% for happy residents
+            else:
+                recruit_chance = 0.15  # 15% for dissatisfied residents
+
+            if self.rng.random() < recruit_chance:
+                # Find a gang that has territory in resident's current zone
+                resident_zone = self._get_resident_zone(resident)
+                suitable_gangs = [g for g in self.gangs if g.territory == resident_zone]
+                if not suitable_gangs:
+                    suitable_gangs = self.gangs
+
+                if suitable_gangs:
+                    gang = self.rng.choice(suitable_gangs)
+                    gang.member_ids.append(resident.id)
+                    if not gang.leader_id:
+                        gang.leader_id = resident.id
+                    self._log_gang_event("招募", gang, f"{resident.name}加入了{gang.name}")
+                    events.append(f"{resident.name}被{gang.name}招募")
+                    # Being in a gang slightly improves mood
+                    self.shift_resident_mood(resident, 1, "gang_recruitment")
+
+        return events
+
+    def _get_resident_zone(self, resident: Resident) -> str:
+        """Get the zone name where a resident is located."""
+        for zone in self.zones:
+            bounds = zone.bounds
+            if (bounds.x <= resident.x < bounds.x + bounds.width and
+                bounds.y <= resident.y < bounds.y + bounds.height):
+                return zone.name
+        return self.zones[0].name if self.zones else ""
+
+    def gang_conflicts_and_expansion(self) -> List[str]:
+        """Every 10 ticks, gangs randomly initiate conflicts or expansion.
+
+        Affects safety feeling of residents in the target territory.
+        Returns list of event descriptions.
+        """
+        events: List[str] = []
+        if len(self.gangs) < 2:
+            return events
+
+        for gang in self.gangs:
+            if self.rng.random() < 0.3:  # 30% chance per gang
+                action = self.rng.choice(["conflict", "expand"])
+
+                if action == "conflict":
+                    # Conflict with another gang
+                    rival = self.rng.choice([g for g in self.gangs if g != gang])
+                    winner = gang if self.rng.random() < 0.5 else rival
+                    loser = rival if winner is gang else gang
+
+                    influence_change = round(self.rng.uniform(0.05, 0.15), 2)
+                    winner.influence = min(1.0, winner.influence + influence_change)
+                    loser.influence = max(0.0, loser.influence - influence_change)
+
+                    self._log_gang_event("冲突", gang, f"{gang.name}与{rival.name}发生冲突")
+                    events.append(f"{gang.name}与{rival.name}在{gang.territory}发生冲突")
+
+                    # Reduce safety feeling for residents in the territory
+                    for agent in self.agents:
+                        if self._get_resident_zone(agent.resident) == gang.territory:
+                            self.shift_resident_mood(agent.resident, -1, "gang_conflict")
+                            agent.resident.safety_feeling = max(0.0, agent.resident.safety_feeling - 0.05)
+
+                elif action == "expand":
+                    # Try to expand territory
+                    other_zones = [z.name for z in self.zones if z.name != gang.territory]
+                    if other_zones:
+                        new_territory = self.rng.choice(other_zones)
+                        gang.territory = new_territory
+                        gang.influence = min(1.0, gang.influence + 0.1)
+                        self._log_gang_event("扩张", gang, f"{gang.name}扩张到{new_territory}")
+                        events.append(f"{gang.name}扩张到{new_territory}")
+
+                gang.last_action_tick = self.current_tick
+
+        return events
+
+    def get_gang_overview(self) -> dict:
+        """Return gang data for the API."""
+        return {
+            "gangs": [
+                {
+                    "name": gang.name,
+                    "leader_id": gang.leader_id,
+                    "leader_name": self._get_resident_name(gang.leader_id),
+                    "member_count": len(gang.member_ids),
+                    "territory": gang.territory,
+                    "influence": round(gang.influence, 2),
+                    "activity": gang.activity,
+                    "color": gang.color,
+                    "created_tick": gang.created_tick,
+                    "last_action_tick": gang.last_action_tick,
+                }
+                for gang in self.gangs
+            ],
+            "recent_events": list(reversed(self.gang_event_log[-5:])),
+        }
+
+    def _get_resident_name(self, resident_id: str) -> str:
+        """Get resident name by ID."""
+        if not resident_id:
+            return ""
+        agent = self.get_agent(resident_id)
+        return agent.resident.name if agent else ""
+
+    def is_resident_in_gang(self, resident_id: str) -> bool:
+        """Check if a resident is a member of any gang."""
+        return any(resident_id in gang.member_ids for gang in self.gangs)
+
+    def get_resident_gang(self, resident_id: str) -> Optional[Gang]:
+        """Get the gang a resident belongs to, or None."""
+        for gang in self.gangs:
+            if resident_id in gang.member_ids:
+                return gang
+        return None
+
+    # ------------------------------------------------------------------
+    # Pet management (continued)
+    # ------------------------------------------------------------------
+
     def list_pets(self) -> List[Pet]:
         self._rebuild_pet_registry()
         return list(self.pets)
@@ -678,8 +898,12 @@ class World:
         return self.set_resident_mood(resident, _MOOD_LADDER[next_rank], cause)
 
     def update_mental_state(self, resident: Resident) -> None:
+        from engine.personality import get_trait
         if self.mood_score(resident.mood) < -0.3:
-            resident.low_mood_ticks += 1
+            # Optimistic residents accumulate low-mood ticks more slowly
+            optimism = get_trait(resident, "optimism")
+            increment = max(0, round(1 - optimism * 0.4))
+            resident.low_mood_ticks += increment
         else:
             resident.low_mood_ticks = 0
             if resident.mental_state == "depressed":
@@ -1773,6 +1997,106 @@ class World:
             "total_spread": len(active_rumors),
             "recent_leaks": list(self.rumor_log[-10:]),
         }
+
+    # ---------------------------------------------------------------------------
+    # Market system (§102)
+    # ---------------------------------------------------------------------------
+
+    def _init_market(self) -> "Market":
+        """Initialise the town market with 8 goods at base prices."""
+        m = Market()
+        for cat in _GOODS_CATALOG:
+            gid = cat["id"]
+            m.base_prices[gid] = float(cat["base_price"])
+            m.goods[gid] = float(cat["base_price"])
+            m.supply[gid] = int(cat["initial_supply"])
+            m.demand_trend[gid] = 0.0
+            m.price_history[gid] = [float(cat["base_price"])]
+        return m
+
+    def update_market_prices(self) -> List[str]:
+        """Fluctuate prices ±10% based on supply/demand. Called every 5 ticks."""
+        events: List[str] = []
+        good_names = {cat["id"]: cat["name"] for cat in _GOODS_CATALOG}
+        for cat in _GOODS_CATALOG:
+            gid = cat["id"]
+            base = self.market.base_prices.get(gid, cat["base_price"])
+            current = self.market.goods.get(gid, base)
+            supply = self.market.supply.get(gid, 50)
+            trend = self.market.demand_trend.get(gid, 0.0)
+
+            # Supply pressure: fewer goods in stock → upward pressure
+            supply_factor = (50 - supply) / 500.0
+            # Random fluctuation capped at ±10%
+            random_factor = random.uniform(-0.10, 0.10)
+            total_change = random_factor + trend * 0.05 + supply_factor
+
+            new_price = current * (1.0 + total_change)
+            # Keep within 50%–200% of base price
+            new_price = max(base * 0.5, min(base * 2.0, new_price))
+            new_price = round(new_price, 2)
+
+            history = self.market.price_history.get(gid, [])
+            history.append(new_price)
+            self.market.price_history[gid] = history[-7:]
+            self.market.goods[gid] = new_price
+
+            change_pct = (new_price - current) / current * 100 if current > 0 else 0
+            if abs(change_pct) >= 8:
+                direction = "上涨" if change_pct > 0 else "下跌"
+                events.append(f"市场：{good_names.get(gid, gid)}价格{direction}{abs(change_pct):.0f}%。")
+
+        return events
+
+    def process_resident_market_trade(self) -> None:
+        """Each resident has a chance to buy goods. Called every 10 ticks."""
+        good_ids = [cat["id"] for cat in _GOODS_CATALOG]
+        for agent in self.agents:
+            resident = agent.resident
+            gid = random.choice(good_ids)
+            price = self.market.goods.get(gid, 5.0)
+            supply = self.market.supply.get(gid, 0)
+            if supply > 0 and getattr(resident, "coins", 0.0) >= price:
+                resident.coins = round(resident.coins - price, 2)
+                self.market.supply[gid] = max(0, supply - 1)
+                self.market.demand_trend[gid] = min(1.0, self.market.demand_trend.get(gid, 0.0) + 0.05)
+            else:
+                self.market.demand_trend[gid] = max(-1.0, self.market.demand_trend.get(gid, 0.0) - 0.02)
+
+        # Slowly replenish supply (production)
+        for cat in _GOODS_CATALOG:
+            gid = cat["id"]
+            self.market.supply[gid] = min(150, self.market.supply.get(gid, 0) + random.randint(0, 2))
+
+    def get_market_overview(self) -> dict:
+        """Return goods list with current price, inventory, price history, and trend."""
+        goods_list = []
+        for cat in _GOODS_CATALOG:
+            gid = cat["id"]
+            current = self.market.goods.get(gid, cat["base_price"])
+            base = self.market.base_prices.get(gid, cat["base_price"])
+            history = self.market.price_history.get(gid, [current])
+            prev = history[-2] if len(history) >= 2 else current
+            if current > prev:
+                trend = "up"
+            elif current < prev:
+                trend = "down"
+            else:
+                trend = "flat"
+            change_pct = round((current - base) / base * 100, 1) if base > 0 else 0.0
+            goods_list.append({
+                "id": gid,
+                "name": cat["name"],
+                "emoji": cat["emoji"],
+                "current_price": round(current, 2),
+                "base_price": round(base, 2),
+                "inventory": self.market.supply.get(gid, 0),
+                "demand_trend": round(self.market.demand_trend.get(gid, 0.0), 3),
+                "price_history": [round(p, 2) for p in history],
+                "trend": trend,
+                "change_pct": change_pct,
+            })
+        return {"goods": goods_list}
 
     def get_building_upgrade_cost(self, building: Building) -> float:
         return float(_BUILDING_UPGRADE_COSTS.get(building.level, 0.0))
@@ -2903,7 +3227,10 @@ class World:
         if agent_b.resident.age_stage == "elder":
             elder_bonus += 0.05
 
-        extroversion_bonus = ((ext_a + ext_b) / 2) * 0.30
+        from engine.personality import get_trait
+        trait_ext_a = get_trait(agent_a.resident, "extraversion")
+        trait_ext_b = get_trait(agent_b.resident, "extraversion")
+        extroversion_bonus = ((ext_a + ext_b) / 2) * 0.30 + ((trait_ext_a + trait_ext_b) / 2 - 0.5) * 0.10
         target_reputation = float(getattr(agent_b.resident, "reputation", 0.0))
         self_reputation = float(getattr(agent_a.resident, "reputation", 0.0))
         reputation_bonus = target_reputation * 0.22
@@ -3413,11 +3740,25 @@ class World:
         if self.current_tick % 100 == 0:
             self.decay_resident_memories()
 
+        # Initialize gangs on first tick
+        if self.current_tick == 1 and not self.gangs:
+            self.initialize_gangs()
+
         crime_events = self.process_crime_tick()
         pet_events = self.update_pets()
         culture_events = self.update_cultural_events()
         religion_events = self.update_religious_events()
         secret_events = self.process_secret_tick()
+
+        # ── Gang system: recruitment every 15 ticks ──
+        gang_recruit_events: List[str] = []
+        if self.current_tick > 0 and self.current_tick % 15 == 0:
+            gang_recruit_events = self.recruit_for_gangs()
+
+        # ── Gang system: conflicts and expansion every 10 ticks ──
+        gang_conflict_events: List[str] = []
+        if self.current_tick > 0 and self.current_tick % 10 == 0 and self.gangs:
+            gang_conflict_events = self.gang_conflicts_and_expansion()
 
         # ── News generation every 10 ticks ──
         if self.current_tick > 0 and self.current_tick % 10 == 0:
@@ -3428,6 +3769,15 @@ class World:
         if new_phase:
             fashion_events.append(f"经济进入{new_phase}期。")
         cycle_events = self.apply_cycle_effects()
+
+        # ── Market price update (every 5 ticks) ──
+        market_events: list[str] = []
+        if self.current_tick > 0 and self.current_tick % 5 == 0:
+            market_events = self.update_market_prices()
+
+        # ── Resident market trading (every 10 ticks) ──
+        if self.current_tick > 0 and self.current_tick % 10 == 0:
+            self.process_resident_market_trade()
 
         # ── Town level + milestone checks (every 5 ticks) ──
         milestone_events: list[str] = []
@@ -3440,6 +3790,11 @@ class World:
             new_level = self.update_town_level()
             if new_level is not None:
                 milestone_events.append(f"城镇升级至 Lv.{new_level}！")
+
+        # ── Personality trait drift (every 20 ticks) ──
+        if self.current_tick > 0 and self.current_tick % 20 == 0:
+            from engine.personality import drift_traits
+            drift_traits(self)
 
         # ── Mood contagion: co-occupants influence each other's mood ──────
         from engine.act import apply_mood_contagion
@@ -3485,6 +3840,9 @@ class World:
         self._refresh_transport_stats()
         self.path_cache.clear()
 
+        # Update intervention effects
+        intervention_events = self.update_intervention_effects()
+
         return TickState(
             tick=self.current_tick,
             time=sim_time,
@@ -3494,6 +3852,7 @@ class World:
                 *[EventUpdate(description=description) for description in fashion_events],
                 *[EventUpdate(description=description) for description in cycle_events],
                 *[EventUpdate(description=description) for description in milestone_events],
+                *[EventUpdate(description=description) for description in market_events],
                 *[EventUpdate(description=description) for description in secret_events],
                 *pet_events,
                 *culture_events,
@@ -3502,11 +3861,131 @@ class World:
                     EventUpdate(description=f"{event.location}发生{event.type}事件")
                     for event in crime_events
                 ],
+                *[EventUpdate(description=description) for description in intervention_events],
+                *[EventUpdate(description=description) for description in gang_recruit_events],
+                *[EventUpdate(description=description) for description in gang_conflict_events],
             ],
             weather=self.weather.value,
             season=active_season.value,
             energy_updates=energy_updates,
         )
+
+    # ------------------------------------------------------------------
+    # Player Intervention System
+    # ------------------------------------------------------------------
+
+    def intervene_bless_resident(self, resident_id: str) -> str:
+        """Give a resident +20 happiness."""
+        agent = self.get_agent(resident_id)
+        if agent is None:
+            return f"居民 {resident_id} 不存在"
+        self.shift_resident_mood(agent, 2, "神的祝福")
+        return f"给 {agent.resident.name} 施加了祝福，幸福感 +20"
+
+    def intervene_curse_resident(self, resident_id: str) -> str:
+        """Give a resident -20 happiness."""
+        agent = self.get_agent(resident_id)
+        if agent is None:
+            return f"居民 {resident_id} 不存在"
+        self.shift_resident_mood(agent, -2, "神的诅咒")
+        return f"给 {agent.resident.name} 施加了诅咒，幸福感 -20"
+
+    def intervene_give_money(self, resident_id: str, amount: float = 50.0) -> str:
+        """Give a resident coins."""
+        agent = self.get_agent(resident_id)
+        if agent is None:
+            return f"居民 {resident_id} 不存在"
+        agent.resident.wallet = round(agent.resident.wallet + amount, 2)
+        return f"赐予 {agent.resident.name} {amount} 金币"
+
+    def intervene_trigger_festival(self) -> str:
+        """Trigger a festival lasting 10 ticks with +10 town mood."""
+        if self.active_festival_effect is not None:
+            return "节庆已在进行中"
+        self.active_festival_effect = FestivalEffect(
+            name="神之节庆",
+            start_tick=self.current_tick,
+            duration=10,
+            mood_boost=0.5,
+            remaining=10,
+        )
+        return "触发了节庆，持续 10 tick，全镇幸福感 +10"
+
+    def intervene_trigger_disaster(self) -> str:
+        """Trigger a minor disaster lasting 5 ticks with -10 safety."""
+        if self.active_disaster_effect is not None:
+            return "灾难已在进行中"
+        self.active_disaster_effect = DisasterEffect(
+            type="轻微灾难",
+            start_tick=self.current_tick,
+            duration=5,
+            safety_penalty=0.5,
+            remaining=5,
+        )
+        return "触发了轻微灾难，持续 5 tick，全镇安全感 -10"
+
+    def intervene_inspire_resident(self, resident_id: str) -> str:
+        """Give a resident random life goal progress +0.2."""
+        agent = self.get_agent(resident_id)
+        if agent is None:
+            return f"居民 {resident_id} 不存在"
+        if agent.resident.life_goal is None:
+            from engine.types import LifeGoal
+            agent.resident.life_goal = LifeGoal(type="inspired", progress=0.2, target=1.0, reward="灵感迸发")
+            return f"激励 {agent.resident.name} 树立新目标，进度 +0.2"
+        agent.resident.life_goal.progress = round(min(1.0, agent.resident.life_goal.progress + 0.2), 2)
+        return f"激励 {agent.resident.name}，梦想进度 +0.2"
+
+    def record_intervention(self, action: str, target_id: str, target_name: str, value: any, effect_description: str) -> None:
+        """Record an intervention to the log."""
+        from datetime import datetime, timezone
+        from uuid import uuid4
+        intervention = PlayerIntervention(
+            id=str(uuid4()),
+            tick=self.current_tick,
+            action=action,
+            target_id=target_id,
+            target_name=target_name,
+            value=value,
+            effect_description=effect_description,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+        self.player_interventions.append(intervention)
+        # Keep only last 100
+        self.player_interventions = self.player_interventions[-100:]
+
+    def get_intervention_log(self, limit: int = 20) -> List["PlayerIntervention"]:
+        """Return the most recent intervention records."""
+        return self.player_interventions[-limit:]
+
+    def update_intervention_effects(self) -> List[str]:
+        """Update active intervention effects, return event descriptions."""
+        events: List[str] = []
+        # Update festival effect
+        if self.active_festival_effect is not None:
+            self.active_festival_effect.remaining -= 1
+            if self.active_festival_effect.remaining <= 0:
+                events.append("节庆结束，全镇恢复正常。")
+                self.active_festival_effect = None
+            else:
+                # Apply mood boost to all residents
+                for agent in self.agents:
+                    self.shift_resident_mood(agent, 1, "节庆氛围")
+                events.append(f"节庆进行中，剩余 {self.active_festival_effect.remaining} tick。")
+
+        # Update disaster effect
+        if self.active_disaster_effect is not None:
+            self.active_disaster_effect.remaining -= 1
+            if self.active_disaster_effect.remaining <= 0:
+                events.append("灾难结束，安全感恢复。")
+                self.active_disaster_effect = None
+            else:
+                # Apply safety penalty to all residents
+                for agent in self.agents:
+                    agent.resident.safety_feeling = round(max(0.0, agent.resident.safety_feeling - 0.1), 3)
+                events.append(f"灾难持续中，剩余 {self.active_disaster_effect.remaining} tick。")
+
+        return events
 
     # ------------------------------------------------------------------
     # Helpers

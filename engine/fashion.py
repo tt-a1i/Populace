@@ -343,7 +343,10 @@ def maybe_purchase_clothing(world: Any, resident: Resident) -> ClothingItem | No
     ensure_resident_fashion(world, resident)
     if float(getattr(resident, "wallet", 0.0)) < 8.0:
         return None
-    if world.rng.random() >= 0.35:
+    from engine.personality import get_trait
+    thrift = get_trait(resident, "thrift")
+    purchase_threshold = 0.35 * (1.0 - thrift * 0.4)  # thrifty residents buy less often
+    if world.rng.random() >= purchase_threshold:
         return None
 
     tailors = _tailor_candidates(world)

@@ -436,6 +436,50 @@ export function getWorldDisasters() {
   return request<DisasterListResponse>('/api/world/disasters')
 }
 
+// ---------------------------------------------------------------------------
+// Player Intervention System (Task 105)
+// ---------------------------------------------------------------------------
+
+export interface InterventionLogEntry {
+  id: string
+  tick: number
+  action: string
+  target_id: string
+  target_name: string
+  value: any
+  effect_description: string
+  timestamp: string
+}
+
+export interface InterventionLogResponse {
+  interventions: InterventionLogEntry[]
+}
+
+export interface IntervenePayload {
+  action: string
+  target_id?: string
+  value?: any
+}
+
+export interface InterveneResponse {
+  success: boolean
+  message: string
+  action: string
+  target_id?: string | null
+  effect_description: string
+}
+
+export function intervene(payload: IntervenePayload) {
+  return request<InterveneResponse>('/api/world/intervene', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function getInterventionLog() {
+  return request<InterventionLogResponse>('/api/world/intervention_log')
+}
+
 export function getWorldBulletin() {
   return request<WorldBulletinPayload>('/api/world/bulletin')
 }
@@ -535,6 +579,29 @@ export interface TravelEntryPayload {
 
 export function getResidentTravels(id: string) {
   return request<TravelEntryPayload[]>(`/api/residents/${id}/travels`)
+}
+
+export interface DreamTopEntry {
+  dream: string
+  count: number
+}
+
+export interface DreamFulfillmentEntry {
+  resident_id: string
+  resident_name: string
+  dream: string
+  tick: number
+}
+
+export interface WorldDreamStatsPayload {
+  dreams_fulfilled_total: number
+  top_dreams: DreamTopEntry[]
+  avg_progress: number
+  recent_fulfillments: DreamFulfillmentEntry[]
+}
+
+export function getWorldDreamStats() {
+  return request<WorldDreamStatsPayload>('/api/world/dream_stats')
 }
 
 export function getResidents() {
@@ -1114,6 +1181,32 @@ export interface WorldReligionPayload {
   leaders: ReligionLeader[]
 }
 
+export interface GangData {
+  name: string
+  leader_id: string
+  leader_name: string
+  member_count: number
+  territory: string
+  influence: number
+  activity: string
+  color: string
+  created_tick: number
+  last_action_tick: number
+}
+
+export interface GangEvent {
+  tick: number
+  type: string
+  gang_name: string
+  gang_color: string
+  description: string
+}
+
+export interface WorldGangsPayload {
+  gangs: GangData[]
+  recent_events: GangEvent[]
+}
+
 export function getWorldEducation() {
   return request<WorldEducationCourse[]>('/api/world/education')
 }
@@ -1124,6 +1217,10 @@ export function getWorldCulture() {
 
 export function getWorldReligion() {
   return request<WorldReligionPayload>('/api/world/religion')
+}
+
+export function getWorldGangs() {
+  return request<WorldGangsPayload>('/api/world/gangs')
 }
 
 export function getWorldHealth() {
@@ -1519,6 +1616,27 @@ export function getTownLevel() {
   return request<TownLevelPayload>('/api/world/level')
 }
 
+export interface MarketGood {
+  id: string
+  name: string
+  emoji: string
+  current_price: number
+  base_price: number
+  inventory: number
+  demand_trend: number
+  price_history: number[]
+  trend: 'up' | 'down' | 'flat'
+  change_pct: number
+}
+
+export interface WorldMarketPayload {
+  goods: MarketGood[]
+}
+
+export function getWorldMarket() {
+  return request<WorldMarketPayload>('/api/world/market')
+}
+
 export function getWorldFashion() {
   return request<WorldFashionPayload>('/api/world/fashion')
 }
@@ -1901,4 +2019,15 @@ export function getKnowledgeGraph(sinceTick?: number, untilTick?: number) {
   if (untilTick !== undefined) params.set('until_tick', String(untilTick))
   const qs = params.toString()
   return request<KnowledgeGraphData>(`/api/simulation/knowledge-graph${qs ? `?${qs}` : ''}`)
+}
+
+export interface PersonalityStatsPayload {
+  extraversion: number
+  optimism: number
+  thrift: number
+  adventurousness: number
+}
+
+export function getPersonalityStats() {
+  return request<PersonalityStatsPayload>('/api/world/personality_stats')
 }

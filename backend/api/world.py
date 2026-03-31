@@ -32,9 +32,11 @@ from backend.api.schemas import (
     WorldCultureResponse,
     WorldDiplomacyResponse,
     WorldDemographicsResponse,
+    WorldDreamStatsResponse,
     WorldHealthResponse,
     EconomyCycleResponse,
     TownLevelResponse,
+    WorldMarketResponse,
     WorldRumorsResponse,
     WorldEconomyResponse,
     WorldFashionResponse,
@@ -43,6 +45,7 @@ from backend.api.schemas import (
     WorldEventResponse,
     WorldPoliticsResponse,
     WorldReligionResponse,
+    WorldPersonalityStatsResponse,
     WorldRomanceStatsResponse,
     WorldTransportResponse,
     ZoneResponse,
@@ -371,6 +374,16 @@ async def get_world_rumors(request: Request) -> WorldRumorsResponse:
 
 
 @router.get(
+    "/market",
+    response_model=WorldMarketResponse,
+    responses=error_responses(503),
+)
+async def get_world_market(request: Request) -> WorldMarketResponse:
+    state = get_simulation_state(request)
+    return WorldMarketResponse(**state.world.get_market_overview())
+
+
+@router.get(
     "/fashion",
     response_model=WorldFashionResponse,
     responses=error_responses(503),
@@ -482,6 +495,18 @@ async def get_world_relationships(request: Request) -> WorldRomanceStatsResponse
 
     state = get_simulation_state(request)
     return WorldRomanceStatsResponse(**get_romance_stats(state.world))
+
+
+@router.get(
+    "/dream_stats",
+    response_model=WorldDreamStatsResponse,
+    responses=error_responses(503),
+)
+async def get_dream_stats(request: Request) -> WorldDreamStatsResponse:
+    from engine.dream import get_dream_stats
+
+    state = get_simulation_state(request)
+    return WorldDreamStatsResponse(**get_dream_stats(state.world))
 
 
 class GenerateScenarioRequest(BaseModel):
@@ -926,3 +951,190 @@ async def get_weather(request: Request) -> WeatherResponse:
         season=normalize_season(state.world.season).value,
         forecast=list(getattr(state.world, "weather_forecast", [])) or build_forecast(state.world.season),
     )
+
+
+# ---------------------------------------------------------------------------
+# Player Intervention System (Task 105)
+# ---------------------------------------------------------------------------
+
+class InterveneRequest(BaseModel):
+    action: str = Field(description="Intervention action: bless_resident, curse_resident, give_money, trigger_festival, trigger_disaster, inspire_resident")
+    target_id: str = Field(default="", description="Target resident ID (optional for global actions)")
+    value: Any = Field(default=None, description="Additional value (e.g., amount for give_money)")
+
+    @field_validator("action", mode="before")
+    @classmethod
+    def strip_action(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip().lower()
+        return value
+
+
+class InterveneResponse(BaseModel):
+    success: bool
+    message: str
+    action: str
+    target_id: str | None = None
+    effect_description: str
+
+
+class InterventionLogEntry(BaseModel):
+    id: str
+    tick: int
+    action: str
+    target_id: str
+    target_name: str
+    value: Any
+    effect_description: str
+    timestamp: str
+
+
+class InterventionLogResponse(BaseModel):
+    interventions: list[InterventionLogEntry]
+
+
+@router.post(
+    "/intervene",
+    response_model=InterveneResponse,
+    responses=error_responses(400, 422, 503),
+)
+async def intervene(payload: InterveneRequest, request: Request) -> InterveneResponse:
+    """Execute a player intervention action."""
+    state = get_simulation_state(request)
+    world = state.world
+
+    action = payload.action
+    target_id = payload.target_id
+    value = payload.value
+
+    valid_actions = {"bless_resident", "curse_resident", "give_money", "trigger_festival", "trigger_disaster", "inspire_resident"}
+    if action not in valid_actions:
+        raise api_error(400, f"Invalid action '{action}'. Valid: {list(valid_actions)}", "invalid_intervention_action")
+
+    # Global actions (no target required)
+    if action == "trigger_festival":
+        effect_desc = world.intervene_trigger_festival()
+        world.record_intervention(action, "", "", None, effect_desc)
+        return InterveneResponse(success=True, message=effect_desc, action=action, effect_description=effect_desc)
+
+    if action == "trigger_disaster":
+        effect_desc = world.intervene_trigger_disaster()
+        world.record_intervention(action, "", "", None, effect_desc)
+        return InterveneResponse(success=True, message=effect_desc, action=action, effect_description=effect_desc)
+
+    # Resident-targeted actions
+    if not target_id:
+        raise api_error(400, "target_id is required for this action", "missing_target_id")
+
+    agent = world.get_agent(target_id)
+    target_name = agent.resident.name if agent else target_id
+
+    if action == "bless_resident":
+        effect_desc = world.intervene_bless_resident(target_id)
+        world.record_intervention(action, target_id, target_name, None, effect_desc)
+    elif action == "curse_resident":
+        effect_desc = world.intervene_curse_resident(target_id)
+        world.record_intervention(action, target_id, target_name, None, effect_desc)
+    elif action == "give_money":
+        amount = float(value) if value is not None else 50.0
+        effect_desc = world.intervene_give_money(target_id, amount)
+        world.record_intervention(action, target_id, target_name, amount, effect_desc)
+    elif action == "inspire_resident":
+        effect_desc = world.intervene_inspire_resident(target_id)
+        world.record_intervention(action, target_id, target_name, None, effect_desc)
+    else:
+        raise api_error(400, f"Unhandled action '{action}'", "unhandled_intervention_action")
+
+    return InterveneResponse(success=True, message=effect_desc, action=action, target_id=target_id, effect_description=effect_desc)
+
+
+class WorldGangMemberResponse(BaseModel):
+    resident_id: str
+    resident_name: str
+
+
+class WorldGangResponse(BaseModel):
+    name: str
+    leader_id: str
+    leader_name: str
+    member_count: int
+    territory: str
+    influence: float
+    activity: str
+    color: str
+    created_tick: int
+    last_action_tick: int
+
+
+class WorldGangsResponse(BaseModel):
+    gangs: list[WorldGangResponse]
+    recent_events: list[dict]
+
+
+@router.get(
+    "/gangs",
+    response_model=WorldGangsResponse,
+    responses=error_responses(503),
+)
+async def get_gangs(request: Request) -> WorldGangsResponse:
+    """Return the list of gangs in the town."""
+    state = get_simulation_state(request)
+    overview = state.world.get_gang_overview()
+    return WorldGangsResponse(
+        gangs=[
+            WorldGangResponse(
+                name=g["name"],
+                leader_id=g["leader_id"],
+                leader_name=g["leader_name"],
+                member_count=g["member_count"],
+                territory=g["territory"],
+                influence=g["influence"],
+                activity=g["activity"],
+                color=g["color"],
+                created_tick=g["created_tick"],
+                last_action_tick=g["last_action_tick"],
+            )
+            for g in overview["gangs"]
+        ],
+        recent_events=overview["recent_events"],
+    )
+
+
+@router.get(
+    "/intervention_log",
+    response_model=InterventionLogResponse,
+    responses=error_responses(503),
+)
+async def get_intervention_log(request: Request) -> InterventionLogResponse:
+    """Return the most recent player intervention records."""
+    state = get_simulation_state(request)
+    interventions = state.world.get_intervention_log(limit=20)
+    return InterventionLogResponse(
+        interventions=[
+            InterventionLogEntry(
+                id=i.id,
+                tick=i.tick,
+                action=i.action,
+                target_id=i.target_id,
+                target_name=i.target_name,
+                value=i.value,
+                effect_description=i.effect_description,
+                timestamp=i.timestamp,
+            )
+            for i in interventions
+        ]
+    )
+
+
+@router.get(
+    "/personality_stats",
+    response_model=WorldPersonalityStatsResponse,
+    responses=error_responses(503),
+)
+async def get_personality_stats(request: Request) -> WorldPersonalityStatsResponse:
+    """Return average personality trait values across all residents."""
+    from engine.personality import get_personality_stats
+
+    state = get_simulation_state(request)
+    stats = get_personality_stats(state)
+    return WorldPersonalityStatsResponse(**stats)

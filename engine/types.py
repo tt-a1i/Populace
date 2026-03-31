@@ -433,6 +433,9 @@ else:
         traveling: bool = False
         jealousy_targets: List["JealousyEntry"] = field(default_factory=list)
         secrets: List["Secret"] = field(default_factory=list)
+        dream: str = ""
+        dream_progress: float = 0.0
+        personality_traits: Dict[str, float] = field(default_factory=dict)
 
 
     @dataclass
@@ -691,6 +694,36 @@ else:
         status: str = "started"
         memorial: Optional[str] = None
 
+    @dataclass
+    class PlayerIntervention:
+        """A player intervention record."""
+        id: str
+        tick: int
+        action: str
+        target_id: str
+        target_name: str
+        value: any
+        effect_description: str
+        timestamp: str
+
+    @dataclass
+    class FestivalEffect:
+        """Active festival effect on the world."""
+        name: str
+        start_tick: int
+        duration: int
+        mood_boost: float
+        remaining: int
+
+    @dataclass
+    class DisasterEffect:
+        """Active disaster effect on the world."""
+        type: str
+        start_tick: int
+        duration: int
+        safety_penalty: float
+        remaining: int
+
 
     @dataclass
     class TickState:
@@ -732,6 +765,19 @@ else:
         is_public: bool = False
         revealed_tick: int = 0
 
+    @dataclass
+    class Gang:
+        """A criminal gang that operates in the town."""
+        name: str
+        leader_id: str
+        member_ids: List[str] = field(default_factory=list)
+        territory: str = ""
+        influence: float = 0.5
+        activity: str = "贩私"
+        color: str = "#8B5CF6"
+        created_tick: int = 0
+        last_action_tick: int = 0
+
     # ---------------------------------------------------------------------------
     # Town level / milestones (§96)
     # ---------------------------------------------------------------------------
@@ -746,6 +792,19 @@ else:
         achieved: bool = False
         achieved_tick: int = 0
         unlocks: List[str] = field(default_factory=list)
+
+    # ---------------------------------------------------------------------------
+    # Market / economy (§102)
+    # ---------------------------------------------------------------------------
+
+    @dataclass
+    class Market:
+        """Town market tracking goods prices, supply, demand, and price history."""
+        goods: dict = field(default_factory=dict)           # good_id -> current price float
+        supply: dict = field(default_factory=dict)          # good_id -> inventory int
+        demand_trend: dict = field(default_factory=dict)    # good_id -> float -1..1
+        price_history: dict = field(default_factory=dict)   # good_id -> List[float] (last 7)
+        base_prices: dict = field(default_factory=dict)     # good_id -> base price float
 
     # ---------------------------------------------------------------------------
     # Economic cycle (§93)

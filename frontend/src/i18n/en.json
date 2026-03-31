@@ -1008,5 +1008,31 @@
     "recent_leaks": "Recent Leaks",
     "learned_about": "learned about",
     "secret_suffix": "'s secret"
+  },
+  "market": {
+    "title": "Market",
+    "error": "Failed to load market data",
+    "loading": "Loading market data…",
+    "loading_msg": "Fetching goods prices and inventory.",
+    "empty": "No market data yet.",
+    "refresh": "Refresh",
+    "goods_count": "goods",
+    "stock": "Stock"
+  },
+  "personality": {
+    "title": "Personality Panel",
+    "subtitle": "Average trait values across all residents",
+    "error": "Failed to load personality stats",
+    "loading": "Loading personality data…",
+    "loading_msg": "Aggregating resident personality traits.",
+    "no_data": "No resident data available",
+    "extraversion": "Extraversion",
+    "extraversion_desc": "Social initiative",
+    "optimism": "Optimism",
+    "optimism_desc": "Mood resilience",
+    "thrift": "Thrift",
+    "thrift_desc": "Spending restraint",
+    "adventurousness": "Adventurousness",
+    "adventurousness_desc": "Travel willingness"
   }
 }

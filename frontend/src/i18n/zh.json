@@ -1008,5 +1008,31 @@
     "recent_leaks": "最近泄露",
     "learned_about": "得知了关于",
     "secret_suffix": "的秘密"
+  },
+  "market": {
+    "title": "市场行情",
+    "error": "市场数据加载失败",
+    "loading": "市场数据加载中…",
+    "loading_msg": "正在汇总商品价格与库存。",
+    "empty": "暂无市场数据。",
+    "refresh": "刷新市场",
+    "goods_count": "种商品",
+    "stock": "库存"
+  },
+  "personality": {
+    "title": "个性特征面板",
+    "subtitle": "全体居民各性格维度的平均值",
+    "error": "个性统计加载失败",
+    "loading": "个性数据加载中…",
+    "loading_msg": "正在统计居民性格特征。",
+    "no_data": "暂无居民数据",
+    "extraversion": "外向性",
+    "extraversion_desc": "社交主动性",
+    "optimism": "乐观性",
+    "optimism_desc": "情绪恢复力",
+    "thrift": "节俭性",
+    "thrift_desc": "消费克制度",
+    "adventurousness": "冒险性",
+    "adventurousness_desc": "旅行意愿"
   }
 }

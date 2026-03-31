@@ -19,6 +19,32 @@ import type {
   VoteRecord,
 } from '../types'
 
+export interface GangData {
+  name: string
+  leader_id: string
+  leader_name: string
+  member_count: number
+  territory: string
+  influence: number
+  activity: string
+  color: string
+  created_tick: number
+  last_action_tick: number
+}
+
+export interface GangEvent {
+  tick: number
+  type: string
+  gang_name: string
+  gang_color: string
+  description: string
+}
+
+export interface WorldGangsPayload {
+  gangs: GangData[]
+  recent_events: GangEvent[]
+}
+
 export type SimulationSpeed = 0 | 1 | 2 | 5 | 10 | 50
 
 export type FeedMessageKind = 'dialogue' | 'event' | 'system'
@@ -77,6 +103,8 @@ export interface ResidentPosition {
   inventory?: Resident['inventory']
   pets?: Pet[]
   health?: HealthState
+  gangId?: string | null
+  gangColor?: string | null
 }
 
 export interface TickMovement extends Omit<MovementUpdate, 'action'> {
@@ -172,6 +200,8 @@ interface SimulationState {
   festivalHistory: Festival[]
   currentDisasters: Disaster[]
   disasterHistory: Disaster[]
+  gangs: GangData[]
+  gangEvents: GangEvent[]
   selectedResidentId: string | null
   hoveredPairIds: [string, string] | null
   setRunning: (running: boolean) => void
@@ -197,6 +227,7 @@ interface SimulationState {
   updateFromTick: (tickState: SimulationTickState) => void
   initFromSnapshot: (snapshot: SimulationSnapshot) => void
   applyPopulationEvents: (events: PopulationEvent[]) => void
+  setGangs: (gangs: GangData[], events: GangEvent[]) => void
 }
 
 const palette = [0xf97316, 0x38bdf8, 0x34d399, 0xf59e0b, 0xe879f9, 0xfb7185]
@@ -339,6 +370,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   festivalHistory: [],
   currentDisasters: [],
   disasterHistory: [],
+  gangs: [],
+  gangEvents: [],
   selectedResidentId: null,
   hoveredPairIds: null,
   setRunning: (running) => set({ running }),
@@ -787,4 +820,5 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       }
     })
   },
+  setGangs: (gangs, events) => set({ gangs, gangEvents: events }),
 }))

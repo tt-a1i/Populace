@@ -169,6 +169,8 @@ export class ResidentSprite extends Container {
   private readonly moodEmoji: Text
   // Occupation badge — small icon at bottom-right of sprite
   private readonly occupationBadge: Text
+  // Gang badge — small colored dot for gang members
+  private readonly gangBadge = new Graphics()
   // Energy bar — horizontal bar below the sprite body
   private readonly energyBar = new Graphics()
 
@@ -313,12 +315,17 @@ export class ResidentSprite extends Container {
     this.occupationBadge.zIndex = 5
     this.occupationBadge.visible = false
 
+    // Gang badge — small colored dot at top-left of sprite
+    this.gangBadge.zIndex = 5
+    this.gangBadge.position.set(-8, -8)
+    this.gangBadge.visible = false
+
     // Energy bar — below the sprite body
     this.energyBar.zIndex = 4
     this.energyBar.y = 14
     this.energyBar.visible = false
 
-    this.addChild(this.shadow, this.highlightGlow, this.body, this.emotionAccent, this.thoughtBubble, this.bubble, this.energyWarning, this.moodEmoji, this.occupationBadge, this.energyBar, this.nameLabel)
+    this.addChild(this.shadow, this.highlightGlow, this.body, this.emotionAccent, this.thoughtBubble, this.bubble, this.energyWarning, this.moodEmoji, this.occupationBadge, this.gangBadge, this.energyBar, this.nameLabel)
     this.on('pointertap', this.handlePointerTap)
     this.on('pointerenter', this.handlePointerEnter)
     this.on('pointerleave', this.handlePointerLeave)
@@ -394,6 +401,16 @@ export class ResidentSprite extends Container {
     const occIcon = OCCUPATION_ICON[resident.occupation ?? ''] ?? ''
     this.occupationBadge.text = occIcon
     this.occupationBadge.visible = occIcon.length > 0
+
+    // Gang badge
+    if (resident.gangId && resident.gangColor) {
+      this.gangBadge.clear()
+      this.gangBadge.circle(0, 0, 4).fill({ color: hexToNumber(resident.gangColor, 0x8B5CF6), alpha: 0.9 })
+      this.gangBadge.visible = true
+    } else {
+      this.gangBadge.clear()
+      this.gangBadge.visible = false
+    }
   }
 
   setSimulationSpeed(speed: SimulationSpeed): void {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { getWorldDemographics, type WorldDemographicsPayload } from '../../services/api'
 import { AnimatedNumber } from '../ui/AnimatedNumber'
@@ -182,11 +182,4 @@ export function PopulationPanel() {
   )
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
-      <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
-    </div>
-  )
-}
+// MetricCard removed - no longer used

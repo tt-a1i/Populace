@@ -69,6 +69,10 @@ def _should_travel(world: "World", resident: Any, rng: random.Random) -> bool:
     prob = 0.002
     if _is_adventurous(resident.personality):
         prob += 0.005
+    # Adventurousness trait boosts probability
+    from engine.personality import get_trait
+    adventurousness = get_trait(resident, "adventurousness")
+    prob += (adventurousness - 0.5) * 0.008
     # Want_travel wish boosts probability
     if any(w.type == "want_travel" and not w.fulfilled for w in getattr(resident, "wishlist", [])):
         prob += 0.008

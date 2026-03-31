@@ -139,7 +139,7 @@ export function PersonalityPanel() {
       ) : null}
 
       {!loading && !error && data === null ? (
-        <PanelEmptyState message={t('personality.no_data', '暂无居民数据')} />
+        <PanelEmptyState title={t('personality.no_data', '暂无居民数据')} />
       ) : null}
 
       {!loading && data ? (

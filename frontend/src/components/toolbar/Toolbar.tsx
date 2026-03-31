@@ -41,6 +41,9 @@ const EconomyPanel = lazy(() =>
 const MilestonePanel = lazy(() =>
   import('./MilestonePanel').then((module) => ({ default: module.MilestonePanel })),
 )
+const MarketPanel = lazy(() =>
+  import('./MarketPanel').then((module) => ({ default: module.MarketPanel })),
+)
 const PoliticsPanel = lazy(() =>
   import('./PoliticsPanel').then((module) => ({ default: module.PoliticsPanel })),
 )
@@ -110,10 +113,22 @@ const RulesPanel = lazy(() =>
 const KnowledgeGraphPanel = lazy(() =>
   import('./KnowledgeGraphPanel').then((module) => ({ default: module.KnowledgeGraphPanel })),
 )
+const InterventionPanel = lazy(() =>
+  import('./InterventionPanel').then((module) => ({ default: module.InterventionPanel })),
+)
+const DreamPanel = lazy(() =>
+  import('./DreamPanel').then((module) => ({ default: module.DreamPanel })),
+)
+const GangPanel = lazy(() =>
+  import('./GangPanel').then((module) => ({ default: module.GangPanel })),
+)
+const PersonalityPanel = lazy(() =>
+  import('./PersonalityPanel').then((module) => ({ default: module.PersonalityPanel })),
+)
 
 const OPEN_SETTINGS_EVENT = 'populace:open-settings'
 
-type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'votes' | 'security' | 'health' | 'emergency' | 'population' | 'family' | 'economy' | 'fashion' | 'culture' | 'politics' | 'religion' | 'reputation' | 'bulletin' | 'diplomacy' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard' | 'leaderboard' | 'achievements' | 'newspaper' | 'fullreport' | 'whatif' | 'mapeditor' | 'rules' | 'knowledge'
+type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'votes' | 'security' | 'health' | 'emergency' | 'population' | 'family' | 'economy' | 'fashion' | 'culture' | 'politics' | 'religion' | 'reputation' | 'bulletin' | 'diplomacy' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard' | 'leaderboard' | 'achievements' | 'newspaper' | 'fullreport' | 'whatif' | 'mapeditor' | 'rules' | 'knowledge' | 'intervention' | 'dreams' | 'gangs' | 'market' | 'milestones' | 'personality'
 
 interface ToolDef {
   key: ToolKey
@@ -137,7 +152,7 @@ function toneClass(_tone: string, active: boolean): string {
 
 const SECONDARY_KEYS: ReadonlySet<ToolKey> = new Set([
   'create', 'build', 'stats', 'dialogue', 'activity', 'saves', 'heatmap', 'compare', 'timeline', 'export', 'settings', 'dashboard', 'leaderboard', 'achievements', 'newspaper', 'fullreport', 'whatif', 'mapeditor', 'rules', 'knowledge',
-  'votes', 'security', 'health', 'emergency', 'population', 'family', 'economy', 'fashion', 'culture', 'politics', 'religion', 'reputation', 'bulletin', 'diplomacy',
+  'votes', 'security', 'health', 'emergency', 'population', 'family', 'economy', 'fashion', 'culture', 'politics', 'religion', 'reputation', 'bulletin', 'diplomacy', 'dreams', 'gangs', 'market', 'personality',
 ])
 
 export function Toolbar() {
@@ -245,7 +260,12 @@ export function Toolbar() {
     { key: 'mapeditor', label: t('toolbar.mapeditor', { defaultValue: '\u5730\u56FE\u7F16\u8F91' }), icon: '\u{1F5FA}\uFE0F', tone: 'emerald' },
     { key: 'rules', label: t('toolbar.rules', { defaultValue: '\u89C4\u5219\u5F15\u64CE' }), icon: '\u2699\uFE0F', tone: 'cyan' },
     { key: 'knowledge', label: t('toolbar.knowledge', { defaultValue: 'Knowledge Graph' }), icon: '\uD83E\uDDE0', tone: 'violet' },
+    { key: 'intervention', label: t('toolbar.intervention', { defaultValue: '干预' }), icon: '\u26A1', tone: 'cyan' },
     { key: 'milestones', label: t('toolbar.milestones', { defaultValue: '里程碑' }), icon: '🏅', tone: 'amber' },
+    { key: 'dreams', label: t('toolbar.dreams', { defaultValue: '梦想面板' }), icon: '✨', tone: 'violet' },
+    { key: 'gangs', label: t('toolbar.gangs', { defaultValue: '势力面板' }), icon: '🗡️', tone: 'rose' },
+    { key: 'market', label: t('toolbar.market', { defaultValue: '市场行情' }), icon: '🛒', tone: 'emerald' },
+    { key: 'personality', label: t('toolbar.personality', { defaultValue: '个性面板' }), icon: '🧠', tone: 'violet' },
   ]
 
   const allTools = [...primaryTools, ...secondaryTools]
@@ -316,7 +336,12 @@ export function Toolbar() {
     }
     if (activeTool === 'rules') return <LazyPanel label={t('toolbar.rules', { defaultValue: '\u89C4\u5219\u5F15\u64CE' })}><RulesPanel /></LazyPanel>
     if (activeTool === 'knowledge') return <LazyPanel label={t('toolbar.knowledge', { defaultValue: 'Knowledge Graph' })}><KnowledgeGraphPanel /></LazyPanel>
+    if (activeTool === 'intervention') return <LazyPanel label={t('toolbar.intervention', { defaultValue: '干预' })}><InterventionPanel /></LazyPanel>
     if (activeTool === 'milestones') return <LazyPanel label={t('toolbar.milestones', { defaultValue: '里程碑' })}><MilestonePanel /></LazyPanel>
+    if (activeTool === 'dreams') return <LazyPanel label={t('toolbar.dreams', { defaultValue: '梦想面板' })}><DreamPanel /></LazyPanel>
+    if (activeTool === 'gangs') return <LazyPanel label={t('toolbar.gangs', { defaultValue: '势力面板' })}><GangPanel /></LazyPanel>
+    if (activeTool === 'market') return <LazyPanel label={t('toolbar.market', { defaultValue: '市场行情' })}><MarketPanel /></LazyPanel>
+    if (activeTool === 'personality') return <LazyPanel label={t('toolbar.personality', { defaultValue: '个性面板' })}><PersonalityPanel /></LazyPanel>
     return <ReportsPanel />
   }, [activeTool, t])
 

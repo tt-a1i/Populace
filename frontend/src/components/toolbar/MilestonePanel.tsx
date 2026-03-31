@@ -66,7 +66,7 @@ export function MilestonePanel() {
           {/* Rating breakdown */}
           <div className="grid gap-2 sm:grid-cols-3">
             {Object.entries(RATING_LABELS).map(([key, meta]) => {
-              const value = (data.rating as Record<string, number>)[key] ?? 0
+              const value = (data.rating as unknown as Record<string, number>)[key] ?? 0
               return (
                 <div key={key} className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
                   <div className="flex items-center gap-1.5">

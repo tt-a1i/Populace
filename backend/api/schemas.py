@@ -946,6 +946,23 @@ class TownLevelResponse(BaseModel):
     unlocks: list[str] = Field(default_factory=list)
 
 
+class MarketGoodEntry(BaseModel):
+    id: str = ""
+    name: str = ""
+    emoji: str = ""
+    current_price: float = 0.0
+    base_price: float = 0.0
+    inventory: int = 0
+    demand_trend: float = 0.0
+    price_history: list[float] = Field(default_factory=list)
+    trend: str = "flat"       # "up", "down", "flat"
+    change_pct: float = 0.0
+
+
+class WorldMarketResponse(BaseModel):
+    goods: list[MarketGoodEntry] = Field(default_factory=list)
+
+
 class FashionTrendResponse(BaseModel):
     color_name: str
     color: str
@@ -1151,6 +1168,25 @@ class WorldRomanceStatsResponse(BaseModel):
     divorces: int = 0
 
 
+class DreamTopEntry(BaseModel):
+    dream: str
+    count: int
+
+
+class DreamFulfillmentEntry(BaseModel):
+    resident_id: str
+    resident_name: str
+    dream: str
+    tick: int
+
+
+class WorldDreamStatsResponse(BaseModel):
+    dreams_fulfilled_total: int = 0
+    top_dreams: list[DreamTopEntry] = Field(default_factory=list)
+    avg_progress: float = 0.0
+    recent_fulfillments: list[DreamFulfillmentEntry] = Field(default_factory=list)
+
+
 class RomancePartnerInfo(BaseModel):
     id: str
     name: str
@@ -1160,3 +1196,10 @@ class ResidentRomanceResponse(BaseModel):
     relationship_status: str = "single"
     partner: RomancePartnerInfo | None = None
     love_intensity: float = 0.0
+
+
+class WorldPersonalityStatsResponse(BaseModel):
+    extraversion: float = 0.5
+    optimism: float = 0.5
+    thrift: float = 0.5
+    adventurousness: float = 0.5

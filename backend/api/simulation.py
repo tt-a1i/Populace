@@ -672,6 +672,7 @@ class SimulationState:
                 life_goal=LifeGoal(**res_data["life_goal"]) if res_data.get("life_goal") else None,
                 wishlist=[Wish(**w) for w in res_data.get("wishlist", [])],
                 jealousy_targets=[JealousyEntry(**j) for j in res_data.get("jealousy_targets", [])],
+                personality_traits=dict(res_data.get("personality_traits", {})),
             )
             resident.achievements = [Achievement(**entry) for entry in res_data.get("achievements", [])]
             for d in res_data.get("diary", []):
@@ -2955,6 +2956,13 @@ class SimulationState:
             for tev in travel_events:
                 tick_state.events.append(EventUpdate(description=tev.description))
 
+        # Dream processing (every 7 ticks)
+        if self.world.current_tick % 7 == 0:
+            from engine.dream import process_dream_tick
+            dream_events = process_dream_tick(self.world, getattr(self.world, "rng", None))
+            for dev in dream_events:
+                tick_state.events.append(EventUpdate(description=dev.description))
+
         seasonal_festival = self._start_festival(
             str(self.world.season.value if hasattr(self.world.season, "value") else self.world.season),
             start_tick=self.world.current_tick,
@@ -3899,6 +3907,7 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
             life_goal=LifeGoal(**res_data["life_goal"]) if res_data.get("life_goal") else None,
             wishlist=[Wish(**w) for w in res_data.get("wishlist", [])],
             jealousy_targets=[JealousyEntry(**j) for j in res_data.get("jealousy_targets", [])],
+            personality_traits=dict(res_data.get("personality_traits", {})),
         )
         resident.achievements = [Achievement(**entry) for entry in res_data.get("achievements", [])]
         for d in res_data.get("diary", []):
