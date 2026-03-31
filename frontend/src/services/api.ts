@@ -512,6 +512,54 @@ export function getWorldRumors() {
   return request<WorldRumorsPayload>('/api/world/rumors')
 }
 
+// ---------------------------------------------------------------------------
+// Leaderboards & Badges (Task 106)
+// ---------------------------------------------------------------------------
+
+export interface LeaderboardEntryApi {
+  resident_id: string
+  name: string
+  value: number
+  rank: number
+}
+
+export interface LeaderboardsApi {
+  richest: LeaderboardEntryApi[]
+  happiest: LeaderboardEntryApi[]
+  most_social: LeaderboardEntryApi[]
+  most_traveled: LeaderboardEntryApi[]
+  most_influential: LeaderboardEntryApi[]
+}
+
+export interface BadgeApi {
+  badge_id: string
+  name: string
+  emoji: string
+  condition_desc: string
+}
+
+export interface BadgesStatsApi {
+  total_awarded: number
+  rarest_badge: { badge_id: string; count: number } | null
+  badge_distribution: Record<string, number>
+}
+
+export function getLeaderboards() {
+  return request<LeaderboardsApi>('/api/world/leaderboards')
+}
+
+export function getBadges() {
+  return request<BadgeApi[]>('/api/world/badges')
+}
+
+export function getBadgesStats() {
+  return request<BadgesStatsApi>('/api/world/badges_stats')
+}
+
+export function awardBadges() {
+  return request<[]>('/api/world/badges/award', { method: 'POST' })
+}
+
 export function getWorldDiplomacy() {
   return request<WorldDiplomacyPayload>('/api/world/diplomacy')
 }
