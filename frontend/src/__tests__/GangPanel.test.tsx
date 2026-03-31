@@ -144,10 +144,12 @@ describe('GangPanel', () => {
     render(<GangPanel />)
 
     await waitFor(() => {
-      const gangCards = screen.getAllByRole('article', { hidden: true }) || screen.getAllByText(/影刃帮 | 夜枭会/)
-      // Cards should have color styling
-      const firstCard = gangCards[0]?.closest('.rounded-xl')
-      expect(firstCard).toBeDefined()
+      // Gang cards should have color styling in their borders
+      const gangCards = screen.getAllByText(/影刃帮 | 夜枭会/)
+      expect(gangCards.length).toBeGreaterThan(0)
+      // Check that colored badges exist
+      const badges = document.querySelectorAll('[style*="background-color"]')
+      expect(badges.length).toBeGreaterThan(0)
     })
   })
 

@@ -769,12 +769,15 @@ else:
     @dataclass
     class Gang:
         """A criminal gang that operates in the town."""
-        id: str = ""
-        name: str = ""
-        leader_id: str = ""
-        members: List[str] = field(default_factory=list)
+        name: str
+        leader_id: str
+        member_ids: List[str] = field(default_factory=list)
         territory: str = ""
-        influence: float = 0.0
+        influence: float = 0.5
+        activity: str = "贩私"
+        color: str = "#8B5CF6"
+        created_tick: int = 0
+        last_action_tick: int = 0
 
     # ---------------------------------------------------------------------------
     # Leaderboards & Badges (§106)

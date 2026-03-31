@@ -3988,6 +3988,176 @@ class World:
         return events
 
     # ------------------------------------------------------------------
+    # Leaderboards & Badges System (§106)
+    # ------------------------------------------------------------------
+
+    def get_leaderboards(self) -> Dict[str, List["LeaderboardEntry"]]:
+        """Return 5 leaderboards with top 5 residents each."""
+        from engine.types import LeaderboardEntry
+
+        residents = [agent.resident for agent in self.agents]
+
+        # Richest (by wallet + coins)
+        richest_data = [(r, r.wallet + r.coins) for r in residents]
+        richest_data.sort(key=lambda x: x[1], reverse=True)
+        richest = [
+            LeaderboardEntry(resident_id=r.id, name=r.name, value=float(val), rank=i+1)
+            for i, (r, val) in enumerate(richest_data[:5])
+        ]
+
+        # Happiest (by mood score)
+        mood_map = {"ecstatic": 1.0, "excited": 0.8, "happy": 0.6, "content": 0.3, "calm": 0.1, "neutral": 0.0, "tired": -0.2, "sad": -0.5, "angry": -0.7, "fearful": -0.9}
+        happiest_data = [(r, mood_map.get(r.mood, 0.0)) for r in residents]
+        happiest_data.sort(key=lambda x: x[1], reverse=True)
+        happiest = [
+            LeaderboardEntry(resident_id=r.id, name=r.name, value=float(val), rank=i+1)
+            for i, (r, val) in enumerate(happiest_data[:5])
+        ]
+
+        # Most social (by relationship count)
+        def count_relationships(resident: "Resident") -> int:
+            count = 0
+            for (from_id, _), rel in self.relationships.items():
+                if from_id == resident.id:
+                    count += 1
+            return count
+
+        social_data = [(r, count_relationships(r)) for r in residents]
+        social_data.sort(key=lambda x: x[1], reverse=True)
+        most_social = [
+            LeaderboardEntry(resident_id=r.id, name=r.name, value=float(val), rank=i+1)
+            for i, (r, val) in enumerate(social_data[:5])
+        ]
+
+        # Most traveled (by travel_log length)
+        traveled_data = [(r, len(r.travel_log)) for r in residents]
+        traveled_data.sort(key=lambda x: x[1], reverse=True)
+        most_traveled = [
+            LeaderboardEntry(resident_id=r.id, name=r.name, value=float(val), rank=i+1)
+            for i, (r, val) in enumerate(traveled_data[:5])
+        ]
+
+        # Most influential (composite: reputation + achievements + relationships)
+        def calc_influence(resident: "Resident") -> float:
+            rel_count = count_relationships(resident)
+            achievement_count = len(resident.achievements)
+            return resident.reputation * 10 + achievement_count * 5 + rel_count * 2
+
+        influential_data = [(r, calc_influence(r)) for r in residents]
+        influential_data.sort(key=lambda x: x[1], reverse=True)
+        most_influential = [
+            LeaderboardEntry(resident_id=r.id, name=r.name, value=float(val), rank=i+1)
+            for i, (r, val) in enumerate(influential_data[:5])
+        ]
+
+        return {
+            "richest": richest,
+            "happiest": happiest,
+            "most_social": most_social,
+            "most_traveled": most_traveled,
+            "most_influential": most_influential,
+        }
+
+    def get_badge_definitions(self) -> List["Badge"]:
+        """Return the list of all possible badges."""
+        from engine.types import Badge
+        return [
+            Badge(badge_id="rich", name="土豪", emoji="💰", condition_desc="金币 + 钱包 > 500"),
+            Badge(badge_id="happy", name="开心果", emoji="😄", condition_desc="持续 10 tick 幸福感高"),
+            Badge(badge_id="social", name="社交达人", emoji="🤝", condition_desc="拥有 10+ 社交关系"),
+            Badge(badge_id="explorer", name="探险家", emoji="🗺️", condition_desc="旅行 5+ 次"),
+            Badge(badge_id="legend", name="传奇人物", emoji="🌟", condition_desc="影响力 > 100"),
+            Badge(badge_id="longevity", name="长寿老人", emoji="👴", condition_desc="年龄 > 800 天"),
+            Badge(badge_id="lover", name="恋爱达人", emoji="💕", condition_desc="拥有伴侣"),
+            Badge(badge_id="dreamer", name="梦想家", emoji="✨", condition_desc="梦想进度 > 0.8"),
+            Badge(badge_id="secret_keeper", name="秘密持有者", emoji="🤫", condition_desc="拥有 3+ 秘密"),
+            Badge(badge_id="gang_leader", name="帮派头目", emoji="👑", condition_desc="是帮派领袖"),
+        ]
+
+    def award_badges(self) -> List[tuple]:
+        """Check and award badges to residents. Returns list of (resident_id, badge_id) awarded."""
+        awarded = []
+        badge_defs = {b.badge_id: b for b in self.get_badge_definitions()}
+
+        for agent in self.agents:
+            resident = agent.resident
+            current_badges = set(resident.badges)
+
+            # Rich: wallet + coins > 500
+            if "rich" not in current_badges and (resident.wallet + resident.coins) > 500:
+                resident.badges.append("rich")
+                awarded.append((resident.id, "rich"))
+
+            # Happy: mood is happy/ecstatic/excited
+            if "happy" not in current_badges and resident.mood in {"happy", "ecstatic", "excited"}:
+                # Check if maintained for 10 ticks (simplified: just check current)
+                resident.badges.append("happy")
+                awarded.append((resident.id, "happy"))
+
+            # Social: 10+ relationships
+            rel_count = sum(1 for (from_id, _) in self.relationships.keys() if from_id == resident.id)
+            if "social" not in current_badges and rel_count >= 10:
+                resident.badges.append("social")
+                awarded.append((resident.id, "social"))
+
+            # Explorer: 5+ travels
+            if "explorer" not in current_badges and len(resident.travel_log) >= 5:
+                resident.badges.append("explorer")
+                awarded.append((resident.id, "explorer"))
+
+            # Legend: influence > 100
+            influence = resident.reputation * 10 + len(resident.achievements) * 5 + rel_count * 2
+            if "legend" not in current_badges and influence > 100:
+                resident.badges.append("legend")
+                awarded.append((resident.id, "legend"))
+
+            # Longevity: age > 800 days
+            if "longevity" not in current_badges and resident.age_days > 800:
+                resident.badges.append("longevity")
+                awarded.append((resident.id, "longevity"))
+
+            # Lover: has partner
+            if "lover" not in current_badges and resident.family.partner_id:
+                resident.badges.append("lover")
+                awarded.append((resident.id, "lover"))
+
+            # Dreamer: dream progress > 0.8
+            if "dreamer" not in current_badges and resident.dream_progress > 0.8:
+                resident.badges.append("dreamer")
+                awarded.append((resident.id, "dreamer"))
+
+            # Secret keeper: 3+ secrets
+            if "secret_keeper" not in current_badges and len(resident.secrets) >= 3:
+                resident.badges.append("secret_keeper")
+                awarded.append((resident.id, "secret_keeper"))
+
+            # Gang leader: is a gang leader (simplified check)
+            # This would need integration with the Gang system
+            # For now, skip or check if resident has a specific flag
+
+        return awarded
+
+    def get_badges_stats(self) -> Dict[str, any]:
+        """Return badge statistics."""
+        badge_counts: Dict[str, int] = {}
+        total_awarded = 0
+
+        for agent in self.agents:
+            for badge_id in agent.resident.badges:
+                badge_counts[badge_id] = badge_counts.get(badge_id, 0) + 1
+                total_awarded += 1
+
+        rarest_badge = None
+        if badge_counts:
+            rarest_badge = min(badge_counts.items(), key=lambda x: x[1])
+
+        return {
+            "total_awarded": total_awarded,
+            "rarest_badge": {"badge_id": rarest_badge[0], "count": rarest_badge[1]} if rarest_badge else None,
+            "badge_distribution": badge_counts,
+        }
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 

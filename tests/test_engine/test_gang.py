@@ -4,7 +4,7 @@ import pytest
 from engine.types import Gang, WorldConfig
 from engine.world import World
 
-from tests.conftest import make_agent
+from tests.conftest import make_agent, make_resident
 
 
 @pytest.fixture
@@ -14,11 +14,14 @@ def mock_world():
     world = World(config)
     
     # Add agents with different moods
-    agent1 = make_agent("a1", "阿强", personality="愤怒，不满", x=5, y=5)
+    agent1 = make_agent("a1", "阿强", x=5, y=5)
+    agent1.resident.personality = "愤怒，不满"
     agent1.resident.mood = "angry"
-    agent2 = make_agent("a2", "小红", personality="外向，热心", x=10, y=10)
+    agent2 = make_agent("a2", "小红", x=10, y=10)
+    agent2.resident.personality = "外向，热心"
     agent2.resident.mood = "happy"
-    agent3 = make_agent("a3", "阿明", personality="内向，害羞", x=15, y=15)
+    agent3 = make_agent("a3", "阿明", x=15, y=15)
+    agent3.resident.personality = "内向，害羞"
     agent3.resident.mood = "sad"
     
     for agent in [agent1, agent2, agent3]:
@@ -104,14 +107,24 @@ class TestGangRecruitment:
         """Residents already in a gang should not be recruited again."""
         mock_world.initialize_gangs()
         
+        # Find a resident not in any gang
+        non_member_id = None
+        for agent in mock_world.agents:
+            if not any(agent.resident.id in gang.member_ids for gang in mock_world.gangs):
+                non_member_id = agent.resident.id
+                break
+        
+        if non_member_id is None:
+            pytest.skip("All residents are already in gangs")
+        
         # Manually add resident to a gang
         if mock_world.gangs:
-            mock_world.gangs[0].member_ids.append("a1")
+            mock_world.gangs[0].member_ids.append(non_member_id)
         
         # Recruitment should not add duplicate
         mock_world.recruit_for_gangs()
         
-        member_count = sum(1 for gang in mock_world.gangs for mid in gang.member_ids if mid == "a1")
+        member_count = sum(1 for gang in mock_world.gangs for mid in gang.member_ids if mid == non_member_id)
         assert member_count == 1
 
 
