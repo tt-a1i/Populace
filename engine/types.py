@@ -294,6 +294,15 @@ else:
         designed_by: Optional[str] = None
 
     @dataclass
+    class Skill:
+        """A single skill entry in a resident's skill tree."""
+        skill_id: str
+        name: str
+        level: int = 0
+        xp: float = 0.0
+        xp_to_next: float = 100.0
+
+    @dataclass
     class Appearance:
         hair: str = "short"
         clothing: str = "casual"
@@ -437,6 +446,7 @@ else:
         dream_progress: float = 0.0
         personality_traits: Dict[str, float] = field(default_factory=dict)
         badges: List[str] = field(default_factory=list)  # List of badge_ids awarded to this resident
+        skill_tree: Dict[str, "Skill"] = field(default_factory=dict)
 
 
     @dataclass
@@ -860,6 +870,15 @@ else:
         tick: int = 0
         headline: str = ""
         articles: List[NewsArticle] = field(default_factory=list)
+
+    @dataclass
+    class NewspaperIssue:
+        """A smart daily newspaper issue generated every 20 ticks."""
+        issue_id: str = ""
+        tick: int = 0
+        headlines: List[str] = field(default_factory=list)   # 3~5 headlines
+        sections: Dict[str, str] = field(default_factory=dict)  # economy/society/gossip/events
+        generated_at: int = 0  # tick when generated
 
     # ---------------------------------------------------------------------------
     # World configuration (§16)

@@ -560,6 +560,42 @@ export function awardBadges() {
   return request<[]>('/api/world/badges/award', { method: 'POST' })
 }
 
+// ---------------------------------------------------------------------------
+// Emotion Heatmap (Task 109)
+// ---------------------------------------------------------------------------
+
+export interface EmotionHotspotApi {
+  x: number
+  y: number
+  mood: string
+  avg_emotion: number
+  resident_count: number
+}
+
+export interface EmotionHeatmapApi {
+  grid: number[][]
+  hotspots: EmotionHotspotApi[]
+  mood_distribution: Record<string, number>
+  avg_happiness: number
+}
+
+export interface EmotionHistoryEntryApi {
+  tick: number
+  avg_happiness: number
+}
+
+export interface EmotionHistoryApi {
+  history: EmotionHistoryEntryApi[]
+}
+
+export function getEmotionHeatmap() {
+  return request<EmotionHeatmapApi>('/api/world/emotion_heatmap')
+}
+
+export function getEmotionHistory() {
+  return request<EmotionHistoryApi>('/api/world/emotion_history')
+}
+
 export function getWorldDiplomacy() {
   return request<WorldDiplomacyPayload>('/api/world/diplomacy')
 }
@@ -650,6 +686,30 @@ export interface WorldDreamStatsPayload {
 
 export function getWorldDreamStats() {
   return request<WorldDreamStatsPayload>('/api/world/dream_stats')
+}
+
+export interface NewspaperIssuePayload {
+  issue_id: string
+  tick: number
+  headlines: string[]
+  sections: Record<string, string>
+  generated_at: number
+}
+
+export interface NewspaperLatestPayload {
+  issue: NewspaperIssuePayload | null
+}
+
+export interface NewspaperArchivePayload {
+  issues: NewspaperIssuePayload[]
+}
+
+export function getWorldNewspaper() {
+  return request<NewspaperLatestPayload>('/api/world/newspaper')
+}
+
+export function getWorldNewspaperArchive() {
+  return request<NewspaperArchivePayload>('/api/world/newspaper/archive')
 }
 
 export function getResidents() {
@@ -2078,4 +2138,25 @@ export interface PersonalityStatsPayload {
 
 export function getPersonalityStats() {
   return request<PersonalityStatsPayload>('/api/world/personality_stats')
+}
+
+export interface SkillStatEntry {
+  avg_level: number
+  max_level: number
+  masters_count: number
+}
+
+export interface SkillMasterEntry {
+  id: string
+  name: string
+  level: number
+}
+
+export interface SkillDistributionPayload {
+  distribution: Record<string, SkillStatEntry>
+  masters: Record<string, SkillMasterEntry[]>
+}
+
+export function getSkillDistribution() {
+  return request<SkillDistributionPayload>('/api/world/skill_distribution')
 }

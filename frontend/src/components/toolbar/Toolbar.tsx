@@ -125,10 +125,13 @@ const GangPanel = lazy(() =>
 const PersonalityPanel = lazy(() =>
   import('./PersonalityPanel').then((module) => ({ default: module.PersonalityPanel })),
 )
+const EmotionPanel = lazy(() =>
+  import('./EmotionPanel').then((module) => ({ default: module.EmotionPanel })),
+)
 
 const OPEN_SETTINGS_EVENT = 'populace:open-settings'
 
-type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'votes' | 'security' | 'health' | 'emergency' | 'population' | 'family' | 'economy' | 'fashion' | 'culture' | 'politics' | 'religion' | 'reputation' | 'bulletin' | 'diplomacy' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard' | 'leaderboard' | 'achievements' | 'newspaper' | 'fullreport' | 'whatif' | 'mapeditor' | 'rules' | 'knowledge' | 'intervention' | 'dreams' | 'gangs' | 'market' | 'milestones' | 'personality'
+type ToolKey = 'director' | 'persona' | 'quest' | 'report' | 'create' | 'build' | 'votes' | 'security' | 'health' | 'emergency' | 'population' | 'family' | 'economy' | 'fashion' | 'culture' | 'politics' | 'religion' | 'reputation' | 'bulletin' | 'diplomacy' | 'stats' | 'dialogue' | 'saves' | 'heatmap' | 'compare' | 'timeline' | 'export' | 'settings' | 'activity' | 'dashboard' | 'leaderboard' | 'achievements' | 'newspaper' | 'fullreport' | 'whatif' | 'mapeditor' | 'rules' | 'knowledge' | 'intervention' | 'dreams' | 'gangs' | 'market' | 'milestones' | 'personality' | 'emotion'
 
 interface ToolDef {
   key: ToolKey
@@ -266,6 +269,7 @@ export function Toolbar() {
     { key: 'gangs', label: t('toolbar.gangs', { defaultValue: '势力面板' }), icon: '🗡️', tone: 'rose' },
     { key: 'market', label: t('toolbar.market', { defaultValue: '市场行情' }), icon: '🛒', tone: 'emerald' },
     { key: 'personality', label: t('toolbar.personality', { defaultValue: '个性面板' }), icon: '🧠', tone: 'violet' },
+    { key: 'emotion', label: t('toolbar.emotion', { defaultValue: '情感' }), icon: '💭', tone: 'cyan' },
   ]
 
   const allTools = [...primaryTools, ...secondaryTools]
@@ -342,6 +346,7 @@ export function Toolbar() {
     if (activeTool === 'gangs') return <LazyPanel label={t('toolbar.gangs', { defaultValue: '势力面板' })}><GangPanel /></LazyPanel>
     if (activeTool === 'market') return <LazyPanel label={t('toolbar.market', { defaultValue: '市场行情' })}><MarketPanel /></LazyPanel>
     if (activeTool === 'personality') return <LazyPanel label={t('toolbar.personality', { defaultValue: '个性面板' })}><PersonalityPanel /></LazyPanel>
+    if (activeTool === 'emotion') return <LazyPanel label={t('toolbar.emotion', { defaultValue: '情感' })}><EmotionPanel /></LazyPanel>
     return <ReportsPanel />
   }, [activeTool, t])
 

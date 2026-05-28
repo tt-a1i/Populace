@@ -1,67 +1,62 @@
-"""Tests for newspaper generation endpoint."""
-from __future__ import annotations
-
-import asyncio
-
+"""Tests for V9 newspaper API endpoints."""
 import pytest
+from fastapi.testclient import TestClient
 
-from backend.api.report import NewspaperResponse, NewspaperArticle, _generate_newspaper
-from backend.api.simulation import SimulationState
-
-
-@pytest.fixture(autouse=True)
-def _ensure_event_loop():
-    try:
-        asyncio.get_event_loop()
-    except RuntimeError:
-        asyncio.set_event_loop(asyncio.new_event_loop())
+from backend.main import app
 
 
-class TestNewspaperModels:
-    """Test Pydantic models for newspaper data."""
-
-    def test_article_defaults(self):
-        a = NewspaperArticle(section="头条", headline="Test", content="Content")
-        assert a.icon == ""
-
-    def test_response_model(self):
-        r = NewspaperResponse(
-            day=0,
-            date_label="Day 1",
-            headline="Test headline",
-            articles=[],
-            generated_at="2026-01-01T00:00:00Z",
-        )
-        assert r.day == 0
-        assert r.headline == "Test headline"
-        assert r.articles == []
+@pytest.fixture(scope="module")
+def client():
+    with TestClient(app) as c:
+        yield c
 
 
-class TestNewspaperGeneration:
-    """Test newspaper generation from simulation state."""
+def test_newspaper_latest_endpoint_exists(client):
+    """GET /api/world/newspaper returns 200."""
+    resp = client.get("/api/world/newspaper")
+    assert resp.status_code == 200
 
-    def test_generates_weather_article(self):
-        """Newspaper always includes a weather section."""
-        state = SimulationState()
-        result = _generate_newspaper(state, 0)
-        sections = [a.section for a in result.articles]
-        assert "天气" in sections
 
-    def test_generates_headline(self):
-        """Newspaper always has a headline."""
-        state = SimulationState()
-        result = _generate_newspaper(state, 0)
-        assert result.headline
-        assert len(result.headline) > 0
+def test_newspaper_latest_response_structure(client):
+    """Response has 'issue' key (may be null if no ticks run)."""
+    resp = client.get("/api/world/newspaper")
+    data = resp.json()
+    assert "issue" in data
 
-    def test_day_label(self):
-        """Day label corresponds to the requested day."""
-        state = SimulationState()
-        result = _generate_newspaper(state, 0)
-        assert "1" in result.date_label or "Day" in result.date_label
 
-    def test_empty_day_still_produces_articles(self):
-        """Even with no experiment history, we get at least weather + headline."""
-        state = SimulationState()
-        result = _generate_newspaper(state, 99)  # Far future day
-        assert len(result.articles) >= 2  # At least headline + weather
+def test_newspaper_archive_endpoint_exists(client):
+    """GET /api/world/newspaper/archive returns 200."""
+    resp = client.get("/api/world/newspaper/archive")
+    assert resp.status_code == 200
+
+
+def test_newspaper_archive_response_structure(client):
+    """Archive response has 'issues' list."""
+    resp = client.get("/api/world/newspaper/archive")
+    data = resp.json()
+    assert "issues" in data
+    assert isinstance(data["issues"], list)
+
+
+def test_newspaper_issue_fields_when_present(client):
+    """If issue is present, it has required fields."""
+    resp = client.get("/api/world/newspaper")
+    data = resp.json()
+    if data["issue"] is not None:
+        issue = data["issue"]
+        assert "issue_id" in issue
+        assert "tick" in issue
+        assert "headlines" in issue
+        assert "sections" in issue
+        assert isinstance(issue["headlines"], list)
+        assert isinstance(issue["sections"], dict)
+
+
+def test_newspaper_archive_items_have_fields(client):
+    """Each archive item has required fields."""
+    resp = client.get("/api/world/newspaper/archive")
+    data = resp.json()
+    for issue in data["issues"]:
+        assert "issue_id" in issue
+        assert "tick" in issue
+        assert "headlines" in issue

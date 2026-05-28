@@ -1187,6 +1187,22 @@ class WorldDreamStatsResponse(BaseModel):
     recent_fulfillments: list[DreamFulfillmentEntry] = Field(default_factory=list)
 
 
+class NewspaperIssueResponse(BaseModel):
+    issue_id: str = ""
+    tick: int = 0
+    headlines: list[str] = Field(default_factory=list)
+    sections: dict[str, str] = Field(default_factory=dict)
+    generated_at: int = 0
+
+
+class NewspaperLatestResponse(BaseModel):
+    issue: NewspaperIssueResponse | None = None
+
+
+class NewspaperArchiveResponse(BaseModel):
+    issues: list[NewspaperIssueResponse] = Field(default_factory=list)
+
+
 class RomancePartnerInfo(BaseModel):
     id: str
     name: str
@@ -1203,3 +1219,20 @@ class WorldPersonalityStatsResponse(BaseModel):
     optimism: float = 0.5
     thrift: float = 0.5
     adventurousness: float = 0.5
+
+
+class SkillStatEntry(BaseModel):
+    avg_level: float = 0.0
+    max_level: int = 0
+    masters_count: int = 0
+
+
+class SkillMasterEntry(BaseModel):
+    id: str
+    name: str
+    level: int
+
+
+class WorldSkillDistributionResponse(BaseModel):
+    distribution: dict[str, SkillStatEntry] = {}
+    masters: dict[str, list[SkillMasterEntry]] = {}

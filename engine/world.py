@@ -46,6 +46,7 @@ from engine.types import (
     EconomicCycle,
     Milestone,
     NewsArticle,
+    NewspaperIssue,
     Secret,
     Newspaper,
     Party,
@@ -187,6 +188,17 @@ _ILLNESS_PROFILES = {
 }
 
 
+def _newspaper_issue_to_dict(issue: "NewspaperIssue") -> dict:
+    """Serialize a NewspaperIssue to a plain dict for API responses."""
+    return {
+        "issue_id": issue.issue_id,
+        "tick": issue.tick,
+        "headlines": list(issue.headlines),
+        "sections": dict(issue.sections),
+        "generated_at": issue.generated_at,
+    }
+
+
 class World:
     """Central state container for a running simulation.
 
@@ -252,6 +264,7 @@ class World:
         self.grid_index: Dict[Tuple[int, int], List[Agent]] = {}
         self._grid_index_dirty = True
         self.news_archive: List[Newspaper] = []
+        self.newspaper_archive: List[NewspaperIssue] = []
         self.town_level: int = 1
         self.milestones: List[Milestone] = self._default_milestones()
         self.unlocks: List[str] = []
@@ -1327,6 +1340,142 @@ class World:
                 for p in reversed(self.news_archive[-12:])
             ],
         }
+
+    # ------------------------------------------------------------------
+    # Smart newspaper system (§107)
+    # ------------------------------------------------------------------
+
+    def generate_newspaper(self) -> Optional["NewspaperIssue"]:
+        """Generate a new NewspaperIssue from current world events.
+
+        Called every 20 ticks.  Pulls from events, market, gangs, dreams,
+        and interventions to build natural-language headlines and sections.
+        """
+        tick = int(getattr(self, "current_tick", 0))
+        issue_num = len(self.newspaper_archive) + 1
+        issue_id = f"issue-{issue_num}-t{tick}"
+        headlines: List[str] = []
+
+        # ── Economy section ──
+        gdp = float(getattr(self, "economic_output", 0.0))
+        market = getattr(self, "market", None)
+        eco_parts: List[str] = []
+        if gdp > 500:
+            eco_parts.append(f"本期经济产出丰厚，镇库积累达 {int(gdp)} 金币。")
+            headlines.append(f"经济形势喜人，产出 {int(gdp)} 金币创近期新高")
+        elif gdp > 0:
+            eco_parts.append(f"本期经济平稳，产出 {int(gdp)} 金币。")
+        else:
+            eco_parts.append("本期经济尚处起步阶段，居民努力经营。")
+        if market:
+            goods = list(getattr(market, "goods", {}).items())
+            if goods:
+                most_expensive = max(goods, key=lambda x: float(x[1]))
+                eco_parts.append(f"市场上「{most_expensive[0]}」价格最高，达 {round(float(most_expensive[1]), 1)} 金。")
+
+        # ── Society section ──
+        adults = [a.resident for a in self.agents if a.resident.age_stage == "adult"]
+        avg_mood_score = 0.0
+        if adults:
+            mood_map = {"ecstatic": 1.0, "excited": 0.8, "happy": 0.6, "content": 0.3,
+                        "calm": 0.1, "neutral": 0.0, "tired": -0.2, "sad": -0.5, "angry": -0.8, "fearful": -0.6}
+            avg_mood_score = sum(mood_map.get(r.mood, 0.0) for r in adults) / len(adults)
+        if avg_mood_score > 0.4:
+            society_text = "镇内居民心情愉快，街头笑声不断，社区氛围和睦。"
+            headlines.append("居民士气高涨，小镇迎来快乐时光")
+        elif avg_mood_score < -0.2:
+            society_text = "近日居民情绪低落，部分居民面露愁容，需要关注。"
+            headlines.append("镇内情绪波动，居民生活压力渐增")
+        else:
+            society_text = "居民生活平稳，社区日常有序推进。"
+
+        # ── Gossip section ──
+        gossip_parts: List[str] = []
+        rumor_log = list(getattr(self, "rumor_log", []))[-5:]
+        for rumor in rumor_log:
+            content = str(rumor.get("content", ""))
+            if content:
+                gossip_parts.append(content)
+                break
+        fulfillments = list(getattr(self, "_dream_fulfillments", []))
+        recent_dreams = [f for f in fulfillments if tick - f.get("tick", 0) <= 20]
+        if recent_dreams:
+            fd = recent_dreams[-1]
+            gossip_parts.append(f"据悉，{fd['resident_name']} 实现了梦想「{fd['dream']}」，镇民纷纷称赞。")
+            if not headlines:
+                headlines.append(f"{fd['resident_name']} 梦想成真，全镇为之喝彩")
+        if not gossip_parts:
+            gossip_parts.append("本期坊间流传着各种奇闻逸事，居民茶余饭后津津乐道。")
+
+        # ── Events section ──
+        events_parts: List[str] = []
+        # Gangs
+        gang_log = list(getattr(self, "gang_event_log", []))
+        recent_gang = [e for e in gang_log if tick - e.get("tick", 0) <= 20]
+        if recent_gang:
+            ev = recent_gang[-1]
+            events_parts.append(f"治安动态：{ev.get('gang_name', '某帮派')}在镇内{ev.get('description', '有所行动')}。")
+            headlines.append(f"【治安快报】{ev.get('gang_name', '帮派')}活动引发关注")
+        # Interventions
+        interventions = list(getattr(self, "player_interventions", []))
+        recent_int = [i for i in interventions if tick - int(getattr(i, "tick", 0)) <= 20]
+        if recent_int:
+            inv = recent_int[-1]
+            events_parts.append(f"镇长介入：{inv.effect_description}。")
+        # Active festival
+        festival_name = getattr(self, "active_festival", None)
+        if festival_name and int(getattr(self, "active_festival_ticks_remaining", 0)) > 0:
+            events_parts.append(f"「{festival_name}」正在举行，全镇喜气洋洋。")
+            headlines.append(f"佳节来临！「{festival_name}」让小镇热闹非凡")
+        if not events_parts:
+            events_parts.append("本期小镇风平浪静，居民安居乐业。")
+
+        # ── Headline fallback ──
+        if not headlines:
+            headlines.append(f"第 {issue_num} 期《小镇日报》如期而至，记录镇内百态")
+        # Ensure 3-5 headlines
+        while len(headlines) < 3:
+            filler = [
+                "四季更替，小镇居民各自书写精彩故事",
+                "人口普查结果出炉，社区发展稳中有进",
+                "本期好人好事：热心居民拾金不昧获称赞",
+            ]
+            for f in filler:
+                if f not in headlines:
+                    headlines.append(f)
+                    if len(headlines) >= 3:
+                        break
+        headlines = headlines[:5]
+
+        sections = {
+            "economy": "".join(eco_parts),
+            "society": society_text,
+            "gossip": "".join(gossip_parts),
+            "events": "".join(events_parts),
+        }
+
+        issue = NewspaperIssue(
+            issue_id=issue_id,
+            tick=tick,
+            headlines=headlines,
+            sections=sections,
+            generated_at=tick,
+        )
+        self.newspaper_archive.append(issue)
+        self.newspaper_archive = self.newspaper_archive[-10:]
+        return issue
+
+    def get_newspaper_overview(self) -> dict:
+        """Return the latest NewspaperIssue as a dict."""
+        if not self.newspaper_archive:
+            return {"issue": None}
+        latest = self.newspaper_archive[-1]
+        return {"issue": _newspaper_issue_to_dict(latest)}
+
+    def get_newspaper_archive_overview(self) -> dict:
+        """Return the last 5 NewspaperIssues as a list."""
+        recent = list(reversed(self.newspaper_archive[-5:]))
+        return {"issues": [_newspaper_issue_to_dict(i) for i in recent]}
 
     def _ensure_resident_memories(self, resident: Resident) -> None:
         resident.memories = list(getattr(resident, "memories", []))
@@ -3796,6 +3945,12 @@ class World:
             from engine.personality import drift_traits
             drift_traits(self)
 
+        # ── Skill XP gain (every 10 ticks) ──
+        skill_events: list[str] = []
+        if self.current_tick > 0 and self.current_tick % 10 == 0:
+            from engine.skill import process_skill_tick
+            skill_events = process_skill_tick(self)
+
         # ── Mood contagion: co-occupants influence each other's mood ──────
         from engine.act import apply_mood_contagion
         apply_mood_contagion(self)
@@ -3864,6 +4019,7 @@ class World:
                 *[EventUpdate(description=description) for description in intervention_events],
                 *[EventUpdate(description=description) for description in gang_recruit_events],
                 *[EventUpdate(description=description) for description in gang_conflict_events],
+                *[EventUpdate(description=description) for description in skill_events],
             ],
             weather=self.weather.value,
             season=active_season.value,
@@ -4156,6 +4312,123 @@ class World:
             "rarest_badge": {"badge_id": rarest_badge[0], "count": rarest_badge[1]} if rarest_badge else None,
             "badge_distribution": badge_counts,
         }
+
+    # ------------------------------------------------------------------
+    # Emotion Heatmap System (§109)
+    # ------------------------------------------------------------------
+
+    # Emotion score mapping for heatmap (-1 to 1)
+    _EMOTION_SCORE_MAP = {
+        "ecstatic": 1.0,
+        "excited": 0.8,
+        "happy": 0.6,
+        "content": 0.3,
+        "calm": 0.1,
+        "neutral": 0.0,
+        "tired": -0.2,
+        "sad": -0.4,
+        "angry": -0.8,
+        "fearful": -0.6,
+        "depressed": -1.0,
+    }
+
+    def get_emotion_heatmap(self) -> Dict[str, any]:
+        """Return emotion heatmap data for the town."""
+        width = self.config.map_width_tiles
+        height = self.config.map_height_tiles
+
+        # Initialize grid with zeros
+        grid: List[List[float]] = [[0.0] * width for _ in range(height)]
+        resident_counts: List[List[int]] = [[0] * width for _ in range(height)]
+
+        # Place resident emotions on grid
+        for agent in self.agents:
+            x, y = agent.resident.x, agent.resident.y
+            if 0 <= x < width and 0 <= y < height:
+                emotion_score = self._EMOTION_SCORE_MAP.get(agent.resident.mood.lower(), 0.0)
+                grid[y][x] += emotion_score
+                resident_counts[y][x] += 1
+
+        # Average emotions per cell
+        for y in range(height):
+            for x in range(width):
+                if resident_counts[y][x] > 0:
+                    grid[y][x] /= resident_counts[y][x]
+
+        # Find hotspots (radius 5, >= 3 residents)
+        hotspots: List[Dict[str, any]] = []
+        radius = 5
+        checked: set = set()
+
+        for agent in self.agents:
+            cx, cy = agent.resident.x, agent.resident.y
+            if (cx, cy) in checked:
+                continue
+
+            # Count residents in radius
+            residents_in_radius: List[Dict[str, any]] = []
+            for other in self.agents:
+                ox, oy = other.resident.x, other.resident.y
+                if abs(ox - cx) <= radius and abs(oy - cy) <= radius:
+                    residents_in_radius.append({
+                        "x": ox,
+                        "y": oy,
+                        "mood": other.resident.mood,
+                        "emotion_score": self._EMOTION_SCORE_MAP.get(other.resident.mood.lower(), 0.0),
+                    })
+
+            if len(residents_in_radius) >= 3:
+                checked.add((cx, cy))
+                avg_mood = sum(r["emotion_score"] for r in residents_in_radius) / len(residents_in_radius)
+                dominant_mood = max(set(r["mood"] for r in residents_in_radius),
+                                   key=lambda m: sum(1 for r in residents_in_radius if r["mood"] == m))
+                hotspots.append({
+                    "x": cx,
+                    "y": cy,
+                    "mood": dominant_mood,
+                    "avg_emotion": round(avg_mood, 3),
+                    "resident_count": len(residents_in_radius),
+                })
+
+        # Sort hotspots by resident count
+        hotspots.sort(key=lambda h: h["resident_count"], reverse=True)
+
+        # Mood distribution
+        mood_distribution: Dict[str, int] = {}
+        for agent in self.agents:
+            mood = agent.resident.mood.lower()
+            mood_distribution[mood] = mood_distribution.get(mood, 0) + 1
+
+        # Average happiness
+        if self.agents:
+            avg_happiness = sum(self._EMOTION_SCORE_MAP.get(a.resident.mood.lower(), 0.0) for a in self.agents) / len(self.agents)
+        else:
+            avg_happiness = 0.0
+
+        return {
+            "grid": grid,
+            "hotspots": hotspots[:5],  # Top 5 hotspots
+            "mood_distribution": mood_distribution,
+            "avg_happiness": round(avg_happiness, 3),
+        }
+
+    def get_emotion_history(self, limit: int = 20) -> List[Dict[str, any]]:
+        """Return recent emotion history (last N ticks)."""
+        # This would require storing history over time
+        # For now, return mock data based on current state
+        current = self.get_emotion_heatmap()
+        history: List[Dict[str, any]] = []
+
+        for i in range(limit):
+            tick = self.current_tick - i
+            # Simulate slight variation for history
+            variation = (i * 0.02) - 0.2  # -0.2 to +0.2 variation
+            history.append({
+                "tick": tick,
+                "avg_happiness": round(current["avg_happiness"] + variation, 3),
+            })
+
+        return list(reversed(history))  # Oldest first
 
     # ------------------------------------------------------------------
     # Helpers

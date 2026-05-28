@@ -549,7 +549,7 @@ class SimulationState:
         from engine.memory import MemoryStream
         from engine.types import (
             Achievement, Appearance, Building, ClothingItem, Course, CourseHistoryEntry, CulturalEvent, DiaryEntry, Education, ExternalTown, Health, Illness, Item, JealousyEntry, Job, LifeGoal, Memory, MoodEntry, Reflection,
-            Pet, Party, Religion, Relationship, RelationType, ReligiousEvent, Resident, TradeRoute, Wish, WorldConfig,
+            Pet, Party, Religion, Relationship, RelationType, ReligiousEvent, Resident, Skill, TradeRoute, Wish, WorldConfig,
         )
         from engine.world import World
 
@@ -673,6 +673,10 @@ class SimulationState:
                 wishlist=[Wish(**w) for w in res_data.get("wishlist", [])],
                 jealousy_targets=[JealousyEntry(**j) for j in res_data.get("jealousy_targets", [])],
                 personality_traits=dict(res_data.get("personality_traits", {})),
+                skill_tree={
+                    sid: Skill(**entry)
+                    for sid, entry in res_data.get("skill_tree", {}).items()
+                },
             )
             resident.achievements = [Achievement(**entry) for entry in res_data.get("achievements", [])]
             for d in res_data.get("diary", []):
@@ -2963,6 +2967,10 @@ class SimulationState:
             for dev in dream_events:
                 tick_state.events.append(EventUpdate(description=dev.description))
 
+        # Smart newspaper generation (every 20 ticks)
+        if self.world.current_tick > 0 and self.world.current_tick % 20 == 0:
+            self.world.generate_newspaper()
+
         seasonal_festival = self._start_festival(
             str(self.world.season.value if hasattr(self.world.season, "value") else self.world.season),
             start_tick=self.world.current_tick,
@@ -3818,6 +3826,7 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
         ReligiousEvent,
         JealousyEntry,
         Resident,
+        Skill,
         TradeRoute,
         WeatherType,
         Wish,
@@ -3908,6 +3917,10 @@ async def run_what_if(body: WhatIfRequest, request: Request) -> WhatIfResponse:
             wishlist=[Wish(**w) for w in res_data.get("wishlist", [])],
             jealousy_targets=[JealousyEntry(**j) for j in res_data.get("jealousy_targets", [])],
             personality_traits=dict(res_data.get("personality_traits", {})),
+            skill_tree={
+                sid: Skill(**entry)
+                for sid, entry in res_data.get("skill_tree", {}).items()
+            },
         )
         resident.achievements = [Achievement(**entry) for entry in res_data.get("achievements", [])]
         for d in res_data.get("diary", []):

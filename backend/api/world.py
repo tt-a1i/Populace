@@ -35,6 +35,9 @@ from backend.api.schemas import (
     WorldDreamStatsResponse,
     WorldHealthResponse,
     EconomyCycleResponse,
+    NewspaperArchiveResponse,
+    NewspaperIssueResponse,
+    NewspaperLatestResponse,
     TownLevelResponse,
     WorldMarketResponse,
     WorldRumorsResponse,
@@ -46,6 +49,9 @@ from backend.api.schemas import (
     WorldPoliticsResponse,
     WorldReligionResponse,
     WorldPersonalityStatsResponse,
+    WorldSkillDistributionResponse,
+    SkillStatEntry,
+    SkillMasterEntry,
     WorldRomanceStatsResponse,
     WorldTransportResponse,
     ZoneResponse,
@@ -507,6 +513,34 @@ async def get_dream_stats(request: Request) -> WorldDreamStatsResponse:
 
     state = get_simulation_state(request)
     return WorldDreamStatsResponse(**get_dream_stats(state.world))
+
+
+@router.get(
+    "/newspaper",
+    response_model=NewspaperLatestResponse,
+    responses=error_responses(503),
+)
+async def get_newspaper_latest(request: Request) -> NewspaperLatestResponse:
+    """Return the latest smart newspaper issue."""
+    state = get_simulation_state(request)
+    data = state.world.get_newspaper_overview()
+    if data["issue"] is None:
+        return NewspaperLatestResponse(issue=None)
+    return NewspaperLatestResponse(issue=NewspaperIssueResponse(**data["issue"]))
+
+
+@router.get(
+    "/newspaper/archive",
+    response_model=NewspaperArchiveResponse,
+    responses=error_responses(503),
+)
+async def get_newspaper_archive(request: Request) -> NewspaperArchiveResponse:
+    """Return the last 5 smart newspaper issues."""
+    state = get_simulation_state(request)
+    data = state.world.get_newspaper_archive_overview()
+    return NewspaperArchiveResponse(
+        issues=[NewspaperIssueResponse(**i) for i in data["issues"]]
+    )
 
 
 class GenerateScenarioRequest(BaseModel):
@@ -1140,6 +1174,24 @@ async def get_personality_stats(request: Request) -> WorldPersonalityStatsRespon
     return WorldPersonalityStatsResponse(**stats)
 
 
+@router.get(
+    "/skill_distribution",
+    response_model=WorldSkillDistributionResponse,
+    responses=error_responses(503),
+)
+async def get_skill_distribution(request: Request) -> WorldSkillDistributionResponse:
+    """Return skill distribution stats and masters leaderboard."""
+    from engine.skill import get_skill_distribution, get_skill_masters
+
+    state = get_simulation_state(request)
+    distribution = get_skill_distribution(state)
+    masters = get_skill_masters(state)
+    return WorldSkillDistributionResponse(
+        distribution={sid: SkillStatEntry(**entry) for sid, entry in distribution.items()},
+        masters={sid: [SkillMasterEntry(**m) for m in lst] for sid, lst in masters.items()},
+    )
+
+
 # ---------------------------------------------------------------------------
 # Leaderboards & Badges System (Task 106)
 # ---------------------------------------------------------------------------
@@ -1244,3 +1296,79 @@ async def award_badges(request: Request) -> list[tuple]:
     state = get_simulation_state(request)
     awarded = state.world.award_badges()
     return awarded
+
+
+# ---------------------------------------------------------------------------
+# Emotion Heatmap System (Task 109)
+# ---------------------------------------------------------------------------
+
+class EmotionHotspotResponse(BaseModel):
+    x: int
+    y: int
+    mood: str
+    avg_emotion: float
+    resident_count: int
+
+
+class EmotionHeatmapResponse(BaseModel):
+    grid: list[list[float]]
+    hotspots: list[EmotionHotspotResponse]
+    mood_distribution: dict[str, int]
+    avg_happiness: float
+
+
+class EmotionHistoryEntry(BaseModel):
+    tick: int
+    avg_happiness: float
+
+
+class EmotionHistoryResponse(BaseModel):
+    history: list[EmotionHistoryEntry]
+
+
+@router.get(
+    "/emotion_heatmap",
+    response_model=EmotionHeatmapResponse,
+    responses=error_responses(503),
+)
+async def get_emotion_heatmap(request: Request) -> EmotionHeatmapResponse:
+    """Return emotion heatmap data for the town."""
+    state = get_simulation_state(request)
+    data = state.world.get_emotion_heatmap()
+
+    return EmotionHeatmapResponse(
+        grid=data["grid"],
+        hotspots=[
+            EmotionHotspotResponse(
+                x=h["x"],
+                y=h["y"],
+                mood=h["mood"],
+                avg_emotion=h["avg_emotion"],
+                resident_count=h["resident_count"],
+            )
+            for h in data["hotspots"]
+        ],
+        mood_distribution=data["mood_distribution"],
+        avg_happiness=data["avg_happiness"],
+    )
+
+
+@router.get(
+    "/emotion_history",
+    response_model=EmotionHistoryResponse,
+    responses=error_responses(503),
+)
+async def get_emotion_history(request: Request) -> EmotionHistoryResponse:
+    """Return recent emotion history (last 20 ticks)."""
+    state = get_simulation_state(request)
+    history = state.world.get_emotion_history(limit=20)
+
+    return EmotionHistoryResponse(
+        history=[
+            EmotionHistoryEntry(
+                tick=h["tick"],
+                avg_happiness=h["avg_happiness"],
+            )
+            for h in history
+        ]
+    )

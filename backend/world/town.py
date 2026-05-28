@@ -182,6 +182,7 @@ def load_scenario(
     world.assign_initial_pets()
     _assign_life_goals(world)
     _init_personality_traits(world)
+    _init_skill_tree(world)
 
     return world
 
@@ -324,6 +325,7 @@ def load_scenario_from_dict(
     world.assign_initial_pets()
     _assign_life_goals(world)
     _init_personality_traits(world)
+    _init_skill_tree(world)
 
     return world
 
@@ -348,6 +350,15 @@ def _init_personality_traits(world: World) -> None:
         if not traits:
             rng = random.Random(hash(resident.id))
             resident.personality_traits = generate_personality_traits(rng)
+
+
+def _init_skill_tree(world: World) -> None:
+    from engine.skill import init_skill_tree
+    import random
+
+    for agent in world.agents:
+        rng = random.Random(hash(agent.resident.id) ^ 0xDEADBEEF)
+        init_skill_tree(agent.resident, rng=rng)
 
 
 def _generate_families(world: World) -> None:
